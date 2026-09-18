@@ -1,4 +1,4 @@
-# 🛒 Mega Mart & Gourmet Restaurant 3D 🍕
+# 🛒 GBLB Mart & Gourmet Restaurant 3D 🍕
 
 Modern Three.js tabanlı, 3D Arcade-Idle / Tycoon ve Restoran Yönetim Oyunu.
 
