@@ -1,4 +1,4 @@
-# Duolingo Design System for Mini-Mart 3D (DESIGN.md)
+# Duolingo Design System for GBLB STORE 3D (DESIGN.md)
 
 > Bu belge, oyunun arayüz mimarisi, görsel kimliği ve bileşen tasarım standardını belirler. Tüm UI, HUD, modal, tipografi ve efekt geliştirmelerinde bağlayıcıdır.
 

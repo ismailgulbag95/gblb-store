@@ -163,7 +163,7 @@ export class EnvironmentProps {
     ctx.font = 'bold 52px "Fredoka", sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('🛒 MINI MART', 256, 64);
+    ctx.fillText('🛒 GBLB STORE', 256, 64);
 
     const texture = new THREE.CanvasTexture(canvas);
     const textMat = new THREE.MeshBasicMaterial({ map: texture });

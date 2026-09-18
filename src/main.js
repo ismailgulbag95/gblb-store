@@ -441,7 +441,7 @@ class Game {
         this.workers.push(chef, waiter);
 
         this.hud.showToast('🧑‍🍳 Şef & 🧑‍💼 Garson İşe Alındı! Restoran tam otomatik!', '#2ecc71');
-        this.hud.setQuest('🏆 TEBRİKLER! Tüm Mega Mart & Gurme Restoran İmparatorluğunu Tamamladın!');
+        this.hud.setQuest('🏆 TEBRİKLER! Tüm GBLB STORE & Gurme Restoran İmparatorluğunu Tamamladın!');
       }, '🧑‍🍳');
       this.upgradeZones.push(chefZone);
 
