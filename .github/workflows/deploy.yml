@@ -41,13 +41,21 @@ jobs:
           path: dist/
           retention-days: 14
 
+      # Deploy to gh-pages branch (Classic / Most reliable method)
+      - name: Deploy to gh-pages branch
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist
+
+      # Also prepare for GitHub Actions Pages deployment
       - name: Upload GitHub Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: dist/
 
   deploy:
-    name: Deploy to GitHub Pages
+    name: Deploy to GitHub Pages (Actions Mode)
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
