@@ -1,3 +1,4 @@
+import './style.css';
 import * as THREE from 'three';
 import { Engine } from './core/Engine.js';
 import { InputManager } from './core/InputManager.js';
