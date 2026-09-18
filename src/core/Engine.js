@@ -4,10 +4,10 @@ export class Engine {
   constructor(containerId = 'game-container') {
     this.container = document.getElementById(containerId);
     
-    // Scene
+    // Scene - Vibrant clean sky blue
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0xa0e2ff);
-    this.scene.fog = new THREE.Fog(0xa0e2ff, 35, 65);
+    this.scene.background = new THREE.Color(0x70d6ff);
+    this.scene.fog = new THREE.Fog(0x70d6ff, 40, 75);
 
     // Camera (Isometric Arcade View)
     const aspect = window.innerWidth / window.innerHeight;
@@ -29,19 +29,24 @@ export class Engine {
   }
 
   setupLights() {
-    // Soft ambient light
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.65);
+    // Soft vibrant ambient light
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.75);
     this.scene.add(ambientLight);
 
-    // Main Sunlight with soft shadows
-    const sunLight = new THREE.DirectionalLight(0xfff7e6, 0.9);
-    sunLight.position.set(20, 30, 15);
+    // Sky & Ground Hemisphere light for colorful fill and vibrant tones
+    const hemiLight = new THREE.HemisphereLight(0x70d6ff, 0x2ed573, 0.45);
+    hemiLight.position.set(0, 40, 0);
+    this.scene.add(hemiLight);
+
+    // Main Sunlight with crisp warm illumination
+    const sunLight = new THREE.DirectionalLight(0xfffae8, 1.15);
+    sunLight.position.set(22, 32, 16);
     sunLight.castShadow = true;
     sunLight.shadow.mapSize.width = 1024;
     sunLight.shadow.mapSize.height = 1024;
     sunLight.shadow.camera.near = 0.5;
-    sunLight.shadow.camera.far = 80;
-    const d = 25;
+    sunLight.shadow.camera.far = 85;
+    const d = 26;
     sunLight.shadow.camera.left = -d;
     sunLight.shadow.camera.right = d;
     sunLight.shadow.camera.top = d;

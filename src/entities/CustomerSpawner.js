@@ -5,20 +5,39 @@ import { ITEM_TYPES, GAME_CONFIG } from '../config/GameConfig.js';
 export class CustomerSpawner {
   constructor(scene, unlockedProducts = [ITEM_TYPES.TOMATO]) {
     this.scene = scene;
-    this.unlockedProducts = unlockedProducts;
+    this.unlockedProducts = [...unlockedProducts];
     this.customers = [];
     this.spawnTimer = 0;
     this.spawnInterval = GAME_CONFIG.CUSTOMER.spawnInterval;
     this.maxActive = GAME_CONFIG.CUSTOMER.maxActive;
     this.hasRestaurant = false;
+    this.demandBag = []; // Dengeli ve karışık ürün dağıtımı için torba sistemi
   }
 
   setUnlockedProducts(products) {
-    this.unlockedProducts = products;
+    this.unlockedProducts = [...products];
+    this.demandBag = []; // Yeni ürün açıldığında dağıtım torbasını sıfırla
   }
 
   setRestaurantUnlocked(status = true) {
     this.hasRestaurant = status;
+  }
+
+  // Mevcut üretimler arasında dönüşümlü ve dengeli ana ürün seçimi
+  getBalancedNextProduct(availablePool) {
+    if (!availablePool || availablePool.length === 0) {
+      return ITEM_TYPES.TOMATO;
+    }
+
+    // Torbada kalanları mevcut havuza göre filtrele
+    this.demandBag = this.demandBag.filter(item => availablePool.some(p => p.id === item.id));
+
+    if (this.demandBag.length === 0) {
+      // Havuzdaki tüm ürünleri ekle ve karıştır (shuffle)
+      this.demandBag = [...availablePool].sort(() => Math.random() - 0.5);
+    }
+
+    return this.demandBag.pop() || availablePool[0];
   }
 
   update(delta, shelves = [], register = null, tables = [], onCustomerPaidCallback) {
@@ -27,7 +46,7 @@ export class CustomerSpawner {
       this.spawnTimer += delta;
       if (this.spawnTimer >= this.spawnInterval) {
         this.spawnTimer = 0;
-        this.spawnCustomer(tables);
+        this.spawnCustomer(tables, shelves);
       }
     }
 
@@ -67,7 +86,7 @@ export class CustomerSpawner {
     }
   }
 
-  spawnCustomer(tables = []) {
+  spawnCustomer(tables = [], shelves = []) {
     // 35% chance for restaurant guest if unlocked and empty table exists
     const hasEmptyTable = tables.some(t => !t.isOccupied);
     const isRestaurantGuest = this.hasRestaurant && hasEmptyTable && Math.random() < 0.35;
@@ -77,11 +96,46 @@ export class CustomerSpawner {
     const randomizedX = baseSpawnX + (Math.random() - 0.5) * 3.0;
     const doorSpawnPos = new THREE.Vector3(randomizedX, 0, 16 + Math.random() * 2.0);
 
-    const listCount = 1 + Math.floor(Math.random() * 2);
+    // Mevcut üretim ve reyon durumuna göre aktif satılabilir ürün havuzunu belirle
+    let availableProducts = [];
+    if (shelves && shelves.length > 0) {
+      const shelfTypesMap = new Map();
+      shelves.forEach(s => {
+        if (s.acceptedType && !shelfTypesMap.has(s.acceptedType.id)) {
+          shelfTypesMap.set(s.acceptedType.id, s.acceptedType);
+        }
+      });
+      availableProducts = Array.from(shelfTypesMap.values());
+    }
+
+    if (availableProducts.length === 0) {
+      availableProducts = this.unlockedProducts.length > 0 ? this.unlockedProducts : [ITEM_TYPES.TOMATO];
+    }
+
+    // Mevcut üretime göre karışık alışveriş sepeti oluştur
     const shoppingList = [];
-    for (let i = 0; i < listCount; i++) {
-      const item = this.unlockedProducts[Math.floor(Math.random() * this.unlockedProducts.length)];
-      shoppingList.push(item);
+    if (!isRestaurantGuest) {
+      // Açık olan çeşit sayısına göre 1-3 arası farklı ürün talep et
+      const maxVariety = availableProducts.length;
+      let targetCount = 1;
+      if (maxVariety >= 3) {
+        const rnd = Math.random();
+        targetCount = rnd < 0.35 ? 1 : (rnd < 0.70 ? 2 : 3);
+      } else if (maxVariety === 2) {
+        targetCount = Math.random() < 0.5 ? 1 : 2;
+      }
+
+      // İlk ürün dengeli torbadan seçilir (böylece tüm reyonlara eşit dağılım sağlanır)
+      const primaryItem = this.getBalancedNextProduct(availableProducts);
+      shoppingList.push(primaryItem);
+
+      // İkinci ve üçüncü ürünler için sepete farklı (karışık) ürünler ekle
+      if (targetCount > 1) {
+        const otherPool = availableProducts.filter(p => p.id !== primaryItem.id).sort(() => Math.random() - 0.5);
+        for (let i = 0; i < targetCount - 1 && i < otherPool.length; i++) {
+          shoppingList.push(otherPool[i]);
+        }
+      }
     }
 
     const customer = new Customer(this.scene, doorSpawnPos, shoppingList, isRestaurantGuest);

@@ -14,8 +14,8 @@ export class MarketGrid {
     // 1. Huge Lush Green Grass Base Ground (extends to entire horizon x = -70 to +40)
     const baseGeo = new THREE.PlaneGeometry(160, 100);
     const baseMat = new THREE.MeshStandardMaterial({
-      color: 0x55efc4,
-      roughness: 0.85
+      color: 0x2ed573, // Vibrant lush arcade grass
+      roughness: 0.75
     });
     const baseGround = new THREE.Mesh(baseGeo, baseMat);
     baseGround.rotation.x = -Math.PI / 2;
@@ -26,8 +26,8 @@ export class MarketGrid {
     // 2. Asphalt Road & Parking Lot in Front of Store & Restaurant (z = 10 to 28)
     const roadGeo = new THREE.PlaneGeometry(80, 18);
     const roadMat = new THREE.MeshStandardMaterial({
-      color: 0x34495e,
-      roughness: 0.7
+      color: 0x2f3640,
+      roughness: 0.6
     });
     const road = new THREE.Mesh(roadGeo, roadMat);
     road.rotation.x = -Math.PI / 2;
@@ -46,18 +46,18 @@ export class MarketGrid {
 
     // Sidewalk curb in front of all zones (z = 9.8)
     const sidewalkGeo = new THREE.PlaneGeometry(74, 2.2);
-    const sidewalkMat = new THREE.MeshStandardMaterial({ color: 0xdcdde1, roughness: 0.5 });
+    const sidewalkMat = new THREE.MeshStandardMaterial({ color: 0xf1f2f6, roughness: 0.4 });
     const sidewalk = new THREE.Mesh(sidewalkGeo, sidewalkMat);
     sidewalk.rotation.x = -Math.PI / 2;
     sidewalk.position.set(-17, -0.02, 10);
     sidewalk.receiveShadow = true;
     this.scene.add(sidewalk);
 
-    // 3. ZONE 1: Store Zone Floor (Clean Shiny Cream/White Tile on Right x = -4 to 14)
+    // 3. ZONE 1: Store Zone Floor (Clean Shiny Vibrant White Tile on Right x = -4 to 14)
     const storeGeo = new THREE.PlaneGeometry(18, 18);
     const storeMat = new THREE.MeshStandardMaterial({
       color: GAME_CONFIG.COLORS.FLOOR_STORE,
-      roughness: 0.25,
+      roughness: 0.2,
       metalness: 0.05
     });
     const storeFloor = new THREE.Mesh(storeGeo, storeMat);
@@ -66,20 +66,20 @@ export class MarketGrid {
     storeFloor.receiveShadow = true;
     this.scene.add(storeFloor);
 
-    // 4. ZONE 2: Farm & Factory Zone Floor (Rich Soil / Field on Left x = -26 to -4)
+    // 4. ZONE 2: Farm & Factory Zone Floor (Rich Soil / Vibrant Pasture on Left x = -26 to -4)
     const farmGeo = new THREE.PlaneGeometry(22, 18);
-    const farmMat = new THREE.MeshStandardMaterial({ color: 0x27ae60, roughness: 0.9 });
+    const farmMat = new THREE.MeshStandardMaterial({ color: GAME_CONFIG.COLORS.FLOOR_FARM, roughness: 0.8 });
     const farmFloor = new THREE.Mesh(farmGeo, farmMat);
     farmFloor.rotation.x = -Math.PI / 2;
     farmFloor.position.set(-15, 0, 0);
     farmFloor.receiveShadow = true;
     this.scene.add(farmFloor);
 
-    // 5. ZONE 3: Gourmet Restaurant Zone Floor (Rich Dark Timber Wood on Far Left x = -48 to -26)
+    // 5. ZONE 3: Gourmet Restaurant Zone Floor (Rich Warm Timber Wood on Far Left x = -48 to -26)
     const restGeo = new THREE.PlaneGeometry(22, 18);
     const restMat = new THREE.MeshStandardMaterial({
       color: GAME_CONFIG.COLORS.FLOOR_RESTAURANT,
-      roughness: 0.35
+      roughness: 0.3
     });
     const restFloor = new THREE.Mesh(restGeo, restMat);
     restFloor.rotation.x = -Math.PI / 2;
@@ -103,11 +103,11 @@ export class MarketGrid {
     this.props.createStoreAwning(-37, 2.3, 9.1, 12, 1.8);
     this.createRestaurantSign(-37, 3.4, 9.0);
 
-    // 9. Low-Poly Cars in Parking Lot (also register obstacles)
-    this.props.createCar(4, 16.5, -Math.PI / 2, 0xe74c3c); // Red car
-    this.props.createCar(11, 16.5, -Math.PI / 2, 0xf1c40f); // Yellow taxi
-    this.props.createCar(-10, 16.5, -Math.PI / 2, 0x3498db); // Blue car
-    this.props.createCar(-24, 16.5, -Math.PI / 2, 0x9b59b6); // Purple car
+    // 9. Low-Poly Cars in Parking Lot (Ultra vibrant candy colors)
+    this.props.createCar(4, 16.5, -Math.PI / 2, 0xff4757); // Candy Red car
+    this.props.createCar(11, 16.5, -Math.PI / 2, 0xffa502); // Bright Gold Taxi
+    this.props.createCar(-10, 16.5, -Math.PI / 2, 0x1e90ff); // Electric Blue car
+    this.props.createCar(-24, 16.5, -Math.PI / 2, 0xa55eea); // Sweet Lilac/Purple car
 
     // 10. Street Lamps & Fences
     this.props.createStreetLamp(14, 10.5);

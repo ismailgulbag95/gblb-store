@@ -59,7 +59,7 @@ export class FarmPlot {
       // Stalk
       const stem = new THREE.Mesh(
         new THREE.CylinderGeometry(0.04, 0.05, 0.5, 6),
-        new THREE.MeshStandardMaterial({ color: 0x2e7d32 })
+        new THREE.MeshStandardMaterial({ color: 0x10ac84, roughness: 0.5 })
       );
       stem.position.y = 0.25;
       stem.castShadow = true;
@@ -67,7 +67,7 @@ export class FarmPlot {
       // Leaves
       const leaves = new THREE.Mesh(
         new THREE.SphereGeometry(0.2, 6, 6),
-        new THREE.MeshStandardMaterial({ color: 0x4caf50 })
+        new THREE.MeshStandardMaterial({ color: 0x2ed573, roughness: 0.4 })
       );
       leaves.position.y = 0.45;
 

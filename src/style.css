@@ -13,9 +13,9 @@ body, html {
   width: 100%;
   height: 100%;
   overflow: hidden;
-  background-color: #a0e2ff;
+  background-color: #70d6ff;
   font-family: 'Fredoka', 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  color: #4b4b4b;
+  color: #2d3436;
 }
 
 #game-container {
@@ -68,41 +68,41 @@ body, html {
   background: #ffffff;
   padding: 0 16px;
   border-radius: 18px;
-  border: 2px solid #e5e5e5;
-  border-bottom: 5px solid #d7d7d7;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  border: 2px solid #e2e8f0;
+  border-bottom: 5px solid #cbd5e1;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
   font-weight: 800;
   font-size: 16px;
-  color: #4b4b4b;
+  color: #2d3436;
   transition: transform 0.1s, border-bottom-width 0.1s;
   box-sizing: border-box;
 }
 
 .pill-icon {
-  font-size: 20px;
-  filter: drop-shadow(0 2px 0 rgba(0, 0, 0, 0.1));
+  font-size: 22px;
+  filter: drop-shadow(0 2px 0 rgba(0, 0, 0, 0.12));
 }
 
 .money-pill .pill-value {
   color: #ff9600;
-  font-size: 18px;
+  font-size: 19px;
   font-weight: 900;
 }
 
 .stack-pill .pill-value {
-  color: #4b4b4b;
+  color: #2d3436;
   font-size: 16px;
   font-weight: 900;
 }
 
 /* Duolingo Fire Orange 3D Booster Button (Equalized) */
 .reward-btn {
-  background: #ff9600;
+  background: linear-gradient(180deg, #ffaa00 0%, #ff9600 100%);
   color: #ffffff;
   cursor: pointer;
   border: 2px solid #ffc800;
   border-bottom: 5px solid #e58500;
-  box-shadow: 0 4px 14px rgba(255, 150, 0, 0.35);
+  box-shadow: 0 6px 16px rgba(255, 150, 0, 0.4);
   font-weight: 800;
   letter-spacing: 0.5px;
 }
@@ -114,22 +114,22 @@ body, html {
 .reward-btn:active {
   transform: translateY(3px);
   border-bottom-width: 2px;
-  box-shadow: 0 1px 4px rgba(255, 150, 0, 0.2);
+  box-shadow: 0 2px 6px rgba(255, 150, 0, 0.25);
 }
 
 /* Duolingo 3D Settings Button (Equalized to 48x48px) */
 .icon-btn {
   background: #ffffff;
-  border: 2px solid #e5e5e5;
-  border-bottom: 5px solid #d7d7d7;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  border: 2px solid #e2e8f0;
+  border-bottom: 5px solid #cbd5e1;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
   width: 48px;
   height: 48px;
   min-width: 48px;
   padding: 0;
   border-radius: 18px;
   font-size: 20px;
-  color: #777777;
+  color: #636e72;
   display: inline-flex;
   align-items: center;
   justify-content: center;

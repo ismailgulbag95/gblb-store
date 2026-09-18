@@ -102,7 +102,7 @@ export class WorldBadge {
 
     // Title text (Fredoka / Nunito Bold)
     ctx.font = '900 36px "Fredoka", "Nunito", sans-serif';
-    ctx.fillStyle = '#4b4b4b';
+    ctx.fillStyle = '#2d3436';
     ctx.fillText(`${this.icon} ${this.title}`, w / 2, ry + 46);
 
     // 3. Cost / Price Tag (Duolingo 3D Button Pill)
@@ -117,11 +117,11 @@ export class WorldBadge {
       const pillY = ry + 92;
 
       // Duolingo 3D Pill Base
-      ctx.fillStyle = isFree ? '#58cc02' : '#f7f7f7';
+      ctx.fillStyle = isFree ? '#58cc02' : '#f1f2f6';
       this.roundRect(ctx, pillX, pillY, pillW, pillH, 18);
       ctx.fill();
 
-      // Progress fill inside cost pill (Duolingo XP Bar)
+      // Progress fill inside cost pill (Duolingo XP Bar - vibrant lime emerald)
       if (!isFree) {
         const spent = this.cost - this.currentCost;
         const pct = Math.min(1.0, Math.max(0, spent / this.cost));
@@ -133,7 +133,7 @@ export class WorldBadge {
       }
 
       ctx.lineWidth = 3;
-      ctx.strokeStyle = isFree ? '#46a302' : '#e5e5e5';
+      ctx.strokeStyle = isFree ? '#46a302' : '#dfe4ea';
       this.roundRect(ctx, pillX, pillY, pillW, pillH, 18);
       ctx.stroke();
 

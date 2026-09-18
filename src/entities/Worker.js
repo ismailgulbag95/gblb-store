@@ -32,24 +32,24 @@ export class Worker {
   createWorkerMesh() {
     const group = new THREE.Group();
 
-    let uniformColor = 0x3498db; // Blue for Cashier
-    let hatColor = 0x2980b9;
+    let uniformColor = 0x1cb0f6; // Vibrant Sky Blue for Cashier
+    let hatColor = 0x1899d6;
 
     if (this.type === WORKER_TYPES.HARVESTER) {
-      uniformColor = 0x27ae60; // Green farmer
-      hatColor = 0x1e824c;
+      uniformColor = 0x58cc02; // Duo Green farmer
+      hatColor = 0x46a302;
     } else if (this.type === WORKER_TYPES.FACTORY_FEEDER) {
-      uniformColor = 0xe67e22; // Orange engineer
-      hatColor = 0xd35400;
+      uniformColor = 0xff9600; // Fox Orange engineer
+      hatColor = 0xe58500;
     } else if (this.type === WORKER_TYPES.FARM_CARETAKER) {
-      uniformColor = 0xf39c12; // Gold caretaker
-      hatColor = 0xe67e22;
+      uniformColor = 0xffc800; // Bee Gold caretaker
+      hatColor = 0xe5b200;
     } else if (this.type === WORKER_TYPES.CHEF) {
-      uniformColor = 0xffffff; // White chef coat
-      hatColor = 0xffffff;
+      uniformColor = 0xffffff; // Clean White chef coat
+      hatColor = 0xff4757; // Red accent chef hat
     } else if (this.type === WORKER_TYPES.WAITER) {
-      uniformColor = 0x2c3e50; // Black/Navy tuxedo
-      hatColor = 0x34495e;
+      uniformColor = 0x2f3640; // Slate Navy tuxedo
+      hatColor = 0xa55eea; // Lilac bowtie/accent
     }
 
     // 1. Body

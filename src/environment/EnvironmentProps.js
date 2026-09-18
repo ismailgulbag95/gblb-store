@@ -27,9 +27,9 @@ export class EnvironmentProps {
     trunk.castShadow = true;
     group.add(trunk);
 
-    // Foliage layers (multi-tier fluffy spheres)
-    const leafMat1 = new THREE.MeshStandardMaterial({ color: 0x2ecc71, roughness: 0.6, flatShading: true });
-    const leafMat2 = new THREE.MeshStandardMaterial({ color: 0x27ae60, roughness: 0.6, flatShading: true });
+    // Foliage layers (multi-tier fluffy spheres - rich vibrant emerald and lime greens)
+    const leafMat1 = new THREE.MeshStandardMaterial({ color: 0x2ed573, roughness: 0.5, flatShading: true });
+    const leafMat2 = new THREE.MeshStandardMaterial({ color: 0x10ac84, roughness: 0.5, flatShading: true });
 
     const fol1 = new THREE.Mesh(new THREE.DodecahedronGeometry(0.9, 1), leafMat1);
     fol1.position.y = 1.8;
@@ -62,8 +62,8 @@ export class EnvironmentProps {
     trunk.castShadow = true;
     group.add(trunk);
 
-    // Pine cones layers
-    const pineMat = new THREE.MeshStandardMaterial({ color: 0x1b5e20, roughness: 0.6, flatShading: true });
+    // Pine cones layers (Vibrant forest pine green)
+    const pineMat = new THREE.MeshStandardMaterial({ color: 0x009432, roughness: 0.5, flatShading: true });
     
     const cone1 = new THREE.Mesh(new THREE.ConeGeometry(1.1, 1.2, 6), pineMat);
     cone1.position.y = 1.4;
@@ -85,7 +85,7 @@ export class EnvironmentProps {
 
   createHedge(x, z, width = 3, height = 0.8, depth = 0.6) {
     const geo = new THREE.BoxGeometry(width, height, depth);
-    const mat = new THREE.MeshStandardMaterial({ color: 0x2e7d32, roughness: 0.8, flatShading: true });
+    const mat = new THREE.MeshStandardMaterial({ color: 0x10ac84, roughness: 0.7, flatShading: true });
     const hedge = new THREE.Mesh(geo, mat);
     hedge.position.set(x, height / 2, z);
     hedge.castShadow = true;
@@ -99,14 +99,14 @@ export class EnvironmentProps {
     const group = new THREE.Group();
     group.position.set(x, y, z);
 
-    // Awning stripes (Red and White alternating ribs)
+    // Awning stripes (Vibrant Red and Crisp White alternating ribs)
     const stripeCount = 10;
     const stripeWidth = width / stripeCount;
 
     for (let i = 0; i < stripeCount; i++) {
       const isRed = i % 2 === 0;
-      const color = isRed ? 0xe74c3c : 0xf5f6fa;
-      const mat = new THREE.MeshStandardMaterial({ color: color, roughness: 0.4 });
+      const color = isRed ? 0xff4757 : 0xffffff;
+      const mat = new THREE.MeshStandardMaterial({ color: color, roughness: 0.3 });
       const geo = new THREE.BoxGeometry(stripeWidth * 0.96, 0.12, depth);
       const stripe = new THREE.Mesh(geo, mat);
       stripe.position.set((i - stripeCount / 2 + 0.5) * stripeWidth, 0, depth / 2);
@@ -122,7 +122,7 @@ export class EnvironmentProps {
     }
 
     // Support metal brackets
-    const bracketMat = new THREE.MeshStandardMaterial({ color: 0x34495e, metalness: 0.7 });
+    const bracketMat = new THREE.MeshStandardMaterial({ color: 0x2f3640, metalness: 0.7 });
     const b1 = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 1.4), bracketMat);
     b1.position.set(-width / 2 + 0.2, -0.4, depth * 0.6);
     b1.rotation.x = -0.7;
@@ -141,14 +141,14 @@ export class EnvironmentProps {
 
     // Signboard back
     const boardGeo = new THREE.BoxGeometry(5.2, 1.1, 0.3);
-    const boardMat = new THREE.MeshStandardMaterial({ color: 0x2c3e50, roughness: 0.3 });
+    const boardMat = new THREE.MeshStandardMaterial({ color: 0x1e272e, roughness: 0.3 });
     const board = new THREE.Mesh(boardGeo, boardMat);
     board.castShadow = true;
     group.add(board);
 
     // Gold frame
     const frameGeo = new THREE.BoxGeometry(5.4, 1.25, 0.2);
-    const frameMat = new THREE.MeshStandardMaterial({ color: 0xf1c40f, metalness: 0.8, roughness: 0.2 });
+    const frameMat = new THREE.MeshStandardMaterial({ color: 0xffc048, metalness: 0.85, roughness: 0.15 });
     const frame = new THREE.Mesh(frameGeo, frameMat);
     group.add(frame);
 
@@ -157,9 +157,9 @@ export class EnvironmentProps {
     canvas.width = 512;
     canvas.height = 128;
     const ctx = canvas.getContext('2d');
-    ctx.fillStyle = '#2c3e50';
+    ctx.fillStyle = '#1e272e';
     ctx.fillRect(0, 0, 512, 128);
-    ctx.fillStyle = '#f1c40f';
+    ctx.fillStyle = '#ffc048';
     ctx.font = 'bold 52px "Fredoka", sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';

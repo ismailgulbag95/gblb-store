@@ -48,12 +48,22 @@ export class Customer {
   createCustomerMesh() {
     const group = new THREE.Group();
 
-    const shirtColors = [0x9b59b6, 0x1abc9c, 0xf39c12, 0xe84393, 0x00cec9, 0xd63031, 0x34495e, 0x16a085];
+    // Vibrant candy customer shirts
+    const shirtColors = [
+      0xff4757, // Bright Coral Red
+      0xffa502, // Vivid Orange Gold
+      0x2ed573, // Fresh Duo Green
+      0x1e90ff, // Electric Blue
+      0xa55eea, // Sweet Lilac Purple
+      0xff6b81, // Bubblegum Pink
+      0x00d2d3, // Bright Cyan
+      0xffc048  // Sun Gold
+    ];
     const chosenColor = shirtColors[Math.floor(Math.random() * shirtColors.length)];
 
     // Body
     const bodyGeo = new THREE.CylinderGeometry(0.3, 0.26, 0.65, 10);
-    const bodyMat = new THREE.MeshStandardMaterial({ color: chosenColor, roughness: 0.5 });
+    const bodyMat = new THREE.MeshStandardMaterial({ color: chosenColor, roughness: 0.4 });
     const body = new THREE.Mesh(bodyGeo, bodyMat);
     body.position.y = 0.6;
     body.castShadow = true;
