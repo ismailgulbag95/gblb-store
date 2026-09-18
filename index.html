@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Mega Mart & Restaurant Tycoon 3D</title>
+  <link rel="stylesheet" href="./src/style.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+  <!-- 3D Canvas Container -->
+  <div id="game-container"></div>
+
+  <!-- HUD & UI Layer -->
+  <div id="ui-layer">
+    <!-- Top Bar: Currencies, Stats & Settings -->
+    <div class="top-bar">
+      <div class="left-stats">
+        <div class="stat-pill money-pill">
+          <span class="pill-icon">💵</span>
+          <span id="money-display" class="pill-value">0</span>
+        </div>
+        <div class="stat-pill stack-pill">
+          <span class="pill-icon">🎒</span>
+          <span id="stack-display" class="pill-value">0 / 6</span>
+        </div>
+      </div>
+
+      <div class="right-controls">
+        <div class="stat-pill reward-btn" id="btn-boost">
+          <span class="pill-icon">⚡</span>
+          <span id="boost-text" class="pill-value">2x HIZ</span>
+        </div>
+        <button id="btn-settings" class="icon-btn" title="Ayarlar">
+          ⚙️
+        </button>
+      </div>
+    </div>
+
+    <!-- Active Quest / Objective banner -->
+    <div id="quest-banner" class="quest-card">
+      <div id="quest-title-badge" class="quest-title">🎯 GÖREV</div>
+      <div id="quest-desc" class="quest-text">Domates topla ve reyon rafına diz!</div>
+    </div>
+
+    <!-- Settings & Debug Modal -->
+    <div id="settings-modal" class="modal-overlay hidden">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h2 id="settings-modal-title">⚙️ AYARLAR & DEBUG</h2>
+          <button id="btn-close-settings" class="close-btn">✕</button>
+        </div>
+
+        <div class="modal-tabs">
+          <button class="tab-btn active" data-tab="tab-general" id="tab-btn-gen">Genel</button>
+          <button class="tab-btn" data-tab="tab-lang" id="tab-btn-lang">🌐 Dil</button>
+          <button class="tab-btn" data-tab="tab-debug" id="tab-btn-deb">🛠️ Debug</button>
+        </div>
+
+        <!-- Tab 1: General Settings -->
+        <div id="tab-general" class="tab-content active">
+          <div class="setting-row">
+            <span id="label-sfx">🔊 Ses Efektleri</span>
+            <label class="switch">
+              <input type="checkbox" id="toggle-sfx" checked>
+              <span class="slider round"></span>
+            </label>
+          </div>
+          <div class="setting-row">
+            <span id="label-music">🎵 Fon Müziği</span>
+            <label class="switch">
+              <input type="checkbox" id="toggle-music" checked>
+              <span class="slider round"></span>
+            </label>
+          </div>
+          <div class="setting-row">
+            <span id="label-haptics">📳 Titreşim / Haptik</span>
+            <label class="switch">
+              <input type="checkbox" id="toggle-haptics" checked>
+              <span class="slider round"></span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Tab 2: Language Selection (i18n) -->
+        <div id="tab-lang" class="tab-content">
+          <div class="lang-grid">
+            <button id="btn-lang-tr" class="lang-btn active">
+              🇹🇷 Türkçe
+            </button>
+            <button id="btn-lang-en" class="lang-btn">
+              🇬🇧 English
+            </button>
+          </div>
+        </div>
+
+        <!-- Tab 3: Debug Mode / Cheats -->
+        <div id="tab-debug" class="tab-content">
+          <div class="debug-badge" id="debug-panel-badge">⚡ GELİŞTİRİCİ TEST PANELİ</div>
+          
+          <div class="debug-grid">
+            <button id="debug-btn-money-1k" class="debug-btn green">
+              💵 +1.000$ Para Ekle
+            </button>
+            <button id="debug-btn-money-inf" class="debug-btn gold">
+              ♾️ Sınırsız Para (99.999$)
+            </button>
+            <button id="debug-btn-speed-2x" class="debug-btn orange">
+              ⚡ 2x Oyun Hızı
+            </button>
+            <button id="debug-btn-speed-5x" class="debug-btn purple">
+              🚀 5x Süper Hız
+            </button>
+            <button id="debug-btn-capacity" class="debug-btn blue">
+              🎒 +50 Çanta Kapasitesi
+            </button>
+            <button id="debug-btn-reset-money" class="debug-btn red">
+              🧹 Parayı Sıfırla (0$)
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toast Notification Container -->
+    <div id="toast-container"></div>
+
+    <!-- Virtual Joystick Zone -->
+    <div id="joystick-zone">
+      <div id="joystick-base">
+        <div id="joystick-thumb"></div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
