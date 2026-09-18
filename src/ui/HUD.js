@@ -15,6 +15,18 @@ export class HUD {
     this.displayedMoney = 0;
     this.setupModalEvents();
     this.setupLanguageEvents();
+    this.setupTactileHaptics();
+  }
+
+  setupTactileHaptics() {
+    // Tactile vibration on all interactive buttons
+    document.querySelectorAll('.stat-pill, .icon-btn, .tab-btn, .lang-btn, .char-card, .debug-btn, .close-btn').forEach(btn => {
+      btn.addEventListener('pointerdown', () => {
+        if (navigator.vibrate) {
+          navigator.vibrate(12);
+        }
+      });
+    });
   }
 
   setupModalEvents() {
@@ -79,53 +91,50 @@ export class HUD {
   }
 
   setupCharacterEvents(player) {
-    const cardShopkeeper = document.getElementById('char-card-shopkeeper');
-    const cardCat = document.getElementById('char-card-cat');
+    const charIds = ['shopkeeper', 'cat', 'robot', 'panda', 'penguin'];
+    const cards = {};
+    charIds.forEach(id => {
+      cards[id] = document.getElementById(`char-card-${id}`);
+    });
 
     const updateActiveCards = (activeType) => {
       const isTr = (i18n.currentLang || 'tr') === 'tr';
-      if (cardShopkeeper) {
-        if (activeType === 'shopkeeper') {
-          cardShopkeeper.classList.add('active');
-          const badge = cardShopkeeper.querySelector('.char-badge');
-          if (badge) badge.innerText = isTr ? '✓ SEÇİLDİ' : '✓ SELECTED';
-        } else {
-          cardShopkeeper.classList.remove('active');
-          const badge = cardShopkeeper.querySelector('.char-badge');
-          if (badge) badge.innerText = isTr ? 'SEÇ' : 'SELECT';
+      charIds.forEach(id => {
+        const card = cards[id];
+        if (card) {
+          const badge = card.querySelector('.char-badge');
+          if (id === activeType) {
+            card.classList.add('active');
+            if (badge) badge.innerText = isTr ? '✓ SEÇİLDİ' : '✓ SELECTED';
+          } else {
+            card.classList.remove('active');
+            if (badge) badge.innerText = isTr ? 'SEÇ' : 'SELECT';
+          }
         }
-      }
-
-      if (cardCat) {
-        if (activeType === 'cat') {
-          cardCat.classList.add('active');
-          const badge = cardCat.querySelector('.char-badge');
-          if (badge) badge.innerText = isTr ? '✓ SEÇİLDİ' : '✓ SELECTED';
-        } else {
-          cardCat.classList.remove('active');
-          const badge = cardCat.querySelector('.char-badge');
-          if (badge) badge.innerText = isTr ? 'SEÇ' : 'SELECT';
-        }
-      }
+      });
     };
 
     updateActiveCards(player.characterType);
 
-    if (cardShopkeeper) {
-      cardShopkeeper.addEventListener('click', () => {
-        player.setCharacterType('shopkeeper');
-        updateActiveCards('shopkeeper');
-        this.showToast('👨‍🌾 Market Çalışanı seçildi!', '#3498db');
-      });
-    }
+    const charToasts = {
+      shopkeeper: { msg: '👨‍🌾 Market Çalışanı seçildi!', color: '#3498db' },
+      cat: { msg: '🐱 Maceracı Kedi seçildi! 🐾', color: '#e67e22' },
+      robot: { msg: '🤖 Siber Lojistik Botu devrede! ⚡', color: '#00d9ff' },
+      panda: { msg: '🐼 Şef Panda mutfağa geçti! 🥐', color: '#2ecc71' },
+      penguin: { msg: '👑 Kral Penguen göreve hazır! ❄️', color: '#9b59b6' }
+    };
 
-    if (cardCat) {
-      cardCat.addEventListener('click', () => {
-        player.setCharacterType('cat');
-        updateActiveCards('cat');
-        this.showToast('🐱 Maceracı Kedi seçildi! 🐾', '#e67e22');
-      });
-    }
+    charIds.forEach(id => {
+      const card = cards[id];
+      if (card) {
+        card.addEventListener('click', () => {
+          player.setCharacterType(id);
+          updateActiveCards(id);
+          const t = charToasts[id];
+          if (t) this.showToast(t.msg, t.color);
+        });
+      }
+    });
   }
 
   updateLanguageUI() {
@@ -157,17 +166,18 @@ export class HUD {
     const charTitle = document.getElementById('char-title');
     if (charTitle) charTitle.innerText = i18n.t('char_select_title');
 
-    const charNameShopkeeper = document.getElementById('char-name-shopkeeper');
-    if (charNameShopkeeper) charNameShopkeeper.innerText = i18n.t('char_shopkeeper');
+    const updateCharLabels = (id, nameKey, descKey) => {
+      const nameEl = document.getElementById(`char-name-${id}`);
+      if (nameEl) nameEl.innerText = i18n.t(nameKey);
+      const descEl = document.getElementById(`char-desc-${id}`);
+      if (descEl) descEl.innerText = i18n.t(descKey);
+    };
 
-    const charDescShopkeeper = document.getElementById('char-desc-shopkeeper');
-    if (charDescShopkeeper) charDescShopkeeper.innerText = i18n.t('char_shopkeeper_desc');
-
-    const charNameCat = document.getElementById('char-name-cat');
-    if (charNameCat) charNameCat.innerText = i18n.t('char_cat');
-
-    const charDescCat = document.getElementById('char-desc-cat');
-    if (charDescCat) charDescCat.innerText = i18n.t('char_cat_desc');
+    updateCharLabels('shopkeeper', 'char_shopkeeper', 'char_shopkeeper_desc');
+    updateCharLabels('cat', 'char_cat', 'char_cat_desc');
+    updateCharLabels('robot', 'char_robot', 'char_robot_desc');
+    updateCharLabels('panda', 'char_panda', 'char_panda_desc');
+    updateCharLabels('penguin', 'char_penguin', 'char_penguin_desc');
 
     const lblSfx = document.getElementById('label-sfx');
     if (lblSfx) lblSfx.innerText = i18n.t('sfx');
@@ -248,10 +258,16 @@ export class HUD {
   updateStack(current, max) {
     if (!this.stackEl) return;
     this.stackEl.innerText = `${current} / ${max}`;
-    if (current >= max) {
-      this.stackEl.parentElement.style.borderColor = '#e74c3c';
-    } else {
-      this.stackEl.parentElement.style.borderColor = '#ecf0f1';
+    const pill = this.stackEl.parentElement;
+    if (pill) {
+      if (current >= max && max > 0) {
+        pill.style.borderColor = '#ff4b4b';
+        pill.style.boxShadow = '0 4px 0 #e53238, 0 6px 14px rgba(255, 75, 75, 0.25)';
+        gsap.fromTo(pill, { scale: 1.0 }, { scale: 1.12, duration: 0.15, yoyo: true, repeat: 1, ease: 'power2.out' });
+      } else {
+        pill.style.borderColor = '#e5e5e5';
+        pill.style.boxShadow = '0 4px 0 #e5e5e5, 0 6px 14px rgba(0, 0, 0, 0.08)';
+      }
     }
   }
 

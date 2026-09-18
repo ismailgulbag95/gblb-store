@@ -24,7 +24,7 @@ class Game {
     this.engine = new Engine('game-container');
     this.input = new InputManager();
     this.hud = new HUD();
-    this.ads = new AdsManager(this.hud);
+    this.ads = new AdsManager(this, this.engine.scene, this.hud);
 
     this.playerMoney = 0;
     this.debugSpeedMultiplier = 1.0;
@@ -58,7 +58,46 @@ class Game {
     this.unlockedProducts = [ITEM_TYPES.TOMATO];
     this.spawner = new CustomerSpawner(this.engine.scene, this.unlockedProducts);
 
-    // 4. Setup Progressive Unlock Chain
+    // 4. Tracking Player Manual Actions (Manual-First Flow)
+    this.manualStats = {
+      tomatoSold: 0,
+      pasteProduced: 0,
+      pasteSold: 0,
+      orangeHarvested: 0,
+      juiceProduced: 0,
+      juiceSold: 0,
+      cornSold: 0,
+      popcornProduced: 0,
+      popcornSold: 0,
+      feedProduced: 0,
+      eggCollected: 0,
+      eggSold: 0,
+      breadProduced: 0,
+      breadSold: 0,
+      burgerCooked: 0,
+      burgerCollected: 0,
+      tablesServed: 0,
+      tipsCollected: 0
+    };
+
+    // Stage Unlocks Flags to prevent duplicate zone spawning
+    this.unlockedStages = {
+      cashierZone: false,
+      pasteZone: false,
+      harvesterZone: false,
+      orangeZone: false,
+      feederZone: false,
+      cornZone: false,
+      popcornZone: false,
+      feedZone: false,
+      coopZone: false,
+      chickenUpgrades: false,
+      caretakerZone: false,
+      bakeryZone: false,
+      restaurantZone: false,
+      chefAndWaiterZone: false
+    };
+
     this.setupUnlockProgression();
 
     // 5. Connect Debug & Character Actions
@@ -68,42 +107,50 @@ class Game {
     // Start UI
     this.hud.updateMoney(this.playerMoney);
     this.hud.updateStack(0, this.player.stack.maxCapacity);
-    this.hud.setQuest(i18n.t('initial_quest'));
+    this.hud.setQuest('🍅 Domates topla, reyon rafına diz ve kasada ilk satışını yap!');
 
     this.animate = this.animate.bind(this);
     requestAnimationFrame(this.animate);
   }
 
   setupUnlockProgression() {
-    // --- STAGE 1: CASHIER AUTOMATION (35$) ---
-    const cashierZone = new UpgradeZone(this.engine.scene, 8.5, -4, 35, i18n.t('hire_cashier'), () => {
-      const cashier = new Worker(this.engine.scene, WORKER_TYPES.CASHIER, this.register.cashierZonePos);
-      this.workers.push(cashier);
-      this.register.hasHiredCashier = true;
-
-      this.hud.showToast('👨‍💼 Kasiyer İşe Alındı! Kasa otomatik çalışıyor!', '#3498db');
-      this.hud.setQuest('🥫 Salça İmalat Kazanını aç ve kazancını 4 katına çıkar!');
-
-      this.spawnPasteMachineZone();
-    }, '👨‍💼');
-    this.upgradeZones.push(cashierZone);
-
-    // Backpack +4 Zone (25$)
-    const bagZone = new UpgradeZone(this.engine.scene, -4, 4, 25, i18n.t('upgrade_backpack'), () => {
-      this.player.stack.maxCapacity += 4;
-      this.hud.updateStack(this.player.stack.getCount(), this.player.stack.maxCapacity);
-      this.hud.showToast('🎒 Çanta Kapasitesi +4 Artırıldı!', '#3498db');
-    }, '🎒');
-    this.upgradeZones.push(bagZone);
+    // --- STAGE 1A: 2ND TOMATO FIELD (25$) ---
+    const tomatoFarm2Zone = new UpgradeZone(this.engine.scene, -6.5, 5, 25, i18n.t('unlock_tomato_farm_2'), () => {
+      const tomatoFarm2 = new FarmPlot(this.engine.scene, -6.5, 5, ITEM_TYPES.TOMATO, '2. Domates Tarlası', this.environment);
+      this.farmPlots.push(tomatoFarm2);
+      this.hud.showToast('🍅 2. Domates Tarlası Açıldı! (2x Üretim Hızı)', '#e74c3c');
+    }, '🍅');
+    this.upgradeZones.push(tomatoFarm2Zone);
   }
 
+  // --- STAGE 1B: CASHIER AUTOMATION (35$) & STAGE 2 PASTE ZONE ---
+  checkFirstTomatoSold() {
+    if (!this.unlockedStages.cashierZone) {
+      this.unlockedStages.cashierZone = true;
+
+      const cashierZone = new UpgradeZone(this.engine.scene, 8.5, -4, 35, i18n.t('hire_cashier'), () => {
+        const cashier = new Worker(this.engine.scene, WORKER_TYPES.CASHIER, this.register.cashierZonePos);
+        this.workers.push(cashier);
+        this.register.hasHiredCashier = true;
+
+        this.hud.showToast('👨‍💼 Kasiyer İşe Alındı! Kasa artık otomatik!', '#3498db');
+      }, '👨‍💼');
+      this.upgradeZones.push(cashierZone);
+
+      this.spawnPasteMachineZone();
+    }
+  }
+
+  // --- STAGE 2: PASTE VAT & SHELF (45$) ---
   spawnPasteMachineZone() {
-    // --- STAGE 2: PASTE VAT & ORANGE (45$) ---
+    if (this.unlockedStages.pasteZone) return;
+    this.unlockedStages.pasteZone = true;
+
     const pasteZone = new UpgradeZone(this.engine.scene, 0, -4, 45, i18n.t('unlock_paste'), () => {
       const pasteMachine = new ProcessingMachine(
         this.engine.scene,
         -10,
-        -1,
+        1.8,
         ITEM_TYPES.TOMATO,
         ITEM_TYPES.TOMATO_PASTE,
         'Salça Kazanı',
@@ -117,30 +164,34 @@ class Game {
       this.unlockedProducts.push(ITEM_TYPES.TOMATO_PASTE);
       this.spawner.setUnlockedProducts(this.unlockedProducts);
 
-      this.hud.showToast('🥫 Salça Kazanı ve Reyonu Açıldı! (4x Gelir!)', '#e67e22');
-      this.hud.setQuest('🧑‍🌾 Tarla İşçisi işe alarak otomatik hasat başlat!');
-
-      this.spawnHarvesterWorkerZone();
+      this.hud.showToast('🥫 Salça Kazanı ve Reyonu Açıldı!', '#e67e22');
+      this.hud.setQuest('🥫 Kazana 2 domates bırak, üretilen salçayı alıp reyonuna diz ve müşteriye sat!');
     }, '🥫');
     this.upgradeZones.push(pasteZone);
   }
 
-  spawnHarvesterWorkerZone() {
-    // --- STAGE 2B: HARVESTER WORKER (60$) ---
-    const harvZone = new UpgradeZone(this.engine.scene, -5, -4, 60, i18n.t('hire_harvester'), () => {
-      const harvester = new Worker(this.engine.scene, WORKER_TYPES.HARVESTER, new THREE.Vector3(-10, 0, 0));
-      this.workers.push(harvester);
+  // --- STAGE 2B: HARVESTER WORKER (60$) ---
+  checkFirstPasteSold() {
+    if (!this.unlockedStages.harvesterZone) {
+      this.unlockedStages.harvesterZone = true;
 
-      this.hud.showToast('🧑‍🌾 Tarla İşçisi İşe Alındı! Tarlayı ve rafları o yönetecek!', '#2ecc71');
-      this.hud.setQuest('🍊 Portakal Bahçesini aç ve marketini büyüt!');
+      const harvZone = new UpgradeZone(this.engine.scene, -5, -4, 60, i18n.t('hire_harvester'), () => {
+        const harvester = new Worker(this.engine.scene, WORKER_TYPES.HARVESTER, new THREE.Vector3(-10, 0, 0));
+        this.workers.push(harvester);
+
+        this.hud.showToast('🧑‍🌾 Tarla İşçisi İşe Alındı! Domatesleri o toplayacak!', '#2ecc71');
+      }, '🧑‍🌾');
+      this.upgradeZones.push(harvZone);
 
       this.spawnOrangeGardenZone();
-    }, '🧑‍🌾');
-    this.upgradeZones.push(harvZone);
+    }
   }
 
+  // --- STAGE 3: ORANGE & JUICE (85$) ---
   spawnOrangeGardenZone() {
-    // --- STAGE 3: ORANGE & JUICE (85$) ---
+    if (this.unlockedStages.orangeZone) return;
+    this.unlockedStages.orangeZone = true;
+
     const orangeZone = new UpgradeZone(this.engine.scene, -10, -7, 85, i18n.t('unlock_orange'), () => {
       const orangeFarm = new FarmPlot(this.engine.scene, -10, -7, ITEM_TYPES.ORANGE, 'Portakal Bahçesi', this.environment);
       this.farmPlots.push(orangeFarm);
@@ -148,70 +199,186 @@ class Game {
       const orangeShelf = new Shelf(this.engine.scene, 3, -1, ITEM_TYPES.ORANGE, 8, 'Portakal Reyonu', this.environment);
       this.shelves.push(orangeShelf);
 
-      this.unlockedProducts.push(ITEM_TYPES.ORANGE);
+      const juiceMachine = new ProcessingMachine(
+        this.engine.scene,
+        -10,
+        -1.8,
+        ITEM_TYPES.ORANGE,
+        ITEM_TYPES.ORANGE_JUICE,
+        'Meyve Sıkacağı',
+        this.environment
+      );
+      this.machines.push(juiceMachine);
+
+      const juiceShelf = new Shelf(this.engine.scene, 7.5, -1, ITEM_TYPES.ORANGE_JUICE, 6, 'Portakal Suyu Reyonu', this.environment);
+      this.shelves.push(juiceShelf);
+
+      this.unlockedProducts.push(ITEM_TYPES.ORANGE, ITEM_TYPES.ORANGE_JUICE);
       this.spawner.setUnlockedProducts(this.unlockedProducts);
 
-      this.hud.showToast('🍊 Portakal Bahçesi ve Reyonu Açıldı!', '#f39c12');
-      this.hud.setQuest('🧑‍🔧 Fabrika Lojistikçisi alarak makineleri tam otomatik yap!');
-
-      this.spawnFactoryWorkerZone();
+      this.hud.showToast('🍊 Portakal Bahçesi & Meyve Sıkacağı Açıldı!', '#f39c12');
+      this.hud.setQuest('🍊 Portakal topla, sıkma makinesine bırak ve taze suyu reyonuna dizip sat!');
     }, '🍊');
     this.upgradeZones.push(orangeZone);
   }
 
-  spawnFactoryWorkerZone() {
-    // --- STAGE 3B: FACTORY FEEDER WORKER (90$) ---
-    const feederZone = new UpgradeZone(this.engine.scene, -8, -1, 90, i18n.t('hire_factory_worker'), () => {
-      const feeder = new Worker(this.engine.scene, WORKER_TYPES.FACTORY_FEEDER, new THREE.Vector3(-10, 0, 0));
-      this.workers.push(feeder);
+  // --- STAGE 3B: FACTORY WORKER (90$) ---
+  checkFirstJuiceSold() {
+    if (!this.unlockedStages.feederZone) {
+      this.unlockedStages.feederZone = true;
 
-      this.hud.showToast('🧑‍🔧 Fabrika Lojistikçisi İşe Alındı! Kazanları o besleyecek!', '#e67e22');
-      this.hud.setQuest('🌽 Mısır Tarlası ve 🐔 Tavuk Kümesini kur!');
+      const feederZone = new UpgradeZone(this.engine.scene, -8, -1, 90, i18n.t('hire_factory_worker'), () => {
+        const feeder = new Worker(this.engine.scene, WORKER_TYPES.FACTORY_FEEDER, new THREE.Vector3(-10, 0, 0));
+        this.workers.push(feeder);
 
-      this.spawnCornAndCoopZone();
-    }, '🧑‍🔧');
-    this.upgradeZones.push(feederZone);
+        const orangeFarm2Zone = new UpgradeZone(this.engine.scene, -6.5, -7, 45, i18n.t('unlock_orange_farm_2'), () => {
+          const orangeFarm2 = new FarmPlot(this.engine.scene, -6.5, -7, ITEM_TYPES.ORANGE, '2. Portakal Bahçesi', this.environment);
+          this.farmPlots.push(orangeFarm2);
+          this.hud.showToast('🍊 2. Portakal Bahçesi Açıldı! (2x Hasat)', '#f39c12');
+        }, '🍊');
+        this.upgradeZones.push(orangeFarm2Zone);
+
+        this.hud.showToast('🧑‍🔧 Fabrika Lojistikçisi İşe Alındı! Kazan ve sıkıcıyı o besleyecek!', '#e67e22');
+      }, '🧑‍🔧');
+      this.upgradeZones.push(feederZone);
+
+      this.spawnCornFarmZone();
+    }
   }
 
-  spawnCornAndCoopZone() {
-    // --- STAGE 4: CORN & CHICKEN COOP (130$) ---
-    const cornZone = new UpgradeZone(this.engine.scene, -18, 5, 130, i18n.t('unlock_coop'), () => {
+  // --- STAGE 4A: CORN FARM (110$) ---
+  spawnCornFarmZone() {
+    if (this.unlockedStages.cornZone) return;
+    this.unlockedStages.cornZone = true;
+
+    const cornZone = new UpgradeZone(this.engine.scene, -18, 5, 110, i18n.t('unlock_corn'), () => {
       const cornFarm = new FarmPlot(this.engine.scene, -18, 5, ITEM_TYPES.CORN, 'Mısır Tarlası', this.environment);
       this.farmPlots.push(cornFarm);
 
-      const coop = new ChickenCoop(this.engine.scene, -18, -1, this.environment);
-      this.coops.push(coop);
+      const cornShelf = new Shelf(this.engine.scene, 11, 2, ITEM_TYPES.CORN, 8, 'Taze Mısır Reyonu', this.environment);
+      this.shelves.push(cornShelf);
 
-      const eggShelf = new Shelf(this.engine.scene, 11, 2, ITEM_TYPES.EGG, 6, 'Çiftlik Yumurtası', this.environment);
-      this.shelves.push(eggShelf);
-
-      this.unlockedProducts.push(ITEM_TYPES.EGG);
+      this.unlockedProducts.push(ITEM_TYPES.CORN);
       this.spawner.setUnlockedProducts(this.unlockedProducts);
 
-      this.hud.showToast('🐔 Tavuk Kümesi & Çiftlik Yumurtası Açıldı!', '#f1c40f');
-      this.hud.setQuest('🧑‍🌾 Çiftlik Bakıcısı işe alarak kümesi otomatik besle!');
-
-      this.spawnFarmCaretakerZone();
-    }, '🐔');
+      this.hud.showToast('🌽 Taze Mısır Tarlası ve Reyonu Açıldı!', '#f1c40f');
+      this.hud.setQuest('🌽 Tarladan mısır topla, reyonuna diz ve müşteriye sat!');
+    }, '🌽');
     this.upgradeZones.push(cornZone);
   }
 
-  spawnFarmCaretakerZone() {
-    // --- STAGE 4B: FARM CARETAKER (140$) ---
-    const careZone = new UpgradeZone(this.engine.scene, -18, 2, 140, i18n.t('hire_farm_caretaker'), () => {
-      const caretaker = new Worker(this.engine.scene, WORKER_TYPES.FARM_CARETAKER, new THREE.Vector3(-18, 0, 0));
-      this.workers.push(caretaker);
+  // --- STAGE 4B: POPCORN MACHINE (125$) ---
+  checkFirstCornSold() {
+    if (!this.unlockedStages.popcornZone) {
+      this.unlockedStages.popcornZone = true;
 
-      this.hud.showToast('🧑‍🌾 Çiftlik Bakıcısı İşe Alındı! Tavukları besleyip yumurta toplayacak!', '#2ecc71');
-      this.hud.setQuest('🌾 Buğday Tarlası ve 🍞 Taş Fırını kur!');
+      const popZone = new UpgradeZone(this.engine.scene, -18, 1.8, 125, i18n.t('unlock_popcorn'), () => {
+        const popcornMachine = new ProcessingMachine(
+          this.engine.scene,
+          -18,
+          1.8,
+          ITEM_TYPES.CORN,
+          ITEM_TYPES.POPCORN,
+          'Popcorn Makinesi',
+          this.environment
+        );
+        this.machines.push(popcornMachine);
 
-      this.spawnWheatAndBakeryZone();
-    }, '🧑‍🌾');
-    this.upgradeZones.push(careZone);
+        const popShelf = new Shelf(this.engine.scene, 11, 0, ITEM_TYPES.POPCORN, 6, 'Sıcak Popcorn Reyonu', this.environment);
+        this.shelves.push(popShelf);
+
+        this.unlockedProducts.push(ITEM_TYPES.POPCORN);
+        this.spawner.setUnlockedProducts(this.unlockedProducts);
+
+        this.hud.showToast('🍿 Sıcak Popcorn Makinesi & Reyonu Açıldı!', '#e74c3c');
+        this.hud.setQuest('🍿 Mısırları makineye at, sıcak popcorn üret ve reyonuna dizip sat!');
+      }, '🍿');
+      this.upgradeZones.push(popZone);
+    }
   }
 
+  // --- STAGE 4C: FEED GRINDER MACHINE (135$) ---
+  checkFirstPopcornSold() {
+    if (!this.unlockedStages.feedZone) {
+      this.unlockedStages.feedZone = true;
+
+      const feedZone = new UpgradeZone(this.engine.scene, -18, -1.8, 135, i18n.t('unlock_feed_machine'), () => {
+        const feedMachine = new ProcessingMachine(
+          this.engine.scene,
+          -18,
+          -1.8,
+          ITEM_TYPES.CORN,
+          ITEM_TYPES.CHICKEN_FEED,
+          'Yem Değirmeni',
+          this.environment
+        );
+        this.machines.push(feedMachine);
+
+        this.hud.showToast('🌾 Yem Değirmeni Kuruldu!', '#27ae60');
+        this.hud.setQuest('🌾 Mısır öğüterek ilk tavuk yemi çuvalını üret ve teslim al!');
+      }, '🌾');
+      this.upgradeZones.push(feedZone);
+    }
+  }
+
+  // --- STAGE 4D: CHICKEN COOP (150$) ---
+  checkFirstFeedProduced() {
+    if (!this.unlockedStages.coopZone) {
+      this.unlockedStages.coopZone = true;
+
+      const coopZone = new UpgradeZone(this.engine.scene, -23, 3.5, 150, i18n.t('unlock_coop'), () => {
+        const coop = new ChickenCoop(this.engine.scene, -23, 3.5, this.environment);
+        this.coops.push(coop);
+
+        const eggShelf = new Shelf(this.engine.scene, 11, -2, ITEM_TYPES.EGG, 6, 'Çiftlik Yumurtası', this.environment);
+        this.shelves.push(eggShelf);
+
+        this.unlockedProducts.push(ITEM_TYPES.EGG);
+        this.spawner.setUnlockedProducts(this.unlockedProducts);
+
+        this.hud.showToast('🐔 Tavuk Kümesi Açıldı! (1. Tavuk devrede)', '#f39c12');
+        this.hud.setQuest('🐔 Kümese yem çuvalı bırak, çıkan taze yumurtayı alıp reyonuna diz ve sat!');
+      }, '🐔');
+      this.upgradeZones.push(coopZone);
+    }
+  }
+
+  // --- STAGE 4E/F/G: CHICKEN 2, 3 & CARETAKER ---
+  checkFirstEggSold() {
+    if (!this.unlockedStages.chickenUpgrades) {
+      this.unlockedStages.chickenUpgrades = true;
+
+      const coop = this.coops[0];
+      if (coop) {
+        const chk2Zone = new UpgradeZone(this.engine.scene, -23, 6.2, 70, i18n.t('buy_chicken_2'), () => {
+          coop.addChicken();
+          this.hud.showToast('🐔 2. Tavuk Kümese Katıldı! (2x Hızlı Yumurtlama)', '#f1c40f');
+          
+          const chk3Zone = new UpgradeZone(this.engine.scene, -23, 6.2, 95, i18n.t('buy_chicken_3'), () => {
+            coop.addChicken();
+            this.hud.showToast('🐔 3. Tavuk Kümese Katıldı! (Süper Hızlı Yumurtlama)', '#e67e22');
+          }, '🐔');
+          this.upgradeZones.push(chk3Zone);
+        }, '🐔');
+        this.upgradeZones.push(chk2Zone);
+      }
+
+      const careZone = new UpgradeZone(this.engine.scene, -18, 0, 150, i18n.t('hire_farm_caretaker'), () => {
+        const caretaker = new Worker(this.engine.scene, WORKER_TYPES.FARM_CARETAKER, new THREE.Vector3(-18, 0, 0));
+        this.workers.push(caretaker);
+        this.hud.showToast('🧑‍🌾 Çiftlik Bakıcısı İşe Alındı! Yem değirmeni ve kümesi o besleyecek!', '#2ecc71');
+      }, '🧑‍🌾');
+      this.upgradeZones.push(careZone);
+
+      this.spawnWheatAndBakeryZone();
+    }
+  }
+
+  // --- STAGE 5: WHEAT & BAKERY OVEN (180$) ---
   spawnWheatAndBakeryZone() {
-    // --- STAGE 5: WHEAT & BAKERY OVEN (180$) ---
+    if (this.unlockedStages.bakeryZone) return;
+    this.unlockedStages.bakeryZone = true;
+
     const bakeryZone = new UpgradeZone(this.engine.scene, -23, 0, 180, i18n.t('unlock_bakery'), () => {
       const wheatFarm = new FarmPlot(this.engine.scene, -18, -7, ITEM_TYPES.WHEAT, 'Buğday Tarlası', this.environment);
       this.farmPlots.push(wheatFarm);
@@ -226,53 +393,59 @@ class Game {
       this.spawner.setUnlockedProducts(this.unlockedProducts);
 
       this.hud.showToast('🍞 Taş Fırın & Taze Ekmek Üretimi Başladı!', '#cd6133');
-      this.hud.setQuest('🍕 GURME RESTORAN Kompleksini aç ve imparatorluğunu taçlandır!');
-
-      this.spawnRestaurantZone();
+      this.hud.setQuest('🍞 Fırına 2 buğday ve 1 yumurta bırak, pişen ekmeği reyonuna diz ve müşteriye sat!');
     }, '🍞');
     this.upgradeZones.push(bakeryZone);
   }
 
-  spawnRestaurantZone() {
-    // --- STAGE 6: GOURMET RESTAURANT COMPLEX (250$) ---
-    const restZone = new UpgradeZone(this.engine.scene, -30, 0, 250, i18n.t('unlock_restaurant'), () => {
-      // 1. Burger Grill
-      const burgerKitchen = new RestaurantKitchen(this.engine.scene, -30, 4, ITEM_TYPES.BURGER, this.environment);
-      this.kitchens.push(burgerKitchen);
+  // --- STAGE 6: GOURMET RESTAURANT COMPLEX (250$) ---
+  checkFirstBreadSold() {
+    if (!this.unlockedStages.restaurantZone) {
+      this.unlockedStages.restaurantZone = true;
 
-      // 2. Pizza Oven
-      const pizzaKitchen = new RestaurantKitchen(this.engine.scene, -30, -4, ITEM_TYPES.PIZZA, this.environment);
-      this.kitchens.push(pizzaKitchen);
+      const restZone = new UpgradeZone(this.engine.scene, -30, 0, 250, i18n.t('unlock_restaurant'), () => {
+        // 1. Burger Grill
+        const burgerKitchen = new RestaurantKitchen(this.engine.scene, -30, 4, ITEM_TYPES.BURGER, this.environment);
+        this.kitchens.push(burgerKitchen);
 
-      // 3. 4 Dining Tables
-      const t1 = new DiningTable(this.engine.scene, -38, 4, 1, this.environment);
-      const t2 = new DiningTable(this.engine.scene, -38, -4, 2, this.environment);
-      const t3 = new DiningTable(this.engine.scene, -44, 4, 3, this.environment);
-      const t4 = new DiningTable(this.engine.scene, -44, -4, 4, this.environment);
-      this.tables.push(t1, t2, t3, t4);
+        // 2. Pizza Oven
+        const pizzaKitchen = new RestaurantKitchen(this.engine.scene, -30, -4, ITEM_TYPES.PIZZA, this.environment);
+        this.kitchens.push(pizzaKitchen);
 
-      // 4. Enable restaurant guests in spawner
-      this.spawner.setRestaurantUnlocked(true);
+        // 3. 4 Dining Tables
+        const t1 = new DiningTable(this.engine.scene, -38, 4, 1, this.environment);
+        const t2 = new DiningTable(this.engine.scene, -38, -4, 2, this.environment);
+        const t3 = new DiningTable(this.engine.scene, -44, 4, 3, this.environment);
+        const t4 = new DiningTable(this.engine.scene, -44, -4, 4, this.environment);
+        this.tables.push(t1, t2, t3, t4);
 
-      this.hud.showToast('👑 GURME RESTORAN AÇILDI! Masalardan büyük bahşiş topla!', '#9b59b6');
-      this.hud.setQuest('🧑‍🍳 Restoran Şefi ve 🧑‍💼 Garson alarak restoranı tam otomatik yap!');
+        // 4. Enable restaurant guests in spawner
+        this.spawner.setRestaurantUnlocked(true);
 
-      this.spawnChefAndWaiterZone();
-    }, '👑');
-    this.upgradeZones.push(restZone);
+        this.hud.showToast('👑 GURME RESTORAN AÇILDI!', '#9b59b6');
+        this.hud.setQuest('🍔 Mutfak tezgahına Ekmek ve Domates koyup ilk Gurme Burgerini pişir!');
+      }, '👑');
+      this.upgradeZones.push(restZone);
+    }
   }
 
-  spawnChefAndWaiterZone() {
-    // --- STAGE 6B: CHEF & WAITER (220$) ---
-    const chefZone = new UpgradeZone(this.engine.scene, -34, 0, 220, i18n.t('hire_waiter'), () => {
-      const chef = new Worker(this.engine.scene, WORKER_TYPES.CHEF, new THREE.Vector3(-30, 0, 0));
-      const waiter = new Worker(this.engine.scene, WORKER_TYPES.WAITER, new THREE.Vector3(-35, 0, 0));
-      this.workers.push(chef, waiter);
+  // --- STAGE 6B: CHEF & WAITER AUTOMATION (220$) ---
+  checkFirstTableServedAndTipped() {
+    if (!this.unlockedStages.chefAndWaiterZone) {
+      this.unlockedStages.chefAndWaiterZone = true;
 
-      this.hud.showToast('🧑‍🍳 Şef & 🧑‍💼 Garson İşe Alındı! Restoran tam otomatik işliyor!', '#2ecc71');
-      this.hud.setQuest('🏆 TEBRİKLER! Tüm Mega Mart & Restoran İmparatorluğunu Tamamladın!');
-    }, '🧑‍🍳');
-    this.upgradeZones.push(chefZone);
+      const chefZone = new UpgradeZone(this.engine.scene, -34, 0, 220, i18n.t('hire_waiter'), () => {
+        const chef = new Worker(this.engine.scene, WORKER_TYPES.CHEF, new THREE.Vector3(-30, 0, 0));
+        const waiter = new Worker(this.engine.scene, WORKER_TYPES.WAITER, new THREE.Vector3(-35, 0, 0));
+        this.workers.push(chef, waiter);
+
+        this.hud.showToast('🧑‍🍳 Şef & 🧑‍💼 Garson İşe Alındı! Restoran tam otomatik!', '#2ecc71');
+        this.hud.setQuest('🏆 TEBRİKLER! Tüm Mega Mart & Gurme Restoran İmparatorluğunu Tamamladın!');
+      }, '🧑‍🍳');
+      this.upgradeZones.push(chefZone);
+
+      this.hud.setQuest('🧑‍🍳 Restoran Şefi ve 🧑‍💼 Garsonu ($220) işe alarak tam otomasyona geç!');
+    }
   }
 
   animate() {
@@ -296,24 +469,72 @@ class Game {
     // 4. Farm plots
     this.farmPlots.forEach(fp => fp.update(delta, this.player, speedMult));
 
-    // 5. Processing Machines
-    this.machines.forEach(pm => pm.update(delta, this.player, time, speedMult));
-
-    // 6. Chicken Coops
-    this.coops.forEach(cp => cp.update(delta, this.player, time, speedMult));
-
-    // 7. Bakery Ovens
-    this.ovens.forEach(ov => ov.update(delta, this.player, time, speedMult));
-
-    // 8. Restaurant Kitchens
-    this.kitchens.forEach(kt => kt.update(delta, this.player, time, speedMult));
-
-    // 9. Dining Tables
-    this.tables.forEach(tb => tb.update(delta, this.player, time, (tipEarned) => {
-      this.playerMoney += tipEarned;
-      this.hud.updateMoney(this.playerMoney);
-      this.hud.showToast(`+${tipEarned} 💵 ${i18n.t('tip_toast')}`, '#f1c40f');
+    // 5. Processing Machines with output callback
+    this.machines.forEach(pm => pm.update(delta, this.player, time, speedMult, (item, outputType) => {
+      if (outputType.id === 'TOMATO_PASTE') {
+        this.manualStats.pasteProduced++;
+        this.hud.setQuest('🥫 Salçayı alıp Salça Reyonuna diz ve müşteriye sat!');
+      } else if (outputType.id === 'ORANGE_JUICE') {
+        this.manualStats.juiceProduced++;
+        this.hud.setQuest('🧃 Taze portakal suyunu reyonuna diz ve müşteriye sat!');
+      } else if (outputType.id === 'POPCORN') {
+        this.manualStats.popcornProduced++;
+        this.hud.setQuest('🍿 Sıcak popcorn kutusunu reyonuna diz ve müşteriye sat!');
+      } else if (outputType.id === 'CHICKEN_FEED') {
+        this.manualStats.feedProduced++;
+        this.hud.setQuest('🐔 Tavuk Kümesini ($150) inşa et!');
+        this.checkFirstFeedProduced();
+      }
     }));
+
+    // 6. Chicken Coops with egg collect callback
+    this.coops.forEach(cp => cp.update(delta, this.player, time, speedMult, (egg) => {
+      this.manualStats.eggCollected++;
+      this.hud.setQuest('🥚 Yumurtaları Yumurta Reyonuna diz ve müşteriye sat!');
+    }));
+
+    // 7. Bakery Ovens with bread collect callback
+    this.ovens.forEach(ov => ov.update(delta, this.player, time, speedMult, (bread) => {
+      this.manualStats.breadProduced++;
+      this.hud.setQuest('🍞 Taze ekmeği reyonuna diz ve müşteriye sat!');
+    }));
+
+    // 8. Restaurant Kitchens with burger/pizza cook & collect callbacks
+    this.kitchens.forEach(kt => kt.update(
+      delta,
+      this.player,
+      time,
+      speedMult,
+      (meal) => {
+        // Meal collected to player stack
+        this.manualStats.burgerCollected++;
+        this.hud.showToast(`${meal.icon} ${meal.id === 'BURGER' ? 'Burger' : 'Pizza'} Alındı! Masaya götür!`, '#9b59b6');
+        this.hud.setQuest('🍽️ Yemeği masada sipariş bekleyen müşteriye bizzat servis et!');
+      },
+      (ingredient, mealType) => {
+        this.hud.showToast(`+1 ${ingredient.icon} Mutfak Tezgahına Eklendi!`, '#3498db');
+      }
+    ));
+
+    // 9. Dining Tables with tip & meal served callback
+    this.tables.forEach(tb => tb.update(
+      delta,
+      this.player,
+      time,
+      (tipEarned) => {
+        this.playerMoney += tipEarned;
+        this.hud.updateMoney(this.playerMoney);
+        this.hud.showToast(`+${tipEarned} 💵 ${i18n.t('tip_toast')}`, '#f1c40f');
+
+        this.manualStats.tipsCollected++;
+        this.checkFirstTableServedAndTipped();
+      },
+      (servedItem, tableIndex) => {
+        this.manualStats.tablesServed++;
+        this.hud.showToast(`🍽️ Masa #${tableIndex}'e ${servedItem.icon} servis edildi! Müşteri yiyor...`, '#2ecc71');
+        this.hud.setQuest('💵 Müşteri yemeğini bitirince masada bıraktığı bahşişi topla!');
+      }
+    ));
 
     // 10. Shelves
     this.shelves.forEach(sh => sh.update(delta, this.player, time));
@@ -321,7 +542,7 @@ class Game {
     // 11. Cash Register & Coins
     this.register.update(delta, this.player);
 
-    // 12. Automated Workers (Cashier, Harvester, Feeder, Caretaker, Chef, Waiter)
+    // 12. Automated Workers
     const workerContext = {
       farmPlots: this.farmPlots,
       shelves: this.shelves,
@@ -334,11 +555,51 @@ class Game {
     };
     this.workers.forEach(w => w.update(delta, workerContext));
 
-    // 13. Customers & Spawner
-    this.spawner.update(delta, this.shelves, this.register, this.tables, (earnedAmount) => {
+    // 13. Customers & Checkout Sales callback with sold items list
+    this.spawner.update(delta, this.shelves, this.register, this.tables, (earnedAmount, soldItems = []) => {
       this.playerMoney += earnedAmount;
       this.hud.updateMoney(this.playerMoney);
       this.hud.showToast(`+${earnedAmount} 💵 ${i18n.t('sale_toast')}`, '#2ecc71');
+
+      // Process sold item types for quest triggers
+      soldItems.forEach(item => {
+        if (item.id === 'TOMATO') {
+          this.manualStats.tomatoSold++;
+          if (this.manualStats.tomatoSold === 1) {
+            this.checkFirstTomatoSold();
+          }
+        } else if (item.id === 'TOMATO_PASTE') {
+          this.manualStats.pasteSold++;
+          if (this.manualStats.pasteSold === 1) {
+            this.checkFirstPasteSold();
+          }
+        } else if (item.id === 'ORANGE_JUICE' || item.id === 'ORANGE') {
+          this.manualStats.juiceSold++;
+          if (this.manualStats.juiceSold === 1) {
+            this.checkFirstJuiceSold();
+          }
+        } else if (item.id === 'CORN') {
+          this.manualStats.cornSold++;
+          if (this.manualStats.cornSold === 1) {
+            this.checkFirstCornSold();
+          }
+        } else if (item.id === 'POPCORN') {
+          this.manualStats.popcornSold++;
+          if (this.manualStats.popcornSold === 1) {
+            this.checkFirstPopcornSold();
+          }
+        } else if (item.id === 'EGG') {
+          this.manualStats.eggSold++;
+          if (this.manualStats.eggSold === 1) {
+            this.checkFirstEggSold();
+          }
+        } else if (item.id === 'BREAD') {
+          this.manualStats.breadSold++;
+          if (this.manualStats.breadSold === 1) {
+            this.checkFirstBreadSold();
+          }
+        }
+      });
     });
 
     // 14. Upgrade zones
@@ -349,8 +610,10 @@ class Game {
       });
     });
 
-    // 15. Ads Boost
-    this.ads.update(delta);
+    // 15. Ads Boost & Lucky Reward Drops
+    if (this.player && this.player.mesh) {
+      this.ads.update(delta, this.player.mesh.position);
+    }
 
     // 16. HUD Stack Update
     this.hud.updateStack(this.player.stack.getCount(), this.player.stack.maxCapacity);
@@ -361,6 +624,12 @@ class Game {
 }
 
 // Bootstrap
-window.addEventListener('DOMContentLoaded', () => {
+if (document.readyState === 'loading') {
+  window.addEventListener('DOMContentLoaded', () => {
+    new Game();
+  });
+} else {
   new Game();
-});
+}
+
+

@@ -28,20 +28,35 @@ export class CashRegister {
   }
 
   buildRegisterMesh() {
-    // 1. Counter Table
-    const tableGeo = new THREE.BoxGeometry(2.4, 0.9, 1.1);
-    const tableMat = new THREE.MeshStandardMaterial({ color: GAME_CONFIG.COLORS.REGISTER, roughness: 0.5 });
+    // 1. Counter Table Base
+    const tableGeo = new THREE.BoxGeometry(2.4, 0.88, 1.1);
+    const tableMat = new THREE.MeshStandardMaterial({ color: GAME_CONFIG.COLORS.REGISTER, roughness: 0.6 });
     const table = new THREE.Mesh(tableGeo, tableMat);
-    table.position.y = 0.45;
+    table.position.y = 0.44;
     table.castShadow = true;
     table.receiveShadow = true;
     this.meshGroup.add(table);
+
+    // 1b. Distinct Dark Anthracite Checkout Top Surface (Contrasts with floor)
+    const topGeo = new THREE.BoxGeometry(2.32, 0.06, 1.02);
+    const topMat = new THREE.MeshStandardMaterial({ color: 0x2c3e50, roughness: 0.5, metalness: 0.2 });
+    const topSurface = new THREE.Mesh(topGeo, topMat);
+    topSurface.position.y = 0.91;
+    topSurface.receiveShadow = true;
+    this.meshGroup.add(topSurface);
+
+    // 1c. Checkout Belt / Service Pad on left side
+    const beltGeo = new THREE.BoxGeometry(1.2, 0.02, 0.75);
+    const beltMat = new THREE.MeshStandardMaterial({ color: 0x1a252f, roughness: 0.9 });
+    const belt = new THREE.Mesh(beltGeo, beltMat);
+    belt.position.set(-0.45, 0.945, 0);
+    this.meshGroup.add(belt);
 
     // 2. POS Terminal & Monitor
     const posGeo = new THREE.BoxGeometry(0.5, 0.35, 0.4);
     const posMat = new THREE.MeshStandardMaterial({ color: 0x1e272e });
     const pos = new THREE.Mesh(posGeo, posMat);
-    pos.position.set(0.4, 1.05, 0);
+    pos.position.set(0.4, 1.08, 0);
     this.meshGroup.add(pos);
 
     // 3. Screen display glowing green
@@ -49,7 +64,7 @@ export class CashRegister {
     const screenMat = new THREE.MeshBasicMaterial({ color: 0x2ecc71 });
     const screen = new THREE.Mesh(screenGeo, screenMat);
     screen.rotation.x = -Math.PI / 6;
-    screen.position.set(0.4, 1.2, -0.15);
+    screen.position.set(0.4, 1.23, -0.15);
     this.meshGroup.add(screen);
 
     // 4. Cashier Mat on floor
@@ -69,9 +84,9 @@ export class CashRegister {
     );
   }
 
-  spawnCoinBurst(amount, onCustomerPaidCallback) {
+  spawnCoinBurst(amount, onCustomerPaidCallback, soldItems = []) {
     if (onCustomerPaidCallback && amount > 0) {
-      onCustomerPaidCallback(amount);
+      onCustomerPaidCallback(amount, soldItems);
     }
 
     const coinCount = Math.min(Math.max(Math.floor(amount / 3), 3), 6);

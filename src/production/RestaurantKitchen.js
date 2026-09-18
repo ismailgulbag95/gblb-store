@@ -104,7 +104,7 @@ export class RestaurantKitchen {
     }
   }
 
-  update(delta, player, time, speedMultiplier = 1.0) {
+  update(delta, player, time, speedMultiplier = 1.0, onMealCollectedCallback = null, onIngredientAddedCallback = null) {
     if (this.plate) {
       this.plate.material.opacity = 0.7 + Math.sin(time * 10) * 0.3;
     }
@@ -118,11 +118,17 @@ export class RestaurantKitchen {
       if (distIn <= this.interactionRadius) {
         if (this.inputStock1 < 3) {
           const item1 = player.stack.popItem(type1);
-          if (item1) this.inputStock1++;
+          if (item1) {
+            this.inputStock1++;
+            if (onIngredientAddedCallback) onIngredientAddedCallback(item1, this.mealType);
+          }
         }
         if (this.inputStock2 < 3) {
           const item2 = player.stack.popItem(type2);
-          if (item2) this.inputStock2++;
+          if (item2) {
+            this.inputStock2++;
+            if (onIngredientAddedCallback) onIngredientAddedCallback(item2, this.mealType);
+          }
         }
         this.updateWorldBadge();
       }
@@ -133,6 +139,9 @@ export class RestaurantKitchen {
         const mesh = this.mealMeshes.pop();
         if (mesh) this.meshGroup.remove(mesh);
         player.stack.addItem(meal);
+        if (onMealCollectedCallback) {
+          onMealCollectedCallback(meal);
+        }
       }
     }
 

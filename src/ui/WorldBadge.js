@@ -80,22 +80,19 @@ export class WorldBadge {
 
     // Outer Glow / Shadow
     ctx.save();
-    ctx.shadowColor = 'rgba(0, 0, 0, 0.45)';
-    ctx.shadowBlur = 18;
-    ctx.shadowOffsetY = 8;
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.2)';
+    ctx.shadowBlur = 16;
+    ctx.shadowOffsetY = 6;
 
-    // Background Gradient
-    const bgGrad = ctx.createLinearGradient(0, ry, 0, ry + rh);
-    bgGrad.addColorStop(0, '#2c3e50');
-    bgGrad.addColorStop(1, '#1a252f');
-    ctx.fillStyle = bgGrad;
+    // Background: Clean Snowy White Cloud Card
+    ctx.fillStyle = '#ffffff';
     this.roundRect(ctx, rx, ry, rw, rh, radius);
     ctx.fill();
     ctx.restore();
 
-    // Chunky Golden/Emerald Border
-    ctx.lineWidth = 8;
-    ctx.strokeStyle = this.color;
+    // Duolingo 3D Chunky Bottom Shadow Border
+    ctx.lineWidth = 6;
+    ctx.strokeStyle = this.color || '#58cc02';
     this.roundRect(ctx, rx, ry, rw, rh, radius);
     ctx.stroke();
 
@@ -103,39 +100,46 @@ export class WorldBadge {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
 
-    // Title text
-    ctx.font = 'bold 36px "Fredoka", "Segoe UI", sans-serif';
-    ctx.fillStyle = '#ffffff';
-    ctx.fillText(`${this.icon} ${this.title}`, w / 2, ry + 50);
+    // Title text (Fredoka / Nunito Bold)
+    ctx.font = '900 36px "Fredoka", "Nunito", sans-serif';
+    ctx.fillStyle = '#4b4b4b';
+    ctx.fillText(`${this.icon} ${this.title}`, w / 2, ry + 46);
 
-    // 3. Cost / Price Tag
+    // 3. Cost / Price Tag (Duolingo 3D Button Pill)
     if (this.cost > 0) {
       const isFree = this.currentCost <= 0;
       const costText = isFree ? 'TAMAMLANDI! 🎉' : `${this.unit} ${this.currentCost}`;
       
       // Cost Pill
-      const pillW = 260;
-      const pillH = 54;
+      const pillW = 270;
+      const pillH = 56;
       const pillX = (w - pillW) / 2;
-      const pillY = ry + 95;
+      const pillY = ry + 92;
 
-      ctx.fillStyle = isFree ? '#27ae60' : 'rgba(0, 0, 0, 0.6)';
-      this.roundRect(ctx, pillX, pillY, pillW, pillH, 20);
+      // Duolingo 3D Pill Base
+      ctx.fillStyle = isFree ? '#58cc02' : '#f7f7f7';
+      this.roundRect(ctx, pillX, pillY, pillW, pillH, 18);
       ctx.fill();
 
-      // Progress fill inside cost pill
+      // Progress fill inside cost pill (Duolingo XP Bar)
       if (!isFree) {
         const spent = this.cost - this.currentCost;
         const pct = Math.min(1.0, Math.max(0, spent / this.cost));
         if (pct > 0) {
-          ctx.fillStyle = 'rgba(46, 204, 113, 0.75)';
-          this.roundRect(ctx, pillX, pillY, pillW * pct, pillH, 20);
+          ctx.fillStyle = '#58cc02';
+          this.roundRect(ctx, pillX, pillY, pillW * pct, pillH, 18);
           ctx.fill();
         }
       }
 
-      ctx.font = 'bold 34px "Fredoka", "Segoe UI", sans-serif';
-      ctx.fillStyle = isFree ? '#ffffff' : '#f1c40f';
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = isFree ? '#46a302' : '#e5e5e5';
+      this.roundRect(ctx, pillX, pillY, pillW, pillH, 18);
+      ctx.stroke();
+
+      ctx.font = '900 32px "Fredoka", "Nunito", sans-serif';
+      const spent = this.cost - this.currentCost;
+      ctx.fillStyle = isFree || (spent / this.cost > 0.4) ? '#ffffff' : '#ff9600';
       ctx.fillText(costText, w / 2, pillY + pillH / 2 + 2);
     }
 
@@ -155,51 +159,51 @@ export class WorldBadge {
     const rh = h - 48;
     const radius = 32;
 
-    // Background
+    // Background (Duolingo White Card)
     ctx.save();
-    ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.15)';
     ctx.shadowBlur = 14;
     ctx.shadowOffsetY = 6;
-    ctx.fillStyle = 'rgba(26, 37, 47, 0.94)';
+    ctx.fillStyle = '#ffffff';
     this.roundRect(ctx, rx, ry, rw, rh, radius);
     ctx.fill();
     ctx.restore();
 
-    // Border
+    // Border (Duolingo Sky Blue or Orange)
     ctx.lineWidth = 6;
-    ctx.strokeStyle = this.isProcessing ? '#e67e22' : '#3498db';
+    ctx.strokeStyle = this.isProcessing ? '#ff9600' : '#1cb0f6';
     this.roundRect(ctx, rx, ry, rw, rh, radius);
     ctx.stroke();
 
     // Title
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.font = 'bold 34px "Fredoka", sans-serif';
-    ctx.fillStyle = '#ffffff';
-    ctx.fillText(`${this.icon} ${this.title}`, w / 2, ry + 45);
+    ctx.font = '900 34px "Fredoka", "Nunito", sans-serif';
+    ctx.fillStyle = '#4b4b4b';
+    ctx.fillText(`${this.icon} ${this.title}`, w / 2, ry + 44);
 
     // Status / Input Stock
     const statusText = this.isProcessing 
       ? `⚙️ Pişiyor... %${Math.floor(this.progressPercent * 100)}` 
-      : `Giriş: ${this.currentInput} / ${this.maxInput}`;
+      : `Stok: ${this.currentInput || 0} / ${this.maxInput || 0}`;
     
-    ctx.font = '600 28px "Fredoka", sans-serif';
-    ctx.fillStyle = this.isProcessing ? '#f39c12' : '#ecf0f1';
-    ctx.fillText(statusText, w / 2, ry + 95);
+    ctx.font = '800 24px "Fredoka", sans-serif';
+    ctx.fillStyle = this.isProcessing ? '#ff9600' : '#777777';
+    ctx.fillText(statusText, w / 2, ry + 90);
 
-    // Progress Bar
+    // Progress Bar (Duolingo Smooth XP Bar)
     const barW = 320;
     const barH = 20;
     const barX = (w - barW) / 2;
-    const barY = ry + 125;
+    const barY = ry + 120;
 
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+    ctx.fillStyle = '#e5e5e5';
     this.roundRect(ctx, barX, barY, barW, barH, 10);
     ctx.fill();
 
     if (this.progressPercent > 0) {
-      ctx.fillStyle = this.isProcessing ? '#e67e22' : '#2ecc71';
-      this.roundRect(ctx, barX, barY, barW * Math.min(1.0, this.progressPercent), barH, 10);
+      ctx.fillStyle = this.isProcessing ? '#ff9600' : '#58cc02';
+      this.roundRect(ctx, barX, barY, Math.max(barW * Math.min(1.0, this.progressPercent), 14), barH, 10);
       ctx.fill();
     }
 

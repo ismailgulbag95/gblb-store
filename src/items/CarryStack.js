@@ -134,6 +134,76 @@ export class CarryStack {
       const cap = new THREE.Mesh(capGeo, capMat);
       cap.position.y = 0.22;
       group.add(bottle, cap);
+    } else if (itemType.id === 'CORN') {
+      const geo = new THREE.CylinderGeometry(0.1, 0.12, 0.38, 6);
+      const mat = new THREE.MeshStandardMaterial({ color: itemType.color, roughness: 0.3 });
+      const corn = new THREE.Mesh(geo, mat);
+      corn.castShadow = true;
+
+      const huskGeo = new THREE.ConeGeometry(0.14, 0.22, 4);
+      const huskMat = new THREE.MeshStandardMaterial({ color: 0x27ae60 });
+      const husk = new THREE.Mesh(huskGeo, huskMat);
+      husk.position.y = -0.15;
+      group.add(corn, husk);
+    } else if (itemType.id === 'POPCORN') {
+      const boxGeo = new THREE.BoxGeometry(0.28, 0.32, 0.28);
+      const boxMat = new THREE.MeshStandardMaterial({ color: 0xe74c3c, roughness: 0.4 });
+      const box = new THREE.Mesh(boxGeo, boxMat);
+      box.castShadow = true;
+
+      const popTop = new THREE.Mesh(new THREE.SphereGeometry(0.16, 8, 8), new THREE.MeshStandardMaterial({ color: 0xf6e58d }));
+      popTop.position.y = 0.16;
+      group.add(box, popTop);
+    } else if (itemType.id === 'CHICKEN_FEED') {
+      const bagGeo = new THREE.CylinderGeometry(0.16, 0.18, 0.36, 8);
+      const bagMat = new THREE.MeshStandardMaterial({ color: 0xd4ac0d, roughness: 0.8 }); // Burlap / grain bag
+      const bag = new THREE.Mesh(bagGeo, bagMat);
+      bag.castShadow = true;
+
+      const tie = new THREE.Mesh(new THREE.TorusGeometry(0.14, 0.03, 6, 12), new THREE.MeshStandardMaterial({ color: 0x795548 }));
+      tie.rotation.x = Math.PI / 2;
+      tie.position.y = 0.14;
+      group.add(bag, tie);
+    } else if (itemType.id === 'EGG') {
+      const geo = new THREE.SphereGeometry(0.15, 8, 8);
+      geo.scale(1, 1.3, 1);
+      const mat = new THREE.MeshStandardMaterial({ color: 0xf8f9fa, roughness: 0.2 });
+      const egg = new THREE.Mesh(geo, mat);
+      egg.castShadow = true;
+      group.add(egg);
+    } else if (itemType.id === 'WHEAT') {
+      const geo = new THREE.ConeGeometry(0.16, 0.45, 6);
+      const mat = new THREE.MeshStandardMaterial({ color: 0xf39c12, roughness: 0.6 });
+      const wheat = new THREE.Mesh(geo, mat);
+      wheat.castShadow = true;
+      group.add(wheat);
+    } else if (itemType.id === 'BREAD') {
+      const geo = new THREE.BoxGeometry(0.36, 0.22, 0.28);
+      const mat = new THREE.MeshStandardMaterial({ color: 0xcd6133, roughness: 0.5 });
+      const bread = new THREE.Mesh(geo, mat);
+      bread.castShadow = true;
+      group.add(bread);
+    } else if (itemType.id === 'BURGER') {
+      const bunMat = new THREE.MeshStandardMaterial({ color: 0xe67e22 });
+      const meatMat = new THREE.MeshStandardMaterial({ color: 0x5d4037 });
+      const saladMat = new THREE.MeshStandardMaterial({ color: 0x2ecc71 });
+
+      const bunBottom = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.06, 10), bunMat);
+      const meat = new THREE.Mesh(new THREE.CylinderGeometry(0.21, 0.21, 0.05, 10), meatMat);
+      meat.position.y = 0.06;
+      const salad = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.03, 8), saladMat);
+      salad.position.y = 0.1;
+      const bunTop = new THREE.Mesh(new THREE.SphereGeometry(0.2, 10, 8, 0, Math.PI * 2, 0, Math.PI / 2), bunMat);
+      bunTop.position.y = 0.12;
+
+      group.add(bunBottom, meat, salad, bunTop);
+    } else if (itemType.id === 'PIZZA') {
+      const plateMat = new THREE.MeshStandardMaterial({ color: 0xd63031 });
+      const crustMat = new THREE.MeshStandardMaterial({ color: 0xf1c40f });
+      const crust = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.25, 0.04, 12), crustMat);
+      const cheese = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.05, 12), plateMat);
+      cheese.position.y = 0.01;
+      group.add(crust, cheese);
     } else {
       const geo = new THREE.BoxGeometry(0.35, 0.35, 0.35);
       const mat = new THREE.MeshStandardMaterial({ color: itemType.color });

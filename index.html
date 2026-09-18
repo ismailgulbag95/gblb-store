@@ -8,6 +8,27 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <script>
+    window.onerror = function(msg, url, line, col, error) {
+      const errDiv = document.createElement('div');
+      errDiv.style.position = 'fixed';
+      errDiv.style.top = '100px';
+      errDiv.style.left = '10px';
+      errDiv.style.right = '10px';
+      errDiv.style.background = 'rgba(255, 0, 0, 0.9)';
+      errDiv.style.color = '#fff';
+      errDiv.style.padding = '14px';
+      errDiv.style.zIndex = '99999';
+      errDiv.style.fontSize = '14px';
+      errDiv.style.borderRadius = '8px';
+      errDiv.style.wordBreak = 'break-all';
+      errDiv.innerHTML = `<b>JS ERROR:</b> ${msg}<br><b>Line:</b> ${line}:${col}<br><b>File:</b> ${url}`;
+      document.body.appendChild(errDiv);
+    };
+    window.onunhandledrejection = function(e) {
+      window.onerror(e.reason ? e.reason.message || e.reason : 'Unhandled Promise Rejection', '', '', '', '');
+    };
+  </script>
 </head>
 <body>
   <!-- 3D Canvas Container -->
@@ -106,6 +127,33 @@
               </div>
               <div class="char-badge">SEÇ</div>
             </div>
+
+            <div class="char-card" id="char-card-robot" data-char="robot">
+              <div class="char-icon">🤖</div>
+              <div class="char-info">
+                <div class="char-name" id="char-name-robot">Siber Lojistik Botu</div>
+                <div class="char-desc" id="char-desc-robot">Neon enerjili ve antenli fütüristik robot</div>
+              </div>
+              <div class="char-badge">SEÇ</div>
+            </div>
+
+            <div class="char-card" id="char-card-panda" data-char="panda">
+              <div class="char-icon">🐼</div>
+              <div class="char-info">
+                <div class="char-name" id="char-name-panda">Şef Panda</div>
+                <div class="char-desc" id="char-desc-panda">Kırmızı aşçı bandanalı, pofuduk sevimli fırıncı panda</div>
+              </div>
+              <div class="char-badge">SEÇ</div>
+            </div>
+
+            <div class="char-card" id="char-card-penguin" data-char="penguin">
+              <div class="char-icon">👑</div>
+              <div class="char-info">
+                <div class="char-name" id="char-name-penguin">Kral Penguen</div>
+                <div class="char-desc" id="char-desc-penguin">Altın taçlı ve smokinli karizmatik penguen patron</div>
+              </div>
+              <div class="char-badge">SEÇ</div>
+            </div>
           </div>
         </div>
 
@@ -146,6 +194,21 @@
             </button>
           </div>
         </div>
+      </div>
+    </div>
+
+    <!-- Surprise Lucky Reward / Ad Modal -->
+    <div id="reward-modal" class="modal-overlay hidden">
+      <div class="reward-modal-card">
+        <div class="reward-icon-hero" id="reward-modal-icon">🎁</div>
+        <div class="reward-title-text" id="reward-modal-title">Sürpriz Hediye!</div>
+        <div class="reward-desc-text" id="reward-modal-desc">Kısa bir ödüllü video izleyerek anında 500$ nakit para kazan!</div>
+        <button id="btn-claim-reward" class="reward-action-btn">
+          🎬 İZLE & KAZAN
+        </button>
+        <button id="btn-cancel-reward" class="reward-cancel-btn">
+          Şimdilik Değil
+        </button>
       </div>
     </div>
 

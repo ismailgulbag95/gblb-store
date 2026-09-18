@@ -21,7 +21,8 @@ export class CustomerSpawner {
     this.hasRestaurant = status;
   }
 
-  update(delta, shelves, register, tables = [], onCustomerPaidCallback) {
+  update(delta, shelves = [], register = null, tables = [], onCustomerPaidCallback) {
+    // 1. Spawn timer
     if (this.customers.length < this.maxActive) {
       this.spawnTimer += delta;
       if (this.spawnTimer >= this.spawnInterval) {
@@ -30,14 +31,35 @@ export class CustomerSpawner {
       }
     }
 
-    const queueingCustomers = this.customers.filter(c => c.state === 'QUEUEING' || c.state === 'PAYING');
-    queueingCustomers.forEach((c, index) => {
+    // 2. Compute Checkout Register Queues
+    const checkoutCustomers = this.customers.filter(c => c.state === 'QUEUEING' || c.state === 'PAYING');
+    checkoutCustomers.forEach((c, index) => {
       c.queueIndex = index;
     });
 
+    // 3. Compute Per-Shelf Waiting Queues
+    shelves.forEach(shelf => {
+      const waitingForThisShelf = this.customers.filter(c => 
+        (c.state === 'GOING_TO_SHELF' || c.state === 'WAITING_FOR_STOCK') &&
+        c.desiredItemTypes.length > 0 &&
+        c.desiredItemTypes[0].id === shelf.acceptedType.id
+      );
+
+      waitingForThisShelf.forEach((c, index) => {
+        c.shelfWaitIndex = index;
+      });
+    });
+
+    // 4. Compute Restaurant Waiting Queue
+    const restaurantWaiting = this.customers.filter(c => c.state === 'WAITING_FOR_TABLE');
+    restaurantWaiting.forEach((c, index) => {
+      c.tableWaitIndex = index;
+    });
+
+    // 5. Update All Customers with Crowd Separation
     for (let i = this.customers.length - 1; i >= 0; i--) {
       const c = this.customers[i];
-      c.update(delta, shelves, register, tables, onCustomerPaidCallback);
+      c.update(delta, shelves, register, tables, this.customers, onCustomerPaidCallback);
 
       if (c.isFinished) {
         this.customers.splice(i, 1);
@@ -46,12 +68,14 @@ export class CustomerSpawner {
   }
 
   spawnCustomer(tables = []) {
-    // 30% chance to spawn restaurant guest if restaurant is unlocked and empty table exists
+    // 35% chance for restaurant guest if unlocked and empty table exists
     const hasEmptyTable = tables.some(t => !t.isOccupied);
     const isRestaurantGuest = this.hasRestaurant && hasEmptyTable && Math.random() < 0.35;
 
-    const spawnX = isRestaurantGuest ? -37 : 5;
-    const doorSpawnPos = new THREE.Vector3(spawnX, 0, 16);
+    // Stagger spawn X position to prevent initial overlaps
+    const baseSpawnX = isRestaurantGuest ? -37 : 5;
+    const randomizedX = baseSpawnX + (Math.random() - 0.5) * 3.0;
+    const doorSpawnPos = new THREE.Vector3(randomizedX, 0, 16 + Math.random() * 2.0);
 
     const listCount = 1 + Math.floor(Math.random() * 2);
     const shoppingList = [];

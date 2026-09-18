@@ -62,11 +62,21 @@ export const ITEM_TYPES = {
     size: [0.35, 0.4, 0.35],
     icon: '🍿'
   },
+  CHICKEN_FEED: {
+    id: 'CHICKEN_FEED',
+    nameKey: 'item_chicken_feed',
+    name: 'Tavuk Yemi Çuvalı',
+    price: 8,
+    color: 0xd4ac0d,
+    accentColor: 0x795548,
+    size: [0.32, 0.42, 0.32],
+    icon: '🌾'
+  },
   EGG: {
     id: 'EGG',
     nameKey: 'item_egg',
     name: 'Çiftlik Yumurtası',
-    price: 15,
+    price: 18,
     color: 0xf8f9fa,
     accentColor: 0xf39c12,
     size: [0.28, 0.35, 0.28],
@@ -145,6 +155,8 @@ export const GAME_CONFIG = {
     orangeInputRequired: 2,
     popcornTime: 2.5,
     popcornInputRequired: 1,
+    feedTime: 2.2,
+    feedInputRequired: 1,
     breadTime: 4.0,
     breadInputRequired: 2,
     burgerTime: 4.5,

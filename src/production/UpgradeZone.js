@@ -14,6 +14,7 @@ export class UpgradeZone {
     this.isUnlocked = false;
     this.radius = 1.35;
     this.drainTimer = 0;
+    this.dwellTimer = 0; // Requires standing inside before draining
 
     this.meshGroup = new THREE.Group();
     this.meshGroup.position.copy(this.position);
@@ -82,28 +83,37 @@ export class UpgradeZone {
     this.ring.scale.set(scale, scale, 1);
     this.centerDisc.rotation.y += delta * 2.0;
 
-    // Check Player proximity and drain money
+    // Check Player proximity and drain money ONLY when standing inside (> 0.30s)
     if (player) {
       const dist = this.position.distanceTo(player.mesh.position);
       if (dist <= this.radius && playerMoney > 0 && this.remainingCost > 0) {
-        this.drainTimer += delta;
-        if (this.drainTimer >= 0.07) {
-          this.drainTimer = 0;
-          const spendAmount = Math.min(Math.min(2, playerMoney), this.remainingCost);
-          this.remainingCost -= spendAmount;
-          
-          if (onMoneySpentCallback) onMoneySpentCallback(spendAmount);
+        this.dwellTimer += delta;
 
-          // Update 3D Floating Badge
-          this.badge.updateCost(this.remainingCost);
+        // Player must intentionally stay inside the zone
+        if (this.dwellTimer >= 0.30) {
+          this.drainTimer += delta;
+          if (this.drainTimer >= 0.06) {
+            this.drainTimer = 0;
+            const spendAmount = Math.min(Math.min(3, playerMoney), this.remainingCost);
+            this.remainingCost -= spendAmount;
+            
+            if (onMoneySpentCallback) onMoneySpentCallback(spendAmount);
 
-          // Spawn Flying Cash Particle from Player to Zone Center
-          this.spawnFlyingCash(player.mesh.position);
+            // Update 3D Floating Badge
+            this.badge.updateCost(this.remainingCost);
 
-          if (this.remainingCost <= 0) {
-            this.unlock();
+            // Spawn Flying Cash Particle from Player to Zone Center
+            this.spawnFlyingCash(player.mesh.position);
+
+            if (this.remainingCost <= 0) {
+              this.unlock();
+            }
           }
         }
+      } else {
+        // Reset dwell timer when player steps out or passes through
+        this.dwellTimer = 0;
+        this.drainTimer = 0;
       }
     }
 

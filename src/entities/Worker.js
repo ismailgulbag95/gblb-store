@@ -106,16 +106,16 @@ export class Worker {
         this.updateCashier(delta, register);
         break;
       case WORKER_TYPES.HARVESTER:
-        this.updateHarvester(delta, farmPlots, shelves);
+        this.updateHarvester(delta, farmPlots, shelves, machines);
         break;
       case WORKER_TYPES.FACTORY_FEEDER:
-        this.updateFactoryFeeder(delta, farmPlots, machines, ovens, shelves);
+        this.updateFactoryFeeder(delta, farmPlots, machines, ovens, kitchens, shelves);
         break;
       case WORKER_TYPES.FARM_CARETAKER:
-        this.updateFarmCaretaker(delta, farmPlots, coops, shelves);
+        this.updateFarmCaretaker(delta, farmPlots, machines, coops, ovens, shelves);
         break;
       case WORKER_TYPES.CHEF:
-        this.updateChef(delta, kitchens, ovens);
+        this.updateChef(delta, kitchens, ovens, shelves);
         break;
       case WORKER_TYPES.WAITER:
         this.updateWaiter(delta, kitchens, tables);
@@ -133,12 +133,13 @@ export class Worker {
     this.mesh.position.y = Math.abs(Math.sin(this.walkCycle)) * 0.04;
   }
 
-  updateHarvester(delta, farmPlots, shelves) {
+  updateHarvester(delta, farmPlots, shelves, machines) {
     let isMoving = false;
 
-    if (this.stack.getCount() >= 4) {
-      // Go deliver to shelf
+    if (this.stack.getCount() > 0) {
       const top = this.stack.items[this.stack.items.length - 1]?.type;
+      
+      // 1. Check primary shelf
       const targetShelf = shelves.find(s => s.acceptedType.id === top?.id && s.stock.length < s.capacity);
       if (targetShelf) {
         isMoving = true;
@@ -146,39 +147,46 @@ export class Worker {
           const item = this.stack.popItem(targetShelf.acceptedType);
           if (item) targetShelf.addItem(item);
         });
+      } else {
+        // 2. Fallback: If shelf is full, check processing machine that accepts this raw item!
+        const needyMachine = machines.find(m => m.inputType.id === top?.id && m.inputStock < m.inputRequired * 3);
+        if (needyMachine) {
+          isMoving = true;
+          this.walkTowards(needyMachine.inputZonePos, delta, () => {
+            const item = this.stack.popItem(needyMachine.inputType);
+            if (item) needyMachine.inputStock++;
+          });
+        } else {
+          // 3. Both full: Wait near shelf without getting stuck or re-harvesting
+          const anyShelf = shelves.find(s => s.acceptedType.id === top?.id);
+          if (anyShelf) {
+            isMoving = true;
+            this.walkTowards(anyShelf.position, delta);
+          }
+        }
       }
     } else {
-      // Find ripe farm plot
+      // Stack is empty -> Find ripe farm plot
       const ripeFarm = farmPlots.find(f => f.ripeCount > 0);
       if (ripeFarm) {
         isMoving = true;
         this.walkTowards(ripeFarm.position, delta, () => {
           ripeFarm.harvest({ stack: this.stack });
         });
-      } else if (this.stack.getCount() > 0) {
-        const top = this.stack.items[this.stack.items.length - 1]?.type;
-        const targetShelf = shelves.find(s => s.acceptedType.id === top?.id && s.stock.length < s.capacity);
-        if (targetShelf) {
-          isMoving = true;
-          this.walkTowards(targetShelf.position, delta, () => {
-            const item = this.stack.popItem(targetShelf.acceptedType);
-            if (item) targetShelf.addItem(item);
-          });
-        }
       }
     }
 
     this.animateLegs(isMoving, delta);
   }
 
-  updateFactoryFeeder(delta, farmPlots, machines, ovens, shelves) {
+  updateFactoryFeeder(delta, farmPlots, machines, ovens, kitchens, shelves) {
     let isMoving = false;
 
-    // 1. Check if holding finished product to shelf
     if (this.stack.getCount() > 0) {
       const top = this.stack.items[this.stack.items.length - 1]?.type;
-      // Is it a raw material for machine?
-      const needyMachine = machines.find(m => m.inputType.id === top?.id && m.inputStock < m.inputRequired * 2);
+      
+      // 1. Try Machines that accept this input
+      const needyMachine = machines.find(m => m.inputType.id === top?.id && m.inputStock < m.inputRequired * 3);
       if (needyMachine) {
         isMoving = true;
         this.walkTowards(needyMachine.inputZonePos, delta, () => {
@@ -186,7 +194,7 @@ export class Worker {
           if (item) needyMachine.inputStock++;
         });
       } else {
-        // Shelf delivery
+        // 2. Try Shelf for this item
         const targetShelf = shelves.find(s => s.acceptedType.id === top?.id && s.stock.length < s.capacity);
         if (targetShelf) {
           isMoving = true;
@@ -194,6 +202,60 @@ export class Worker {
             const item = this.stack.popItem(targetShelf.acceptedType);
             if (item) targetShelf.addItem(item);
           });
+        } else {
+          // 3. Fallback: If shelf is full, check restaurant kitchens & ovens!
+          let fallbackDestination = null;
+          let fallbackAction = null;
+
+          if (top?.id === 'TOMATO') {
+            const needyBurger = kitchens.find(k => k.mealType.id === 'BURGER' && k.inputStock2 < 3);
+            if (needyBurger) {
+              fallbackDestination = needyBurger.inputZonePos;
+              fallbackAction = () => {
+                const item = this.stack.popItem(ITEM_TYPES.TOMATO);
+                if (item) needyBurger.inputStock2++;
+              };
+            }
+          } else if (top?.id === 'TOMATO_PASTE') {
+            const needyPizza = kitchens.find(k => k.mealType.id === 'PIZZA' && k.inputStock2 < 3);
+            if (needyPizza) {
+              fallbackDestination = needyPizza.inputZonePos;
+              fallbackAction = () => {
+                const item = this.stack.popItem(ITEM_TYPES.TOMATO_PASTE);
+                if (item) needyPizza.inputStock2++;
+              };
+            }
+          } else if (top?.id === 'WHEAT') {
+            const needyOven = ovens.find(o => o.wheatStock < 4);
+            if (needyOven) {
+              fallbackDestination = needyOven.inputZonePos;
+              fallbackAction = () => {
+                const item = this.stack.popItem(ITEM_TYPES.WHEAT);
+                if (item) needyOven.wheatStock++;
+              };
+            }
+          } else if (top?.id === 'BREAD') {
+            const needyBurger = kitchens.find(k => k.mealType.id === 'BURGER' && k.inputStock1 < 3);
+            if (needyBurger) {
+              fallbackDestination = needyBurger.inputZonePos;
+              fallbackAction = () => {
+                const item = this.stack.popItem(ITEM_TYPES.BREAD);
+                if (item) needyBurger.inputStock1++;
+              };
+            }
+          }
+
+          if (fallbackDestination && fallbackAction) {
+            isMoving = true;
+            this.walkTowards(fallbackDestination, delta, fallbackAction);
+          } else {
+            // Wait near primary machine/shelf
+            const primaryMachine = machines.find(m => m.inputType.id === top?.id);
+            if (primaryMachine) {
+              isMoving = true;
+              this.walkTowards(primaryMachine.inputZonePos, delta);
+            }
+          }
         }
       }
     } else {
@@ -208,7 +270,7 @@ export class Worker {
           if (item) this.stack.addItem(item);
         });
       } else {
-        // Harvest tomato or orange for machine
+        // Harvest tomato or orange for machines
         const rawFarm = farmPlots.find(f => (f.itemType.id === 'TOMATO' || f.itemType.id === 'ORANGE') && f.ripeCount > 0);
         if (rawFarm) {
           isMoving = true;
@@ -222,22 +284,86 @@ export class Worker {
     this.animateLegs(isMoving, delta);
   }
 
-  updateFarmCaretaker(delta, farmPlots, coops, shelves) {
+  updateFarmCaretaker(delta, farmPlots, machines, coops, ovens, shelves) {
     let isMoving = false;
 
     if (this.stack.getCount() > 0) {
       const top = this.stack.items[this.stack.items.length - 1]?.type;
-      if (top?.id === 'CORN') {
-        const needyCoop = coops.find(c => c.feedStock < 4);
+
+      if (top?.id === 'CHICKEN_FEED') {
+        const needyCoop = coops.find(c => c.feedStock < 8);
         if (needyCoop) {
           isMoving = true;
           this.walkTowards(needyCoop.inputZonePos, delta, () => {
-            const c = this.stack.popItem(ITEM_TYPES.CORN);
-            if (c) needyCoop.feedStock++;
+            const feed = this.stack.popItem(ITEM_TYPES.CHICKEN_FEED);
+            if (feed) needyCoop.feedStock++;
           });
         }
+      } else if (top?.id === 'CORN') {
+        // 1. Feed grinder machine
+        const feedMachine = machines.find(m => m.outputType.id === 'CHICKEN_FEED' && m.inputStock < 6);
+        if (feedMachine) {
+          isMoving = true;
+          this.walkTowards(feedMachine.inputZonePos, delta, () => {
+            const corn = this.stack.popItem(ITEM_TYPES.CORN);
+            if (corn) feedMachine.inputStock++;
+          });
+        } else {
+          // 2. Popcorn machine fallback
+          const popMachine = machines.find(m => m.outputType.id === 'POPCORN' && m.inputStock < 6);
+          if (popMachine) {
+            isMoving = true;
+            this.walkTowards(popMachine.inputZonePos, delta, () => {
+              const corn = this.stack.popItem(ITEM_TYPES.CORN);
+              if (corn) popMachine.inputStock++;
+            });
+          } else {
+            // 3. Deliver to corn shelf
+            const targetShelf = shelves.find(s => s.acceptedType.id === top?.id && s.stock.length < s.capacity);
+            if (targetShelf) {
+              isMoving = true;
+              this.walkTowards(targetShelf.position, delta, () => {
+                const item = this.stack.popItem(targetShelf.acceptedType);
+                if (item) targetShelf.addItem(item);
+              });
+            } else {
+              // Wait near feed machine
+              const fm = machines.find(m => m.outputType.id === 'CHICKEN_FEED');
+              if (fm) {
+                isMoving = true;
+                this.walkTowards(fm.inputZonePos, delta);
+              }
+            }
+          }
+        }
+      } else if (top?.id === 'EGG') {
+        // 1. Egg shelf
+        const eggShelf = shelves.find(s => s.acceptedType.id === 'EGG' && s.stock.length < s.capacity);
+        if (eggShelf) {
+          isMoving = true;
+          this.walkTowards(eggShelf.position, delta, () => {
+            const item = this.stack.popItem(eggShelf.acceptedType);
+            if (item) eggShelf.addItem(item);
+          });
+        } else {
+          // 2. Fallback: Deliver Egg to Bakery Oven!
+          const needyOven = ovens.find(o => o.eggStock < 3);
+          if (needyOven) {
+            isMoving = true;
+            this.walkTowards(needyOven.inputZonePos, delta, () => {
+              const egg = this.stack.popItem(ITEM_TYPES.EGG);
+              if (egg) needyOven.eggStock++;
+            });
+          } else {
+            const es = shelves.find(s => s.acceptedType.id === 'EGG');
+            if (es) {
+              isMoving = true;
+              this.walkTowards(es.position, delta);
+            }
+          }
+        }
       } else {
-        // Shelf (Egg, Popcorn, Corn)
+        // Other item shelf delivery
         const targetShelf = shelves.find(s => s.acceptedType.id === top?.id && s.stock.length < s.capacity);
         if (targetShelf) {
           isMoving = true;
@@ -248,7 +374,7 @@ export class Worker {
         }
       }
     } else {
-      // Check coop egg output first
+      // 1. Check coop egg output first
       const coopWithEggs = coops.find(c => c.eggStock.length > 0);
       if (coopWithEggs) {
         isMoving = true;
@@ -259,13 +385,25 @@ export class Worker {
           if (egg) this.stack.addItem(egg);
         });
       } else {
-        // Harvest corn
-        const cornFarm = farmPlots.find(f => f.itemType.id === 'CORN' && f.ripeCount > 0);
-        if (cornFarm) {
+        // 2. Check feed machine output
+        const feedMachineOutput = machines.find(m => m.outputType.id === 'CHICKEN_FEED' && m.outputStock.length > 0);
+        if (feedMachineOutput) {
           isMoving = true;
-          this.walkTowards(cornFarm.position, delta, () => {
-            cornFarm.harvest({ stack: this.stack });
+          this.walkTowards(feedMachineOutput.outputZonePos, delta, () => {
+            const feed = feedMachineOutput.outputStock.pop();
+            const mesh = feedMachineOutput.outputMeshes.pop();
+            if (mesh) feedMachineOutput.meshGroup.remove(mesh);
+            if (feed) this.stack.addItem(feed);
           });
+        } else {
+          // 3. Harvest corn
+          const cornFarm = farmPlots.find(f => f.itemType.id === 'CORN' && f.ripeCount > 0);
+          if (cornFarm) {
+            isMoving = true;
+            this.walkTowards(cornFarm.position, delta, () => {
+              cornFarm.harvest({ stack: this.stack });
+            });
+          }
         }
       }
     }
@@ -273,8 +411,7 @@ export class Worker {
     this.animateLegs(isMoving, delta);
   }
 
-  updateChef(delta, kitchens, ovens) {
-    // Stands near Kitchen grill station
+  updateChef(delta, kitchens, ovens, shelves) {
     if (kitchens.length > 0) {
       const k = kitchens[0];
       this.mesh.position.lerp(new THREE.Vector3(k.position.x, 0, k.position.z - 1.2), delta * 8.0);

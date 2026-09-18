@@ -37,8 +37,8 @@ export class Engine {
     const sunLight = new THREE.DirectionalLight(0xfff7e6, 0.9);
     sunLight.position.set(20, 30, 15);
     sunLight.castShadow = true;
-    sunLight.shadow.mapSize.width = 2048;
-    sunLight.shadow.mapSize.height = 2048;
+    sunLight.shadow.mapSize.width = 1024;
+    sunLight.shadow.mapSize.height = 1024;
     sunLight.shadow.camera.near = 0.5;
     sunLight.shadow.camera.far = 80;
     const d = 25;

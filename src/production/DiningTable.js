@@ -153,7 +153,7 @@ export class DiningTable {
     return false;
   }
 
-  update(delta, player, time, onTipCollectedCallback) {
+  update(delta, player, time, onTipCollectedCallback, onMealServedCallback) {
     // 1. Eating animation & process
     if (this.isEating) {
       this.eatTimer += delta;
@@ -188,6 +188,9 @@ export class DiningTable {
         const item = player.stack.popItem(this.desiredMeal);
         if (item) {
           this.serveMeal(item);
+          if (onMealServedCallback) {
+            onMealServedCallback(item, this.tableIndex);
+          }
         }
       }
     }

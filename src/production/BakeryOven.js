@@ -101,7 +101,7 @@ export class BakeryOven {
     }
   }
 
-  update(delta, player, time, speedMultiplier = 1.0) {
+  update(delta, player, time, speedMultiplier = 1.0, onBreadCollectedCallback = null) {
     // Hearth flame flicker
     if (this.hearth) {
       const flicker = 0.8 + Math.sin(time * 15) * 0.2;
@@ -129,6 +129,9 @@ export class BakeryOven {
         const mesh = this.breadMeshes.pop();
         if (mesh) this.meshGroup.remove(mesh);
         player.stack.addItem(bread);
+        if (onBreadCollectedCallback) {
+          onBreadCollectedCallback(bread);
+        }
       }
     }
 
