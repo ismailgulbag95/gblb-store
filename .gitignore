@@ -5,6 +5,5 @@ dist-ssr
 .env
 .env.*
 .DS_Store
-gblb-store
 .vscode
 .idea
