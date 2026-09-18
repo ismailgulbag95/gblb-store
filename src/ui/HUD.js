@@ -83,15 +83,16 @@ export class HUD {
     const cardCat = document.getElementById('char-card-cat');
 
     const updateActiveCards = (activeType) => {
+      const isTr = (i18n.currentLang || 'tr') === 'tr';
       if (cardShopkeeper) {
         if (activeType === 'shopkeeper') {
           cardShopkeeper.classList.add('active');
           const badge = cardShopkeeper.querySelector('.char-badge');
-          if (badge) badge.innerText = i18n.getCurrentLanguage() === 'tr' ? '✓ SEÇİLDİ' : '✓ SELECTED';
+          if (badge) badge.innerText = isTr ? '✓ SEÇİLDİ' : '✓ SELECTED';
         } else {
           cardShopkeeper.classList.remove('active');
           const badge = cardShopkeeper.querySelector('.char-badge');
-          if (badge) badge.innerText = i18n.getCurrentLanguage() === 'tr' ? 'SEÇ' : 'SELECT';
+          if (badge) badge.innerText = isTr ? 'SEÇ' : 'SELECT';
         }
       }
 
@@ -99,11 +100,11 @@ export class HUD {
         if (activeType === 'cat') {
           cardCat.classList.add('active');
           const badge = cardCat.querySelector('.char-badge');
-          if (badge) badge.innerText = i18n.getCurrentLanguage() === 'tr' ? '✓ SEÇİLDİ' : '✓ SELECTED';
+          if (badge) badge.innerText = isTr ? '✓ SEÇİLDİ' : '✓ SELECTED';
         } else {
           cardCat.classList.remove('active');
           const badge = cardCat.querySelector('.char-badge');
-          if (badge) badge.innerText = i18n.getCurrentLanguage() === 'tr' ? 'SEÇ' : 'SELECT';
+          if (badge) badge.innerText = isTr ? 'SEÇ' : 'SELECT';
         }
       }
     };

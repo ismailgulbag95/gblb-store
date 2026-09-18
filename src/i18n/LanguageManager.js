@@ -175,12 +175,18 @@ export class LanguageManager {
     return this.currentLang;
   }
 
-  t(key) {
-    const dict = TRANSLATIONS[this.currentLang] || TRANSLATIONS.tr;
-    return dict[key] || key;
+  getCurrentLanguage() {
+    return this.currentLang;
   }
 
-  onLanguageChange(callback) {
+  t(key) {
+    if (TRANSLATIONS[this.currentLang] && TRANSLATIONS[this.currentLang][key]) {
+      return TRANSLATIONS[this.currentLang][key];
+    }
+    return TRANSLATIONS.tr[key] || key;
+  }
+
+  onChange(callback) {
     this.listeners.push(callback);
   }
 }
