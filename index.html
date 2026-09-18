@@ -55,6 +55,7 @@
 
         <div class="modal-tabs">
           <button class="tab-btn active" data-tab="tab-general" id="tab-btn-gen">Genel</button>
+          <button class="tab-btn" data-tab="tab-character" id="tab-btn-char">🐱 Karakter</button>
           <button class="tab-btn" data-tab="tab-lang" id="tab-btn-lang">🌐 Dil</button>
           <button class="tab-btn" data-tab="tab-debug" id="tab-btn-deb">🛠️ Debug</button>
         </div>
@@ -84,7 +85,31 @@
           </div>
         </div>
 
-        <!-- Tab 2: Language Selection (i18n) -->
+        <!-- Tab 2: Character Selection -->
+        <div id="tab-character" class="tab-content">
+          <div class="character-select-title" id="char-title">OYUNCU KARAKTERİNİ SEÇ</div>
+          <div class="character-grid">
+            <div class="char-card active" id="char-card-shopkeeper" data-char="shopkeeper">
+              <div class="char-icon">👨‍🌾</div>
+              <div class="char-info">
+                <div class="char-name" id="char-name-shopkeeper">Market Çalışanı</div>
+                <div class="char-desc" id="char-desc-shopkeeper">Klasik çalışkan süpermarket ve çiftlik yöneticisi</div>
+              </div>
+              <div class="char-badge">✓ SEÇİLDİ</div>
+            </div>
+
+            <div class="char-card" id="char-card-cat" data-char="cat">
+              <div class="char-icon">🐱</div>
+              <div class="char-info">
+                <div class="char-name" id="char-name-cat">Maceracı Kedi</div>
+                <div class="char-desc" id="char-desc-cat">Zümrüt gözlü, sevimli kıvrık kuyruklu maceracı kedi</div>
+              </div>
+              <div class="char-badge">SEÇ</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 3: Language Selection (i18n) -->
         <div id="tab-lang" class="tab-content">
           <div class="lang-grid">
             <button id="btn-lang-tr" class="lang-btn active">

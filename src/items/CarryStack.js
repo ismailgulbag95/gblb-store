@@ -14,6 +14,16 @@ export class CarryStack {
     this.parentMesh.add(this.group);
   }
 
+  attachToParent(newParentMesh) {
+    if (this.parentMesh && this.group) {
+      this.parentMesh.remove(this.group);
+    }
+    this.parentMesh = newParentMesh;
+    if (this.parentMesh && this.group) {
+      this.parentMesh.add(this.group);
+    }
+  }
+
   canAdd() {
     return this.items.length < this.maxCapacity;
   }

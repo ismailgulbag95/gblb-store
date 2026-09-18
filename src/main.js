@@ -61,8 +61,9 @@ class Game {
     // 4. Setup Progressive Unlock Chain
     this.setupUnlockProgression();
 
-    // 5. Connect Debug Actions
+    // 5. Connect Debug & Character Actions
     this.hud.bindDebugActions(this);
+    this.hud.setupCharacterEvents(this.player);
 
     // Start UI
     this.hud.updateMoney(this.playerMoney);

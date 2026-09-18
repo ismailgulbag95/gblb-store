@@ -78,6 +78,55 @@ export class HUD {
     }
   }
 
+  setupCharacterEvents(player) {
+    const cardShopkeeper = document.getElementById('char-card-shopkeeper');
+    const cardCat = document.getElementById('char-card-cat');
+
+    const updateActiveCards = (activeType) => {
+      if (cardShopkeeper) {
+        if (activeType === 'shopkeeper') {
+          cardShopkeeper.classList.add('active');
+          const badge = cardShopkeeper.querySelector('.char-badge');
+          if (badge) badge.innerText = i18n.getCurrentLanguage() === 'tr' ? '✓ SEÇİLDİ' : '✓ SELECTED';
+        } else {
+          cardShopkeeper.classList.remove('active');
+          const badge = cardShopkeeper.querySelector('.char-badge');
+          if (badge) badge.innerText = i18n.getCurrentLanguage() === 'tr' ? 'SEÇ' : 'SELECT';
+        }
+      }
+
+      if (cardCat) {
+        if (activeType === 'cat') {
+          cardCat.classList.add('active');
+          const badge = cardCat.querySelector('.char-badge');
+          if (badge) badge.innerText = i18n.getCurrentLanguage() === 'tr' ? '✓ SEÇİLDİ' : '✓ SELECTED';
+        } else {
+          cardCat.classList.remove('active');
+          const badge = cardCat.querySelector('.char-badge');
+          if (badge) badge.innerText = i18n.getCurrentLanguage() === 'tr' ? 'SEÇ' : 'SELECT';
+        }
+      }
+    };
+
+    updateActiveCards(player.characterType);
+
+    if (cardShopkeeper) {
+      cardShopkeeper.addEventListener('click', () => {
+        player.setCharacterType('shopkeeper');
+        updateActiveCards('shopkeeper');
+        this.showToast('👨‍🌾 Market Çalışanı seçildi!', '#3498db');
+      });
+    }
+
+    if (cardCat) {
+      cardCat.addEventListener('click', () => {
+        player.setCharacterType('cat');
+        updateActiveCards('cat');
+        this.showToast('🐱 Maceracı Kedi seçildi! 🐾', '#e67e22');
+      });
+    }
+  }
+
   updateLanguageUI() {
     // Top bar boost
     const boostText = document.getElementById('boost-text');
@@ -94,11 +143,30 @@ export class HUD {
     const tabGen = document.getElementById('tab-btn-gen');
     if (tabGen) tabGen.innerText = i18n.t('tab_general');
 
+    const tabChar = document.getElementById('tab-btn-char');
+    if (tabChar) tabChar.innerText = i18n.t('tab_character');
+
     const tabLang = document.getElementById('tab-btn-lang');
     if (tabLang) tabLang.innerText = i18n.t('tab_language');
 
     const tabDeb = document.getElementById('tab-btn-deb');
     if (tabDeb) tabDeb.innerText = i18n.t('tab_debug');
+
+    // Character tab labels
+    const charTitle = document.getElementById('char-title');
+    if (charTitle) charTitle.innerText = i18n.t('char_select_title');
+
+    const charNameShopkeeper = document.getElementById('char-name-shopkeeper');
+    if (charNameShopkeeper) charNameShopkeeper.innerText = i18n.t('char_shopkeeper');
+
+    const charDescShopkeeper = document.getElementById('char-desc-shopkeeper');
+    if (charDescShopkeeper) charDescShopkeeper.innerText = i18n.t('char_shopkeeper_desc');
+
+    const charNameCat = document.getElementById('char-name-cat');
+    if (charNameCat) charNameCat.innerText = i18n.t('char_cat');
+
+    const charDescCat = document.getElementById('char-desc-cat');
+    if (charDescCat) charDescCat.innerText = i18n.t('char_cat_desc');
 
     const lblSfx = document.getElementById('label-sfx');
     if (lblSfx) lblSfx.innerText = i18n.t('sfx');
