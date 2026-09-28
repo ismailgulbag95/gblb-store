@@ -9,9 +9,17 @@ export class Engine {
     this.scene.background = new THREE.Color(0x70d6ff);
     this.scene.fog = new THREE.Fog(0x70d6ff, 40, 75);
 
-    // Camera (Isometric Arcade View)
+    // Isometric camera with a stable world scale across desktop and portrait screens.
     const aspect = window.innerWidth / window.innerHeight;
-    this.camera = new THREE.PerspectiveCamera(42, aspect, 0.1, 1000);
+    const viewHeight = window.innerHeight > window.innerWidth ? 29 : 24;
+    this.camera = new THREE.OrthographicCamera(
+      -(viewHeight * aspect) / 2,
+      (viewHeight * aspect) / 2,
+      viewHeight / 2,
+      -viewHeight / 2,
+      0.1,
+      1000,
+    );
     this.cameraOffset = new THREE.Vector3(14, 18, 14);
     this.camera.position.copy(this.cameraOffset);
     this.camera.lookAt(0, 0, 0);
@@ -19,7 +27,7 @@ export class Engine {
     // Renderer
     this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
     this.renderer.setSize(window.innerWidth, window.innerHeight);
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.container.appendChild(this.renderer.domElement);
@@ -63,9 +71,15 @@ export class Engine {
   }
 
   onWindowResize() {
-    this.camera.aspect = window.innerWidth / window.innerHeight;
+    const aspect = window.innerWidth / window.innerHeight;
+    const viewHeight = window.innerHeight > window.innerWidth ? 29 : 24;
+    this.camera.left = -(viewHeight * aspect) / 2;
+    this.camera.right = (viewHeight * aspect) / 2;
+    this.camera.top = viewHeight / 2;
+    this.camera.bottom = -viewHeight / 2;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(window.innerWidth, window.innerHeight);
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
   }
 
   render() {

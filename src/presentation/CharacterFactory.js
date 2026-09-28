@@ -1,71 +1,61 @@
 import * as THREE from 'three';
-import { GAME_CONFIG } from '../config/GameConfig.js';
-import { CarryStack } from '../items/CarryStack.js';
 
-export class Player {
-  constructor(scene) {
-    this.scene = scene;
-    this.speed = GAME_CONFIG.PLAYER.speed;
-    this.radius = 0.48; // collision radius
+// Character meshes and walk animations are ported from the original player models.
+export class CharacterFactory {
+  constructor(type = 'shopkeeper') {
+    this.type = type;
     this.walkCycle = 0;
-    this.characterType = localStorage.getItem('player_character') || 'shopkeeper';
-
-    this.rootGroup = new THREE.Group();
-    this.scene.add(this.rootGroup);
-
-    this.mesh = this.rootGroup; // compatibility alias
-    this.characterMesh = null;
-    this.buildCurrentCharacter();
-
-    this.stack = new CarryStack(this.rootGroup, GAME_CONFIG.PLAYER.baseStackCapacity);
-  }
-
-  get position() {
-    return this.rootGroup.position;
-  }
-
-  getPosition() {
-    return this.rootGroup.position;
-  }
-
-  setCharacterType(type) {
-    if (this.characterType === type) return;
-    this.characterType = type;
-    localStorage.setItem('player_character', type);
-    this.buildCurrentCharacter();
-  }
-
-  buildCurrentCharacter() {
-    if (this.characterMesh) {
-      this.rootGroup.remove(this.characterMesh);
-    }
-
-    // Reset animation part references
     this.leftLeg = null;
     this.rightLeg = null;
     this.leftArm = null;
     this.rightArm = null;
     this.tailGroup = null;
-    this.earsGroup = null;
     this.antennaGroup = null;
-    this.wingsGroup = null;
-
-    if (this.characterType === 'cat') {
-      this.characterMesh = this.createCatMesh();
-    } else if (this.characterType === 'robot') {
-      this.characterMesh = this.createRobotMesh();
-    } else if (this.characterType === 'panda') {
-      this.characterMesh = this.createPandaMesh();
-    } else if (this.characterType === 'penguin') {
-      this.characterMesh = this.createPenguinMesh();
-    } else {
-      this.characterMesh = this.createShopkeeperMesh();
-    }
-
-    this.rootGroup.add(this.characterMesh);
+    this.group = this.#build(type);
   }
 
-  // 1. SHOPKEEPER (Classic)
+  #build(type) {
+    const builders = {
+      shopkeeper: this.createShopkeeperMesh,
+      cat: this.createCatMesh,
+      robot: this.createRobotMesh,
+      panda: this.createPandaMesh,
+      penguin: this.createPenguinMesh,
+    };
+    return (builders[type] ?? builders.shopkeeper).call(this);
+  }
+
+  animate(delta, moving) {
+    if (moving) {
+      this.walkCycle += delta * (this.type === 'penguin' ? 16 : 14);
+      if (this.leftLeg) this.leftLeg.rotation.x = Math.sin(this.walkCycle) * 0.65;
+      if (this.rightLeg) this.rightLeg.rotation.x = -Math.sin(this.walkCycle) * 0.65;
+      if (this.leftArm) this.leftArm.rotation.x = -Math.sin(this.walkCycle) * 0.5;
+      if (this.rightArm) this.rightArm.rotation.x = Math.sin(this.walkCycle) * 0.5;
+      if (this.type === 'cat' && this.tailGroup) {
+        this.tailGroup.rotation.y = Math.sin(this.walkCycle * 1.2) * 0.35;
+        this.tailGroup.rotation.z = Math.cos(this.walkCycle * 0.8) * 0.2;
+        this.tailGroup.rotation.x = -0.2 + Math.abs(Math.sin(this.walkCycle)) * 0.15;
+      }
+      if (this.type === 'penguin') {
+        if (this.leftArm) this.leftArm.rotation.z = 0.3 + Math.abs(Math.sin(this.walkCycle)) * 0.25;
+        if (this.rightArm) this.rightArm.rotation.z = -0.3 - Math.abs(Math.sin(this.walkCycle)) * 0.25;
+      }
+      if (this.type === 'robot' && this.antennaGroup) this.antennaGroup.rotation.z = Math.sin(this.walkCycle * 2) * 0.2;
+      this.group.position.y = Math.abs(Math.sin(this.walkCycle * 2)) * 0.06;
+    } else {
+      for (const limb of [this.leftLeg, this.rightLeg, this.leftArm, this.rightArm]) {
+        if (limb) limb.rotation.x = THREE.MathUtils.lerp(limb.rotation.x, 0, delta * 10);
+      }
+      this.group.rotation.z = THREE.MathUtils.lerp(this.group.rotation.z, 0, delta * 10);
+      if (this.type === 'cat' && this.tailGroup) {
+        this.walkCycle += delta * 3;
+        this.tailGroup.rotation.y = Math.sin(this.walkCycle) * 0.2;
+        this.tailGroup.rotation.z = Math.cos(this.walkCycle * 0.5) * 0.1;
+      }
+      this.group.position.y = THREE.MathUtils.lerp(this.group.position.y, 0, delta * 10);
+    }
+  }
   createShopkeeperMesh() {
     const group = new THREE.Group();
 
@@ -675,152 +665,5 @@ export class Player {
 
     return group;
   }
-
-  update(delta, inputVector, obstacles = []) {
-    const isMoving = inputVector.lengthSq() > 0.01;
-
-    if (isMoving) {
-      // Rotate player smoothly towards movement direction
-      const targetAngle = Math.atan2(inputVector.x, inputVector.z);
-      this.rootGroup.rotation.y = THREE.MathUtils.lerp(
-        this.rootGroup.rotation.y,
-        targetAngle,
-        delta * GAME_CONFIG.PLAYER.turnSpeed
-      );
-
-      // Total movement distance this frame
-      const totalMoveDist = this.speed * delta;
-      
-      // Prevent tunneling by sub-stepping fast movements
-      const maxSubStep = this.radius * 0.4;
-      const numSteps = Math.max(1, Math.ceil(totalMoveDist / maxSubStep));
-      const stepDist = totalMoveDist / numSteps;
-      const stepDirX = inputVector.x * stepDist;
-      const stepDirZ = inputVector.z * stepDist;
-
-      let currentX = this.rootGroup.position.x;
-      let currentZ = this.rootGroup.position.z;
-
-      for (let s = 0; s < numSteps; s++) {
-        currentX += stepDirX;
-        currentZ += stepDirZ;
-
-        // Iterative relaxation solver for solid obstacles
-        const resolved = this.resolveObstacleCollisions(currentX, currentZ, obstacles);
-        currentX = resolved.x;
-        currentZ = resolved.z;
-      }
-
-      // Map Boundary Constraints
-      const minX = -47.2, maxX = 13.6;
-      const minZ = -8.5, maxZ = 8.5;
-      currentX = Math.max(minX, Math.min(maxX, currentX));
-      currentZ = Math.max(minZ, Math.min(maxZ, currentZ));
-
-      // Apply new position
-      this.rootGroup.position.x = currentX;
-      this.rootGroup.position.z = currentZ;
-
-      // Walk cycle animation
-      this.walkCycle += delta * (this.characterType === 'penguin' ? 16.0 : 14.0);
-      
-      // Leg strides
-      if (this.leftLeg) this.leftLeg.rotation.x = Math.sin(this.walkCycle) * 0.65;
-      if (this.rightLeg) this.rightLeg.rotation.x = -Math.sin(this.walkCycle) * 0.65;
-
-      // Arm swings (opposite to legs)
-      if (this.leftArm) this.leftArm.rotation.x = -Math.sin(this.walkCycle) * 0.5;
-      if (this.rightArm) this.rightArm.rotation.x = Math.sin(this.walkCycle) * 0.5;
-
-      // Special Animations per Character
-      if (this.characterType === 'cat' && this.tailGroup) {
-        this.tailGroup.rotation.y = Math.sin(this.walkCycle * 1.2) * 0.35;
-        this.tailGroup.rotation.z = Math.cos(this.walkCycle * 0.8) * 0.2;
-        this.tailGroup.rotation.x = -0.2 + Math.abs(Math.sin(this.walkCycle)) * 0.15;
-      } else if (this.characterType === 'penguin') {
-        // Penguin cute waddle (side-to-side body tilt)
-        this.rootGroup.rotation.z = Math.sin(this.walkCycle) * 0.18;
-        if (this.leftArm) this.leftArm.rotation.z = 0.3 + Math.abs(Math.sin(this.walkCycle)) * 0.25;
-        if (this.rightArm) this.rightArm.rotation.z = -0.3 - Math.abs(Math.sin(this.walkCycle)) * 0.25;
-      } else if (this.characterType === 'robot' && this.antennaGroup) {
-        this.antennaGroup.rotation.z = Math.sin(this.walkCycle * 2.0) * 0.2;
-      }
-
-      // Body bounce
-      this.rootGroup.position.y = Math.abs(Math.sin(this.walkCycle * 2)) * 0.06;
-    } else {
-      if (this.leftLeg) this.leftLeg.rotation.x = THREE.MathUtils.lerp(this.leftLeg.rotation.x, 0, delta * 10);
-      if (this.rightLeg) this.rightLeg.rotation.x = THREE.MathUtils.lerp(this.rightLeg.rotation.x, 0, delta * 10);
-      if (this.leftArm) this.leftArm.rotation.x = THREE.MathUtils.lerp(this.leftArm.rotation.x, 0, delta * 10);
-      if (this.rightArm) this.rightArm.rotation.x = THREE.MathUtils.lerp(this.rightArm.rotation.x, 0, delta * 10);
-      this.rootGroup.rotation.z = THREE.MathUtils.lerp(this.rootGroup.rotation.z, 0, delta * 10);
-      
-      // Idle animations
-      if (this.characterType === 'cat' && this.tailGroup) {
-        this.walkCycle += delta * 3.0;
-        this.tailGroup.rotation.y = Math.sin(this.walkCycle) * 0.2;
-        this.tailGroup.rotation.z = Math.cos(this.walkCycle * 0.5) * 0.1;
-      }
-
-      this.rootGroup.position.y = THREE.MathUtils.lerp(this.rootGroup.position.y, 0, delta * 10);
-    }
-
-    this.stack.update(delta, isMoving);
-  }
-
-  /**
-   * Circle vs AABB Separation Solver with multiple relaxation passes
-   */
-  resolveObstacleCollisions(posX, posZ, obstacles, iterations = 3) {
-    const r = this.radius;
-
-    for (let iter = 0; iter < iterations; iter++) {
-      for (const obs of obstacles) {
-        const minX = obs.min.x;
-        const maxX = obs.max.x;
-        const minZ = obs.min.z !== undefined ? obs.min.z : obs.min.y;
-        const maxZ = obs.max.z !== undefined ? obs.max.z : obs.max.y;
-
-        // Find closest point on AABB box to circle center
-        const closestX = Math.max(minX, Math.min(maxX, posX));
-        const closestZ = Math.max(minZ, Math.min(maxZ, posZ));
-
-        const dx = posX - closestX;
-        const dz = posZ - closestZ;
-        const distSq = dx * dx + dz * dz;
-
-        // Check if circle touches or is inside the box
-        if (distSq < r * r) {
-          if (distSq > 0.00001) {
-            // Case A: Circle center is outside the box -> Push outward along normal
-            const dist = Math.sqrt(distSq);
-            const overlap = r - dist;
-            const nx = dx / dist;
-            const nz = dz / dist;
-            posX += nx * overlap;
-            posZ += nz * overlap;
-          } else {
-            // Case B: Circle center is INSIDE the box -> Push out through closest edge
-            const dLeft = Math.abs(posX - minX);
-            const dRight = Math.abs(maxX - posX);
-            const dTop = Math.abs(posZ - minZ);
-            const dBottom = Math.abs(maxZ - posZ);
-
-            const minDist = Math.min(dLeft, dRight, dTop, dBottom);
-            if (minDist === dLeft) {
-              posX = minX - r;
-            } else if (minDist === dRight) {
-              posX = maxX + r;
-            } else if (minDist === dTop) {
-              posZ = minZ - r;
-            } else {
-              posZ = maxZ + r;
-            }
-          }
-        }
-      }
-    }
-
-    return { x: posX, z: posZ };
-  }
 }
+
