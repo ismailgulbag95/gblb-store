@@ -96,8 +96,8 @@ export const STAFF = Object.freeze({
 
 export const STAFF_HIRES = Object.freeze([
   { upgradeId: 'cashier', staffTypes: ['cashier'], effect: 'Kasada müşteri ödemelerini otomatik alır.', unlock: 'İlk domates satışından sonra açılır.' },
-  { upgradeId: 'harvester', staffTypes: ['harvester'], effect: 'Tarladaki ürünü uygun reyonlara taşır.', unlock: 'İlk salça satışından sonra açılır.' },
-  { upgradeId: 'factoryFeeder', staffTypes: ['factoryFeeder'], effect: 'Üretim hatlarına malzeme taşır.', unlock: 'İlk portakal suyu satışından sonra açılır.' },
+  { upgradeId: 'harvester', staffTypes: ['harvester'], effect: 'Önce reyonları doldurur, ardından üretim hatlarına malzeme taşır.', unlock: 'İlk salça satışından sonra açılır.' },
+  { upgradeId: 'factoryFeeder', staffTypes: ['factoryFeeder'], effect: 'Reyon stoklarını tamamlayıp üretim hatlarını besler.', unlock: 'İlk portakal suyu satışından sonra açılır.' },
   { upgradeId: 'caretaker', staffTypes: ['caretaker'], effect: 'Yemi kümese, yumurtaları reyona taşır.', unlock: 'İlk yumurta satışından sonra açılır.' },
   { upgradeId: 'chefWaiter', staffTypes: ['chefWaiter', 'waiter'], effect: 'Restoran mutfağını ve masa servisini otomatikleştirir.', unlock: 'Restoran müşterisinden bahşiş alınca açılır.' },
 ]);

@@ -39,7 +39,7 @@ const UPGRADE_MESSAGES = {
   tomatoFarm2: 'İkinci domates tarlası açıldı. Hasat kapasiten arttı.',
   cashier: 'Kasiyer işe alındı. Ödemeler daha hızlı işleniyor.',
   paste: 'Salça kazanı ve yeni reyon açıldı.',
-  harvester: 'Hasat işçisi rafları otomatik dolduruyor.',
+  harvester: 'Hasat işçisi önce rafları dolduruyor, ardından üretim makinelerini besliyor.',
   orange: 'Portakal bahçesi ve meyve sıkacağı açıldı.',
   factoryFeeder: 'Fabrika lojistikçisi üretim hatlarını besliyor.',
   orangeFarm2: 'İkinci portakal bahçesi açıldı.',

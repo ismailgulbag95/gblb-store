@@ -11,36 +11,36 @@
     <div id="ui-layer">
       <header class="top-bar" data-ui>
         <div class="brand-pill"><span class="brand-mark">G</span><span>GBLB STORE</span></div>
+        <section class="quest-card" aria-live="polite" data-ui>
+          <div class="quest-icon">🎯</div>
+          <div class="quest-copy"><span class="eyebrow">SIRADAKİ HEDEF</span><strong id="quest-text">Domates topla, reyonu doldur ve ilk satışını yap.</strong></div>
+          <div class="quest-progress"><span id="progress-count">0 / 17</span><div class="progress-track"><i id="progress-fill"></i></div></div>
+        </section>
         <div class="stat-group">
           <div class="stat-pill money-pill"><span>💵</span><strong id="money-display">$100</strong></div>
           <div class="stat-pill bag-pill"><span>🎒</span><strong id="stack-display">0 / 6</strong></div>
         </div>
-        <div class="top-actions">
-          <button class="icon-btn" id="btn-expansions" aria-label="İşletme geliştirmeleri">🏗️ <span id="upgrade-count">1</span></button>
-          <button class="icon-btn" id="btn-furniture" aria-label="Mobilya dükkanı" title="Mobilya dükkanı">🛋️</button>
-          <button class="icon-btn" id="btn-layout" aria-label="Yerleşimi düzenle" aria-pressed="false" title="Yerleşimi düzenle">▦</button>
-          <button class="icon-btn" id="btn-decor-top" aria-label="Dekorasyon mağazası" title="Dekorasyon mağazası">🎨</button>
-          <button class="icon-btn" id="btn-settings" aria-label="Ayarlar">⚙️</button>
+        <div class="top-utility-row">
+          <section class="order-card hidden" id="order-card" data-ui aria-live="polite">
+            <div class="order-heading"><span>📋</span><strong id="order-title" data-short-label="SİPARİŞ">MÜŞTERİ SİPARİŞİ</strong><button id="btn-order-toggle" class="order-collapse" aria-label="Sipariş ayrıntılarını küçült" aria-expanded="true">⌃</button></div>
+            <div class="order-details"><span id="order-item"></span><strong id="order-reward"></strong></div>
+            <div class="order-progress"><span id="order-progress"></span><div class="progress-track"><i id="order-progress-fill"></i></div></div>
+            <button id="btn-deliver-order" class="order-deliver">Siparişi teslim et</button>
+            <small id="order-bonus-progress" class="order-bonus-progress"></small>
+          </section>
+          <div class="top-actions">
+            <button class="icon-btn" id="btn-expansions" aria-label="İşletme geliştirmeleri">🏗️ <span id="upgrade-count">1</span></button>
+            <button class="icon-btn" id="btn-furniture" aria-label="Mobilya dükkanı" title="Mobilya dükkanı">🛋️</button>
+            <button class="icon-btn" id="btn-layout" aria-label="Yerleşimi düzenle" aria-pressed="false" title="Yerleşimi düzenle">▦</button>
+            <button class="icon-btn" id="btn-decor-top" aria-label="Dekorasyon mağazası" title="Dekorasyon mağazası">🎨</button>
+            <button class="icon-btn" id="btn-settings" aria-label="Ayarlar">⚙️</button>
+          </div>
         </div>
       </header>
       <div id="layout-help" class="layout-help hidden" data-ui>
         <span id="layout-help-text">Taşımak için bir yapıya dokun, sonra boş bir kareye dokun. Bitirmek için ▦ düğmesine bas.</span>
         <button id="btn-rotate-layout" class="layout-rotate-btn hidden" type="button" aria-label="Seçili yapıyı döndür">↻ Döndür (R)</button>
       </div>
-
-      <section class="quest-card" aria-live="polite" data-ui>
-        <div class="quest-icon">🎯</div>
-        <div class="quest-copy"><span class="eyebrow">SIRADAKİ HEDEF</span><strong id="quest-text">Domates topla, reyonu doldur ve ilk satışını yap.</strong></div>
-        <div class="quest-progress"><span id="progress-count">0 / 17</span><div class="progress-track"><i id="progress-fill"></i></div></div>
-      </section>
-
-      <section class="order-card hidden" id="order-card" data-ui aria-live="polite">
-        <div class="order-heading"><span>📋</span><strong id="order-title">MÜŞTERİ SİPARİŞİ</strong><button id="btn-order-toggle" class="order-collapse" aria-label="Siparişi küçült" aria-expanded="true">⌃</button></div>
-        <div class="order-details"><span id="order-item"></span><strong id="order-reward"></strong></div>
-        <div class="order-progress"><span id="order-progress"></span><div class="progress-track"><i id="order-progress-fill"></i></div></div>
-        <button id="btn-deliver-order" class="order-deliver">Siparişi teslim et</button>
-        <small id="order-bonus-progress" class="order-bonus-progress"></small>
-      </section>
 
       <button class="business-toggle" id="btn-business-toggle" data-ui aria-label="İşletme özetini aç" aria-expanded="false">🏪 <span id="business-toggle-score">—</span></button>
 

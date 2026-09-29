@@ -803,6 +803,9 @@ function routeCustomerToShelf(state, customer, item, queueIndex = 0) {
     const position = shelfQueuePosition(item, queueIndex, state, shelf.id);
     const path = findCustomerMarketRoute(state, customer, position, item);
     if (!path.length) continue;
+    if (shelf.id === customer.targetShelfId && (customer.phase === 'waiting-stock'
+      || (customer.phase === 'to-shelf' && customer.shelfQueueIndex === queueIndex
+        && customer.route?.length && !customer.routeBlocked))) return;
     customer.targetShelfId = shelf.id;
     customer.shelfQueueIndex = queueIndex;
     routeTo(customer, path, 'to-shelf');
@@ -1113,10 +1116,11 @@ function customerTick(state, events) {
       const item = customer.shoppingList[customer.shoppingIndex] ?? customer.demand;
       const queue = shelfQueues.get(customer.targetShelfId) ?? [];
       const queueIndex = queue.indexOf(customer);
-      const shelf = chooseShelfLocation(state, item, customer.targetShelfId);
+      let shelf = chooseShelfLocation(state, item, customer.targetShelfId);
       if (shelf?.id !== customer.targetShelfId) {
         routeCustomerToShelf(state, customer, item, Math.max(0, queueIndex));
-        continue;
+        if (customer.phase === 'to-shelf') continue;
+        shelf = getShelfLocations(state, item).find((entry) => entry.id === customer.targetShelfId);
       }
       const position = shelfQueuePosition(item, Math.max(0, queueIndex), state, customer.targetShelfId);
       moveToward(customer, position.x, position.z, CUSTOMER_SPEED);

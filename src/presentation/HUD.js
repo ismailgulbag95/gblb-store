@@ -20,8 +20,8 @@ const EN = {
   haptics: 'Haptic feedback', backgroundNote: 'The simulation pauses while the app is in the background. Tap resume when you return.',
   resetGame: 'Start a new game', orTap: 'or tap to move', businessTab: 'Business', staffTab: 'Staff',
   staffEffect: {
-    cashier: 'Handles customer payments at the register.', harvester: 'Moves farm produce to matching shelves.',
-    factoryFeeder: 'Carries ingredients between production stations.', caretaker: 'Supplies the coop and stocks eggs on the shelf.',
+    cashier: 'Handles customer payments at the register.', harvester: 'Stocks shelves first, then supplies production machines.',
+    factoryFeeder: 'Refills retail stock before carrying production ingredients.', caretaker: 'Supplies the coop and stocks eggs on the shelf.',
     chefWaiter: 'Automates restaurant cooking and table service.',
   },
   staffUnlock: {
