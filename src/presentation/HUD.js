@@ -7,6 +7,7 @@ const UPGRADE_ICONS = {
   tomatoFarm2: '🍅', cashier: '🧑‍💼', paste: '🥫', harvester: '🧑‍🌾', orange: '🍊',
   factoryFeeder: '🧑‍🔧', orangeFarm2: '🍊', corn: '🌽', popcorn: '🍿', feed: '🌾',
   coop: '🐔', chicken2: '🐔', chicken3: '🐔', caretaker: '🧑‍🌾', bakery: '🍞',
+  flourMill: '🌾', orangeTartKitchen: '🥧',
   restaurant: '🍽️', chefWaiter: '🧑‍🍳',
 };
 
@@ -525,7 +526,9 @@ export class HUD {
       orange: 'Orange grove and juicer', factoryFeeder: 'Hire a factory feeder', orangeFarm2: 'Second orange grove',
       corn: 'Corn field and shelf', popcorn: 'Popcorn machine and shelf', feed: 'Chicken feed grinder',
       coop: 'Chicken coop and egg shelf', chicken2: 'Second chicken', chicken3: 'Third chicken',
-      caretaker: 'Hire a farm caretaker', bakery: 'Wheat field and stone oven', restaurant: 'Gourmet restaurant', chefWaiter: 'Hire chef and waiter',
+      caretaker: 'Hire a farm caretaker', bakery: 'Wheat field and stone oven',
+      flourMill: 'Flour mill and shelf', orangeTartKitchen: 'Orange tart pastry kitchen',
+      restaurant: 'Gourmet restaurant', chefWaiter: 'Hire chef and waiter',
     };
     return names[id] ?? fallback;
   }
@@ -539,7 +542,11 @@ export class HUD {
       return names[action.item] ?? 'Harvest';
     }
     if (action.kind === 'machine') {
-      const outputItems = { paste: 'TOMATO_PASTE', juice: 'ORANGE_JUICE', popcorn: 'POPCORN', feed: 'CHICKEN_FEED', bakery: 'BREAD', burgerKitchen: 'BURGER', pizzaKitchen: 'PIZZA' };
+      const outputItems = {
+        paste: 'TOMATO_PASTE', juice: 'ORANGE_JUICE', popcorn: 'POPCORN', feed: 'CHICKEN_FEED',
+        bakery: 'BREAD', flourMill: 'FLOUR', orangeTartKitchen: 'ORANGE_TART',
+        burgerKitchen: 'BURGER', pizzaKitchen: 'PIZZA',
+      };
       const outputId = outputItems[action.id];
       return state.stock[`machine:${action.id}:output`]?.items?.[outputId] ? 'Collect product' : 'Load ingredients';
     }
@@ -585,7 +592,11 @@ export class HUD {
   }
 
   #itemNameEnglish(itemId, fallback) {
-    return ({ TOMATO: 'Tomato', TOMATO_PASTE: 'Tomato paste', ORANGE: 'Orange', ORANGE_JUICE: 'Orange juice', CORN: 'Corn', POPCORN: 'Popcorn', CHICKEN_FEED: 'Chicken feed', EGG: 'Egg', WHEAT: 'Wheat', BREAD: 'Bread', BURGER: 'Gourmet burger', PIZZA: 'Pizza' })[itemId] ?? fallback;
+    return ({
+      TOMATO: 'Tomato', TOMATO_PASTE: 'Tomato paste', ORANGE: 'Orange', ORANGE_JUICE: 'Orange juice',
+      CORN: 'Corn', POPCORN: 'Popcorn', CHICKEN_FEED: 'Chicken feed', EGG: 'Egg', WHEAT: 'Wheat',
+      FLOUR: 'Flour', BREAD: 'Bread', ORANGE_TART: 'Orange tart', BURGER: 'Gourmet burger', PIZZA: 'Pizza',
+    })[itemId] ?? fallback;
   }
 
   toast(message, tone = 'success') {

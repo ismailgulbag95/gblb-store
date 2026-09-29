@@ -4,7 +4,7 @@ import { EconomyLedger } from '../domain/ledger.js';
 import { canTransfer, makeLocation, quantityAt, transferStock } from '../domain/inventory.js';
 import { createInitialState, hydrateState } from '../domain/state.js';
 import { advanceSimulation } from '../domain/simulation.js';
-import { syncFarmHarvest } from '../domain/farm.js';
+import { createFarmState, removeFarmReady, syncFarmHarvest } from '../domain/farm.js';
 import { ZONES, canPlaceDecoration, canPlaceStation, getAllStationIds, getMarketCollisionBoxes, getShelfLocations, isStationUnlocked, stationPosition, syncCatalogLayout } from '../domain/layout.js';
 import { DECORATIONS } from '../domain/decorCatalog.js';
 import { decorationPrice, nextOrder } from '../domain/orders.js';
@@ -51,6 +51,8 @@ const UPGRADE_MESSAGES = {
   chicken3: 'Üçüncü tavuk kümese katıldı.',
   caretaker: 'Çiftlik bakıcısı işe alındı.',
   bakery: 'Buğday tarlası ve taş fırın açıldı.',
+  flourMill: 'Un değirmeni ve un reyonu açıldı. Buğday için yeni bir kullanım alanı hazır.',
+  orangeTartKitchen: 'Pastane tezgâhı ve tart reyonu açıldı.',
   restaurant: 'Gurme restoran ve masalar açıldı.',
   chefWaiter: 'Şef ve garson işe alındı. Restoran otomasyona geçti.',
 };
@@ -302,7 +304,7 @@ export class GameApplication {
 
       if (definition.kind === 'farm') {
         draft.farms ??= {};
-        draft.farms[stationId] = { progressTicks: 0, harvestCount: 0, readyCount: 0 };
+        draft.farms[stationId] = createFarmState(draft.tick, stationId);
         draft.customStations[stationId] = {
           id: stationId,
           baseType: type,
@@ -412,7 +414,7 @@ export class GameApplication {
     };
     const addFarm = (id) => {
       const station = STATIONS[id];
-      state.farms[id] = { progressTicks: 0, harvestCount: 0, readyCount: 0 };
+      state.farms[id] = createFarmState(state.tick, id);
       makeLocation(state.stock, `farm:${station.item}`, 60);
     };
     const unlockProduct = (itemId) => {
@@ -445,6 +447,8 @@ export class GameApplication {
     if (upgradeId === 'bakery') {
       addFarm('wheatFarm'); addMachine('bakery'); unlockProduct('BREAD');
     }
+    if (upgradeId === 'flourMill') { addMachine('flourMill'); unlockProduct('FLOUR'); }
+    if (upgradeId === 'orangeTartKitchen') { addMachine('orangeTartKitchen'); unlockProduct('ORANGE_TART'); }
     if (upgradeId === 'restaurant') {
       addMachine('burgerKitchen'); addMachine('pizzaKitchen');
       state.unlockedProducts.push('BURGER', 'PIZZA');
@@ -483,6 +487,8 @@ export class GameApplication {
       chicken2: state.stats.eggSold > 0,
       caretaker: state.stats.eggSold > 0,
       bakery: state.stats.eggSold > 0,
+      flourMill: state.stats.breadSold > 0,
+      orangeTartKitchen: state.stats.flourProduced > 0 && state.stats.juiceSold > 0,
       chicken3: state.completedUpgrades.includes('chicken2'),
       restaurant: state.stats.breadSold > 0,
       chefWaiter: state.stats.tipsCollected > 0,
@@ -533,7 +539,7 @@ export class GameApplication {
         syncFarmHarvest(draft);
         const from = `farm:${station.item}`;
         moved += this.#transferUpTo(draft, from, 'player', station.item, draft.farms[targetId].readyCount);
-        draft.farms[targetId].readyCount -= moved;
+        removeFarmReady(draft.farms[targetId], moved, draft.tick);
         return moved ? { ok: true, message: `${ITEMS[station.item].icon} ${moved} ürün alındı.` } : { ok: false, reason: 'empty' };
       }
       if (station.kind === 'machine') {

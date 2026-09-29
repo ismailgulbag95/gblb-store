@@ -10,7 +10,9 @@ export const ITEMS = Object.freeze({
   CHICKEN_FEED: { id: 'CHICKEN_FEED', name: 'Tavuk yemi', icon: '🌾', price: 8, color: 0xa16207 },
   EGG: { id: 'EGG', name: 'Yumurta', icon: '🥚', price: 18, color: 0xfef3c7 },
   WHEAT: { id: 'WHEAT', name: 'Buğday', icon: '🌾', price: 4, color: 0xfbbf24 },
+  FLOUR: { id: 'FLOUR', name: 'Un', icon: '🛍️', price: 10, color: 0xf5deb3 },
   BREAD: { id: 'BREAD', name: 'Ekmek', icon: '🍞', price: 24, color: 0xc2410c },
+  ORANGE_TART: { id: 'ORANGE_TART', name: 'Portakallı tart', icon: '🥧', price: 42, color: 0xf59e0b },
   BURGER: { id: 'BURGER', name: 'Gurme burger', icon: '🍔', price: 75, color: 0xfb923c },
   PIZZA: { id: 'PIZZA', name: 'Pizza', icon: '🍕', price: 90, color: 0xdc2626 },
 });
@@ -21,6 +23,8 @@ export const RECIPES = Object.freeze({
   popcorn: { inputs: { CORN: 1 }, output: 'POPCORN', seconds: 2.5 },
   feed: { inputs: { CORN: 1 }, output: 'CHICKEN_FEED', seconds: 2.2 },
   bakery: { inputs: { WHEAT: 2, EGG: 1 }, output: 'BREAD', seconds: 4 },
+  flour: { inputs: { WHEAT: 2 }, output: 'FLOUR', seconds: 6 },
+  orangeTart: { inputs: { FLOUR: 1, EGG: 1, ORANGE: 1 }, output: 'ORANGE_TART', seconds: 5 },
   burger: { inputs: { BREAD: 1, TOMATO: 1 }, output: 'BURGER', seconds: 4.5 },
   pizza: { inputs: { WHEAT: 1, TOMATO: 2 }, output: 'PIZZA', seconds: 5 },
 });
@@ -38,6 +42,8 @@ export const STATIONS = Object.freeze({
   coop: { kind: 'coop', x: -23, z: 3.5, title: 'Tavuk kümesi' },
   wheatFarm: { kind: 'farm', item: 'WHEAT', x: -18, z: -7, title: 'Buğday tarlası' },
   bakery: { kind: 'machine', recipe: 'bakery', x: -23, z: 0, title: 'Taş fırın' },
+  flourMill: { kind: 'machine', recipe: 'flour', x: -23, z: -4, title: 'Un değirmeni' },
+  orangeTartKitchen: { kind: 'machine', recipe: 'orangeTart', x: -40, z: 0, title: 'Pastane tezgâhı' },
   burgerKitchen: { kind: 'machine', recipe: 'burger', x: -30, z: 4, title: 'Burger mutfağı' },
   pizzaKitchen: { kind: 'machine', recipe: 'pizza', x: -30, z: -4, title: 'Pizza fırını' },
   register: { kind: 'register', x: 5, z: -4, title: 'Kasa' },
@@ -49,6 +55,8 @@ export const STATIONS = Object.freeze({
   popcornShelf: { kind: 'shelf', item: 'POPCORN', x: 11, z: 0, title: 'Gondol Reyon (Popcorn)' },
   eggShelf: { kind: 'shelf', item: 'EGG', x: 11, z: -2, title: 'Soğutucu Dolap (Yumurta)' },
   breadShelf: { kind: 'shelf', item: 'BREAD', x: 8.6, z: -2.2, title: 'Fırın Tezgâhı (Ekmek)' },
+  flourShelf: { kind: 'shelf', item: 'FLOUR', x: 11, z: -4, title: 'Un Reyonu' },
+  orangeTartShelf: { kind: 'shelf', item: 'ORANGE_TART', x: 8.6, z: -4.5, title: 'Pastane Reyonu' },
   table1: { kind: 'table', x: -38, z: 4, title: 'Masa 1' },
   table2: { kind: 'table', x: -38, z: -4, title: 'Masa 2' },
   table3: { kind: 'table', x: -44, z: 4, title: 'Masa 3' },
@@ -64,6 +72,8 @@ export const SHELVES = Object.freeze({
   POPCORN: { id: 'shelf:POPCORN', x: 11, z: 0, capacity: 6, displayType: 'gondola' },
   EGG: { id: 'shelf:EGG', x: 11, z: -2, capacity: 6, displayType: 'cooler' },
   BREAD: { id: 'shelf:BREAD', x: 8.6, z: -2.2, capacity: 6, displayType: 'bakery' },
+  FLOUR: { id: 'shelf:FLOUR', x: 11, z: -4, capacity: 6, displayType: 'gondola' },
+  ORANGE_TART: { id: 'shelf:ORANGE_TART', x: 8.6, z: -4.5, capacity: 6, displayType: 'bakery' },
 });
 
 export const UPGRADES = Object.freeze([
@@ -82,6 +92,8 @@ export const UPGRADES = Object.freeze([
   { id: 'chicken3', title: 'Üçüncü tavuk', price: 95, x: -23, z: 6.2, when: 'chicken2', unlocks: ['chicken3'] },
   { id: 'caretaker', title: 'Çiftlik bakıcısı işe al', price: 150, x: -18, z: 0, when: 'eggSold', unlocks: ['caretaker'] },
   { id: 'bakery', title: 'Buğday tarlası ve taş fırın', price: 180, x: -23, z: 0, when: 'eggSold', unlocks: ['bakery'] },
+  { id: 'flourMill', title: 'Un değirmeni ve reyon', price: 220, x: -23, z: -4, when: 'breadSold', unlocks: ['flourMill'] },
+  { id: 'orangeTartKitchen', title: 'Portakallı tart pastanesi', price: 300, x: -40, z: 0, when: 'flourProduced', unlocks: ['orangeTartKitchen'] },
   { id: 'restaurant', title: 'Gurme restoran', price: 250, x: -30, z: 0, when: 'breadSold', unlocks: ['restaurant'] },
   { id: 'chefWaiter', title: 'Şef ve garson işe al', price: 220, x: -34, z: 0, when: 'tipCollected', unlocks: ['chefWaiter'] },
 ]);

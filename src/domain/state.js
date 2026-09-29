@@ -1,7 +1,7 @@
 import { ITEMS, SHELVES, STATIONS } from './catalog.js';
-import { syncFarmHarvest } from './farm.js';
+import { createFarmState, ensureFarmState, syncFarmHarvest } from './farm.js';
 
-export const SAVE_VERSION = 3;
+export const SAVE_VERSION = 5;
 
 function emptyStock(capacity) {
   return { capacity, items: {}, reserved: {}, reservedCapacity: 0 };
@@ -16,7 +16,7 @@ export function createInitialState(seed = 0x51f15e) {
     'order:delivery': emptyStock(500),
   };
   const farms = {
-    tomatoFarm: { progressTicks: 0, harvestCount: 0, readyCount: 0 },
+    tomatoFarm: createFarmState(0, 'tomatoFarm'),
   };
   const state = {
     saveVersion: SAVE_VERSION,
@@ -55,7 +55,8 @@ export function createInitialState(seed = 0x51f15e) {
     stats: {
       tomatoSold: 0, pasteProduced: 0, pasteSold: 0, juiceProduced: 0, juiceSold: 0,
       cornSold: 0, popcornProduced: 0, popcornSold: 0, feedProduced: 0,
-      eggSold: 0, breadProduced: 0, breadSold: 0, burgerCooked: 0, pizzaCooked: 0,
+      eggSold: 0, flourProduced: 0, flourSold: 0, breadProduced: 0, breadSold: 0,
+      orangeTartProduced: 0, orangeTartSold: 0, burgerCooked: 0, pizzaCooked: 0,
       tablesServed: 0, tipsCollected: 0,
       customersSatisfied: 0, customersUnhappy: 0,
     },
@@ -79,7 +80,7 @@ export function createInitialState(seed = 0x51f15e) {
 
 export function hydrateState(candidate) {
   if (!candidate || typeof candidate !== 'object') throw new Error('Kayıt boş veya bozuk.');
-  if (![2, SAVE_VERSION].includes(candidate.saveVersion)) throw new Error(`Bu kayıt sürümü desteklenmiyor (${candidate.saveVersion ?? 'bilinmiyor'}).`);
+  if (![2, 3, 4, SAVE_VERSION].includes(candidate.saveVersion)) throw new Error(`Bu kayıt sürümü desteklenmiyor (${candidate.saveVersion ?? 'bilinmiyor'}).`);
   const initial = createInitialState(candidate.rng);
   const hydrated = { ...initial, ...candidate };
   hydrated.saveVersion = SAVE_VERSION;
@@ -131,11 +132,8 @@ export function hydrateState(candidate) {
       mealWaitTicks: customer.mealWaitTicks ?? 0,
     };
   });
-  hydrated.farms = Object.fromEntries(Object.entries(hydrated.farms).map(([id, farm]) => [id, {
-    progressTicks: farm.progressTicks ?? farm.progress ?? 0,
-    harvestCount: farm.harvestCount ?? 0,
-    readyCount: farm.readyCount ?? 0,
-  }]));
+  hydrated.farms = Object.fromEntries(Object.entries(hydrated.farms).map(([id, farm]) => [id,
+    ensureFarmState({ ...farm }, hydrated.tick, id)]));
   hydrated.workers = hydrated.workers.map((worker) => ({
     ...worker,
     task: worker.task === 'idle' ? null : (worker.task ?? null),

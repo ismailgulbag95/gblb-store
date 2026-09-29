@@ -2,13 +2,12 @@ import { ITEMS, RECIPES, SHELVES, STATIONS } from './catalog.js';
 import { getMarketCollisionBoxes, getShelfLocations, stationPosition } from './layout.js';
 import { EconomyLedger } from './ledger.js';
 import { decorBonus, decorScore } from './decorCatalog.js';
-import { FARM_YIELD, syncFarmHarvest } from './farm.js';
+import { FARM_CAPACITY, ensureFarmState, removeFarmReady, syncFarmHarvest } from './farm.js';
 import { customerMood, saleMoodMultiplier, tipForMood } from './customerExperience.js';
 import { nextOrder } from './orders.js';
 import { cancelReservation, capacityAt, makeLocation, pickUpReservedStock, quantityAt, reserveStock, totalAt, transferStock } from './inventory.js';
 
 const TICKS_PER_SECOND = 10;
-const FARM_GROW_TICKS = 22;
 const CUSTOMER_SPAWN_TICKS = 40;
 const MAX_CUSTOMERS = 8;
 const CUSTOMER_SPEED = 0.36;
@@ -50,26 +49,29 @@ function move(state, from, to, item, quantity, key) {
   return result.ok ? amount : 0;
 }
 
-function produceFarm(state) {
+function produceFarm(state, events) {
   let durable = false;
+  const farmTick = state.tick + 1;
   for (const [farmId, farm] of Object.entries(state.farms)) {
     const station = STATIONS[farmId] ?? state.customStations?.[farmId];
     const item = farm.item ?? station?.item;
     if (!item) continue;
+    ensureFarmState(farm, state.tick, farmId);
     const location = `farm:${item}`;
-    if (farm.readyCount > 0) {
-      farm.progressTicks = 0;
-      continue;
+    for (const plant of farm.plants) {
+      if (plant.ready || plant.nextReadyTick > farmTick) continue;
+      if (farm.readyCount >= FARM_CAPACITY || capacityAt(state.stock, location) - totalAt(state.stock, location) < 1) {
+        plant.nextReadyTick += (Math.floor((farmTick - plant.nextReadyTick) / plant.cycleTicks) + 1) * plant.cycleTicks;
+        continue;
+      }
+      state.stock[location].items[item] = quantityAt(state.stock, location, item) + 1;
+      plant.ready = true;
+      plant.nextReadyTick += plant.cycleTicks;
+      farm.readyCount += 1;
+      farm.harvestCount += 1;
+      events.push({ type: 'production', item, farmId, message: `${ITEMS[item].icon} ${ITEMS[item].name} hazır.` });
+      durable = true;
     }
-    if (capacityAt(state.stock, location) - totalAt(state.stock, location) < 1) continue;
-    farm.progressTicks += 1;
-    if (farm.progressTicks < FARM_GROW_TICKS) continue;
-    farm.progressTicks -= FARM_GROW_TICKS;
-    const produced = Math.min(FARM_YIELD, capacityAt(state.stock, location) - totalAt(state.stock, location));
-    state.stock[location].items[item] = quantityAt(state.stock, location, item) + produced;
-    farm.harvestCount += produced;
-    farm.readyCount = produced;
-    durable = true;
   }
   return durable;
 }
@@ -107,7 +109,8 @@ function produceMachines(state, events) {
     state.stock[outputId].items[recipe.output] = quantityAt(state.stock, outputId, recipe.output) + 1;
     const producedStat = {
       TOMATO_PASTE: 'pasteProduced', ORANGE_JUICE: 'juiceProduced', POPCORN: 'popcornProduced',
-      CHICKEN_FEED: 'feedProduced', BREAD: 'breadProduced', BURGER: 'burgerCooked', PIZZA: 'pizzaCooked',
+      CHICKEN_FEED: 'feedProduced', FLOUR: 'flourProduced', BREAD: 'breadProduced',
+      ORANGE_TART: 'orangeTartProduced', BURGER: 'burgerCooked', PIZZA: 'pizzaCooked',
     }[recipe.output];
     if (producedStat) state.stats[producedStat] = (state.stats[producedStat] ?? 0) + 1;
     events.push({ type: 'production', item: recipe.output, message: `${ITEMS[recipe.output].icon} ${ITEMS[recipe.output].name} hazır.` });
@@ -442,7 +445,7 @@ function workerTick(state) {
     if (task.phase === 'to-source') {
       const picked = pickUpReservedStock(state, task.reservationId, task.carrier);
       if (picked.ok) {
-        if (task.farmId && state.farms[task.farmId]) state.farms[task.farmId].readyCount -= task.quantity;
+        if (task.farmId && state.farms[task.farmId]) removeFarmReady(state.farms[task.farmId], task.quantity, state.tick);
         task.phase = 'to-target';
         durable = true;
       }
@@ -1219,7 +1222,11 @@ function customerTick(state, events) {
           const unitPrice = Math.round(ITEMS[item].price * (1 + decorBonus(state)) * saleMoodMultiplier(customer) * 10_000) / 10_000;
           ledger.credit(`sale:${customer.id}:${itemIndex}`, unitPrice, `sale:${item}`);
           saleAmount += unitPrice;
-          const statMap = { TOMATO: 'tomatoSold', TOMATO_PASTE: 'pasteSold', ORANGE_JUICE: 'juiceSold', CORN: 'cornSold', POPCORN: 'popcornSold', EGG: 'eggSold', BREAD: 'breadSold' };
+          const statMap = {
+            TOMATO: 'tomatoSold', TOMATO_PASTE: 'pasteSold', ORANGE_JUICE: 'juiceSold', CORN: 'cornSold',
+            POPCORN: 'popcornSold', EGG: 'eggSold', FLOUR: 'flourSold', BREAD: 'breadSold',
+            ORANGE_TART: 'orangeTartSold',
+          };
           if (statMap[item]) state.stats[statMap[item]] += 1;
         }
         if (saleAmount) {
@@ -1269,7 +1276,7 @@ function coopTick(state) {
 export function advanceSimulation(state) {
   const events = [];
   syncFarmHarvest(state);
-  let durable = produceFarm(state);
+  let durable = produceFarm(state, events);
   durable = produceMachines(state, events) || durable;
   durable = coopTick(state) || durable;
   durable = workerTick(state) || durable;

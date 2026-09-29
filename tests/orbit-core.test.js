@@ -42,7 +42,7 @@ test('older v2 saves migrate customer and order fields without losing inventory'
   old.customers.push({ id: 'customer-90', kind: 'shopper', x: 5, z: 5, phase: 'leaving',
     shoppingList: ['TOMATO'], basket: [], demand: 'TOMATO' });
   const migrated = hydrateState(old);
-  assert.equal(migrated.saveVersion, 3);
+  assert.equal(migrated.saveVersion, 5);
   assert.equal(migrated.stock.player.items.TOMATO, 2);
   assert.equal(migrated.customers[0].checkoutWaitTicks, 0);
   assert.equal(migrated.ordersCompleted, 0);
@@ -98,35 +98,61 @@ function runTicks(state, count) {
   return state;
 }
 
-test('10 Hz farm production is deterministic and independent of rendering', () => {
-  const first = runTicks(createInitialState(123), 22);
-  const second = runTicks(createInitialState(123), 22);
-
-  assert.equal(quantityAt(first.stock, 'farm:TOMATO', 'TOMATO'), 4);
-  assert.deepEqual(first, second);
+test('four farm plants ripen independently at their persisted phase times', () => {
+  const state = createInitialState(123);
+  runTicks(state, 44);
+  assert.equal(state.farms.tomatoFarm.readyCount, 0);
+  runTicks(state, 1);
+  assert.equal(state.farms.tomatoFarm.readyCount, 1);
+  runTicks(state, 11);
+  assert.equal(state.farms.tomatoFarm.readyCount, 2);
+  runTicks(state, 11);
+  assert.equal(state.farms.tomatoFarm.readyCount, 3);
+  runTicks(state, 11);
+  assert.equal(state.farms.tomatoFarm.readyCount, 4);
+  assert.equal(quantityAt(state.stock, 'farm:TOMATO', 'TOMATO'), 4);
 });
 
-test('a harvested plot becomes empty and ripens again after a full growth cycle', () => {
+test('farm stock stops at four until the ripe plants are collected', () => {
+  const state = runTicks(createInitialState(123), 600);
+
+  assert.equal(state.farms.tomatoFarm.readyCount, 4);
+  assert.equal(quantityAt(state.stock, 'farm:TOMATO', 'TOMATO'), 4);
+  assert.equal(state.farms.tomatoFarm.harvestCount, 4);
+});
+
+test('collecting a partial ripe batch gives the exact amount and preserves each plant schedule', () => {
   const storage = new MemoryStorage();
   const app = new GameApplication(new SaveService(storage));
-  for (let tick = 0; tick < 22; tick += 1) app.tick();
-  assert.equal(app.getState().farms.tomatoFarm.readyCount, 4);
+  for (let tick = 0; tick < 67; tick += 1) app.tick();
+  assert.equal(app.getState().farms.tomatoFarm.readyCount, 3);
   app.getState().player.x = STATIONS.tomatoFarm.x;
   app.getState().player.z = STATIONS.tomatoFarm.z;
   assert.equal(app.interact('tomatoFarm').ok, true);
+  assert.equal(quantityAt(app.getState().stock, 'player', 'TOMATO'), 3);
   assert.equal(app.getState().farms.tomatoFarm.readyCount, 0);
   assert.equal(quantityAt(app.getState().stock, 'farm:TOMATO', 'TOMATO'), 0);
-  assert.equal(new GameApplication(new SaveService(storage)).getState().farms.tomatoFarm.readyCount, 0);
-  for (let tick = 0; tick < 21; tick += 1) app.tick();
+  const savedPlants = structuredClone(app.getState().farms.tomatoFarm.plants);
+  const reloaded = new GameApplication(new SaveService(storage));
+  assert.equal(reloaded.getState().farms.tomatoFarm.readyCount, 0);
+  assert.deepEqual(reloaded.getState().farms.tomatoFarm.plants, savedPlants);
+  for (let tick = 0; tick < 10; tick += 1) app.tick();
   assert.equal(app.getState().farms.tomatoFarm.readyCount, 0);
   app.tick();
-  assert.equal(app.getState().farms.tomatoFarm.readyCount, 4);
+  assert.equal(app.getState().farms.tomatoFarm.readyCount, 1);
+  assert.equal(app.interact('tomatoFarm').ok, true);
+  assert.equal(quantityAt(app.getState().stock, 'player', 'TOMATO'), 4);
+  for (let tick = 0; tick < 11; tick += 1) app.tick();
+  assert.equal(app.getState().farms.tomatoFarm.readyCount, 0);
+  app.tick();
+  assert.equal(app.getState().farms.tomatoFarm.readyCount, 1);
 });
 
 test('harvesting one of two plots leaves the other plot ripe', () => {
   const app = new GameApplication(new SaveService(new MemoryStorage()));
   assert.equal(app.buyUpgrade('tomatoFarm2').ok, true);
-  for (let tick = 0; tick < 22; tick += 1) app.tick();
+  assert.deepEqual(app.getState().farms.tomatoFarm2.plants.map((plant) => plant.nextReadyTick), [52, 63, 74, 85]);
+  for (let tick = 0; tick < 85; tick += 1) app.tick();
   assert.equal(app.getState().farms.tomatoFarm.readyCount, 4);
   assert.equal(app.getState().farms.tomatoFarm2.readyCount, 4);
   Object.assign(app.getState().player, { x: STATIONS.tomatoFarm.x, z: STATIONS.tomatoFarm.z });
@@ -134,6 +160,66 @@ test('harvesting one of two plots leaves the other plot ripe', () => {
   assert.equal(app.getState().farms.tomatoFarm.readyCount, 0);
   assert.equal(app.getState().farms.tomatoFarm2.readyCount, 4);
   assert.equal(quantityAt(app.getState().stock, 'farm:TOMATO', 'TOMATO'), 4);
+});
+
+test('legacy farm saves retain ripe quantity and upgrade to independent timers', () => {
+  const legacy = createInitialState(124);
+  legacy.saveVersion = 3;
+  legacy.stock['farm:TOMATO'].items.TOMATO = 3;
+  legacy.farms.tomatoFarm.readyCount = 3;
+  delete legacy.farms.tomatoFarm.plants;
+
+  const migrated = hydrateState(legacy);
+  assert.equal(migrated.saveVersion, 5);
+  assert.equal(migrated.farms.tomatoFarm.plants.length, 4);
+  assert.equal(migrated.farms.tomatoFarm.plants.filter((plant) => plant.ready).length, 3);
+  assert.equal(migrated.stock['farm:TOMATO'].items.TOMATO, 3);
+});
+
+test('version four farm timers migrate to one evenly phased cycle without losing ripe stock', () => {
+  const legacy = createInitialState(125);
+  legacy.saveVersion = 4;
+  legacy.tick = 68;
+  legacy.stock['farm:TOMATO'].items.TOMATO = 1;
+  legacy.farms.tomatoFarm.readyCount = 1;
+  legacy.farms.tomatoFarm.plants = [
+    { ready: true, phaseOffsetTicks: 1, cycleTicks: 38, nextReadyTick: 77 },
+    { ready: false, phaseOffsetTicks: 11, cycleTicks: 43, nextReadyTick: 97 },
+    { ready: false, phaseOffsetTicks: 21, cycleTicks: 47, nextReadyTick: 115 },
+    { ready: false, phaseOffsetTicks: 31, cycleTicks: 52, nextReadyTick: 135 },
+  ];
+
+  const migrated = hydrateState(legacy);
+  const plants = migrated.farms.tomatoFarm.plants;
+  assert.equal(migrated.saveVersion, 5);
+  assert.equal(migrated.farms.tomatoFarm.readyCount, 1);
+  assert.equal(migrated.stock['farm:TOMATO'].items.TOMATO, 1);
+  assert.deepEqual(plants.map((plant) => plant.cycleTicks), [45, 45, 45, 45]);
+  assert.deepEqual(plants.map((plant) => plant.phaseOffsetTicks), [0, 11, 22, 33]);
+  assert.equal(new Set(plants.map((plant) => (plant.nextReadyTick - plant.phaseOffsetTicks) % 45)).size, 1);
+});
+
+test('new flour and orange tart recipes use the existing machine inventory flow', () => {
+  const app = new GameApplication(new SaveService(new MemoryStorage()));
+  app.debugCredit(1000);
+  app.getState().stats.breadSold = 1;
+  app.getState().stats.juiceSold = 1;
+  app.tick();
+  assert.equal(app.buyUpgrade('flourMill').ok, true);
+  Object.assign(app.getState().stock.player.items, { WHEAT: 2 });
+  Object.assign(app.getState().player, { x: STATIONS.flourMill.x, z: STATIONS.flourMill.z });
+  assert.equal(app.interact('flourMill').ok, true);
+  for (let tick = 0; tick < 60; tick += 1) app.tick();
+  assert.equal(app.getState().stats.flourProduced, 1);
+  assert.equal(app.interact('flourMill').ok, true);
+  assert.equal(app.buyUpgrade('orangeTartKitchen').ok, true);
+
+  Object.assign(app.getState().stock.player.items, { EGG: 1, ORANGE: 1 });
+  Object.assign(app.getState().player, { x: STATIONS.orangeTartKitchen.x, z: STATIONS.orangeTartKitchen.z });
+  assert.equal(app.interact('orangeTartKitchen').ok, true);
+  for (let tick = 0; tick < 50; tick += 1) app.tick();
+  assert.equal(app.getState().stats.orangeTartProduced, 1);
+  assert.equal(quantityAt(app.getState().stock, 'machine:orangeTartKitchen:output', 'ORANGE_TART'), 1);
 });
 
 test('stock reservations protect both source quantity and destination capacity through pickup and delivery', () => {

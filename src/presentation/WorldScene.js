@@ -790,8 +790,11 @@ export class WorldScene {
     let point = { x: state.player.x, z: state.player.z };
     if (event.type === 'sale') point = stationPosition(state, 'register');
     if (event.type === 'production') {
-      const machineId = Object.keys(state.machines).find((id) => RECIPES[STATIONS[id]?.recipe]?.output === event.item);
-      if (machineId) point = stationPosition(state, machineId);
+      if (event.farmId) point = stationPosition(state, event.farmId);
+      else {
+        const machineId = Object.keys(state.machines).find((id) => RECIPES[STATIONS[id]?.recipe]?.output === event.item);
+        if (machineId) point = stationPosition(state, machineId);
+      }
     }
     const color = event.type === 'sale' || event.type === 'tip-ready' ? 0xffc800
       : event.type === 'production' ? 0x1cb0f6 : 0x58cc02;
@@ -1585,12 +1588,14 @@ export class WorldScene {
       POPCORN: ['REYON • POPCORN', 'SNACKS • POPCORN'],
       ORANGE_JUICE: ['DOLAP • MEYVE SUYU', 'CHILLED • COLD JUICE'],
       EGG: ['DOLAP • TAZE YUMURTA', 'CHILLED • FARM EGGS'],
+      FLOUR: ['REYON • UN', 'GROCERY • FLOUR'],
       BREAD: ['FIRIN • TAZE EKMEK', 'BAKERY • FRESH BREAD'],
+      ORANGE_TART: ['PASTANE • PORTAKALLI TART', 'BAKERY • ORANGE TART'],
     };
     const colors = {
       TOMATO: '#27ae60', ORANGE: '#e67e22', TOMATO_PASTE: '#c0392b',
       ORANGE_JUICE: '#f39c12', CORN: '#f1c40f', POPCORN: '#e74c3c',
-      EGG: '#8e44ad', BREAD: '#d35400',
+      EGG: '#8e44ad', FLOUR: '#bca47a', BREAD: '#d35400', ORANGE_TART: '#e67e22',
     };
     context.fillStyle = colors[itemId] ?? '#286f70';
     context.beginPath();
@@ -2611,8 +2616,11 @@ export class WorldScene {
 
     this.#syncCollection(this.farms, Object.keys(state.farms), (id) => this.#addFarm(id), (entry) => this.#disposeVisual(entry));
     for (const [farmId, farm] of this.farms) {
-      const count = state.farms[farmId]?.readyCount ?? 0;
-      farm.produce.forEach((mesh, index) => { mesh.visible = index < count; });
+      const farmState = state.farms[farmId];
+      const count = farmState?.readyCount ?? 0;
+      farm.produce.forEach((mesh, index) => {
+        mesh.visible = farmState?.plants?.[index]?.ready ?? index < count;
+      });
       const distance = Math.hypot(state.player.x - farm.group.position.x, state.player.z - farm.group.position.z);
       this.#statusBadge(farm.group, count ? (state.settings.language === 'en' ? `READY ${count}` : `HAZIR ${count}`)
         : (state.settings.language === 'en' ? 'GROWING' : 'BÜYÜYOR'), count ? '#58cc02' : '#1cb0f6', distance < 10, 2.1);
