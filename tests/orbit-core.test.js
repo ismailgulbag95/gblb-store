@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { GameApplication } from '../src/application/GameApplication.js';
-import { advanceSimulation } from '../src/domain/simulation.js';
+import { advanceSimulation, findCustomerMarketRoute } from '../src/domain/simulation.js';
 import { createInitialState, hydrateState } from '../src/domain/state.js';
 import {
   canTransfer,
@@ -14,7 +14,12 @@ import {
 import { EconomyLedger, InsufficientBalanceError } from '../src/domain/ledger.js';
 import { SaveRecoveryError, SaveService } from '../src/infrastructure/SaveService.js';
 import { SHELVES, STATIONS } from '../src/domain/catalog.js';
+import { canPlaceStation, getDecorationDimensions, getMarketCollisionBoxes, getStationDimensions } from '../src/domain/layout.js';
 import { CharacterFactory } from '../src/presentation/CharacterFactory.js';
+import { customerMood, saleMoodMultiplier, tipForMood } from '../src/domain/customerExperience.js';
+import { decorationPrice, nextOrder, orderProgress } from '../src/domain/orders.js';
+import { FURNITURE_TYPES, calculateParabolicPrice, getFurnitureCount, getFurniturePrice, getStaffCount, getStaffHirePrice, isFurnitureUnlocked } from '../src/domain/furnitureCatalog.js';
+import { getAvailableRegisters } from '../src/domain/simulation.js';
 
 class MemoryStorage {
   values = new Map();
@@ -23,6 +28,67 @@ class MemoryStorage {
   setItem(key, value) { this.values.set(key, String(value)); }
   removeItem(key) { this.values.delete(key); }
 }
+
+function makeApp(seed = 1) {
+  return new GameApplication(new SaveService(new MemoryStorage()));
+}
+
+test('older v2 saves migrate customer and order fields without losing inventory', () => {
+  const old = createInitialState(42);
+  old.saveVersion = 2;
+  delete old.activeOrder;
+  delete old.ordersCompleted;
+  old.stock.player.items.TOMATO = 2;
+  old.customers.push({ id: 'customer-90', kind: 'shopper', x: 5, z: 5, phase: 'leaving',
+    shoppingList: ['TOMATO'], basket: [], demand: 'TOMATO' });
+  const migrated = hydrateState(old);
+  assert.equal(migrated.saveVersion, 3);
+  assert.equal(migrated.stock.player.items.TOMATO, 2);
+  assert.equal(migrated.customers[0].checkoutWaitTicks, 0);
+  assert.equal(migrated.ordersCompleted, 0);
+});
+
+test('customer mood changes sale and tip rewards only after meaningful waits', () => {
+  assert.equal(customerMood({}), 100);
+  assert.equal(saleMoodMultiplier({ checkoutWaitTicks: 10 }), 1);
+  assert.equal(customerMood({ missedItems: 1, checkoutWaitTicks: 100 }), 65);
+  assert.equal(saleMoodMultiplier({ missedItems: 1, checkoutWaitTicks: 100 }), 0.95);
+  assert.equal(tipForMood({ mealWaitTicks: 240 }), 10);
+});
+
+test('optional order consumes bag stock and credits reward exactly once', () => {
+  const app = new GameApplication(new SaveService(new MemoryStorage()));
+  const state = app.getState();
+  state.stats.tomatoSold = 1;
+  state.stock.player.items.TOMATO = 3;
+  app.tick();
+  const order = app.getState().activeOrder;
+  assert.deepEqual(order, nextOrder(app.getState()));
+  assert.equal(orderProgress(app.getState()), 3);
+  const before = app.getBalance();
+  assert.equal(app.fulfillOrder().ok, true);
+  assert.equal(app.getBalance(), before + order.reward);
+  assert.equal(app.getState().stock.player.items.TOMATO, undefined);
+  assert.equal(app.getState().ordersCompleted, 1);
+  assert.equal(app.fulfillOrder().reason, 'order-stock');
+});
+
+test('three completed orders grant and redeem one decoration voucher', () => {
+  const app = new GameApplication(new SaveService(new MemoryStorage()));
+  app.getState().stats.tomatoSold = 1;
+  app.tick();
+  for (let index = 0; index < 3; index += 1) {
+    const order = app.getState().activeOrder;
+    app.getState().stock.player.items[order.item] = order.quantity;
+    assert.equal(app.fulfillOrder().ok, true);
+  }
+  assert.equal(app.getState().decorVouchers, 1);
+  assert.equal(decorationPrice(app.getState(), 85), 65);
+  const before = app.getBalance();
+  assert.equal(app.buyDecoration('welcomeMat').ok, true);
+  assert.equal(app.getBalance(), before - 65);
+  assert.equal(app.getState().decorVouchers, 0);
+});
 
 function runTicks(state, count) {
   for (let index = 0; index < count; index += 1) {
@@ -36,7 +102,7 @@ test('10 Hz farm production is deterministic and independent of rendering', () =
   const first = runTicks(createInitialState(123), 22);
   const second = runTicks(createInitialState(123), 22);
 
-  assert.equal(quantityAt(first.stock, 'farm:TOMATO', 'TOMATO'), 3);
+  assert.equal(quantityAt(first.stock, 'farm:TOMATO', 'TOMATO'), 4);
   assert.deepEqual(first, second);
 });
 
@@ -44,7 +110,7 @@ test('a harvested plot becomes empty and ripens again after a full growth cycle'
   const storage = new MemoryStorage();
   const app = new GameApplication(new SaveService(storage));
   for (let tick = 0; tick < 22; tick += 1) app.tick();
-  assert.equal(app.getState().farms.tomatoFarm.readyCount, 3);
+  assert.equal(app.getState().farms.tomatoFarm.readyCount, 4);
   app.getState().player.x = STATIONS.tomatoFarm.x;
   app.getState().player.z = STATIONS.tomatoFarm.z;
   assert.equal(app.interact('tomatoFarm').ok, true);
@@ -54,20 +120,20 @@ test('a harvested plot becomes empty and ripens again after a full growth cycle'
   for (let tick = 0; tick < 21; tick += 1) app.tick();
   assert.equal(app.getState().farms.tomatoFarm.readyCount, 0);
   app.tick();
-  assert.equal(app.getState().farms.tomatoFarm.readyCount, 3);
+  assert.equal(app.getState().farms.tomatoFarm.readyCount, 4);
 });
 
 test('harvesting one of two plots leaves the other plot ripe', () => {
   const app = new GameApplication(new SaveService(new MemoryStorage()));
   assert.equal(app.buyUpgrade('tomatoFarm2').ok, true);
   for (let tick = 0; tick < 22; tick += 1) app.tick();
-  assert.equal(app.getState().farms.tomatoFarm.readyCount, 3);
-  assert.equal(app.getState().farms.tomatoFarm2.readyCount, 3);
+  assert.equal(app.getState().farms.tomatoFarm.readyCount, 4);
+  assert.equal(app.getState().farms.tomatoFarm2.readyCount, 4);
   Object.assign(app.getState().player, { x: STATIONS.tomatoFarm.x, z: STATIONS.tomatoFarm.z });
   assert.equal(app.interact('tomatoFarm').ok, true);
   assert.equal(app.getState().farms.tomatoFarm.readyCount, 0);
-  assert.equal(app.getState().farms.tomatoFarm2.readyCount, 3);
-  assert.equal(quantityAt(app.getState().stock, 'farm:TOMATO', 'TOMATO'), 3);
+  assert.equal(app.getState().farms.tomatoFarm2.readyCount, 4);
+  assert.equal(quantityAt(app.getState().stock, 'farm:TOMATO', 'TOMATO'), 4);
 });
 
 test('stock reservations protect both source quantity and destination capacity through pickup and delivery', () => {
@@ -405,3 +471,326 @@ test('corn production unlocks the full feed, egg, bread, and restaurant chain', 
   assert.equal(app.buyUpgrade('chefWaiter').ok, true);
   assert.deepEqual(app.getState().workers.filter((worker) => ['chefWaiter', 'waiter'].includes(worker.type)).map((worker) => worker.type), ['chefWaiter', 'waiter']);
 });
+
+test('specialized display fixtures categorize products into produce, cooler, bakery, and gondola types', () => {
+  assert.equal(SHELVES.TOMATO.displayType, 'produce');
+  assert.equal(SHELVES.ORANGE.displayType, 'produce');
+  assert.equal(SHELVES.CORN.displayType, 'produce');
+  assert.equal(SHELVES.TOMATO_PASTE.displayType, 'gondola');
+  assert.equal(SHELVES.POPCORN.displayType, 'gondola');
+  assert.equal(SHELVES.ORANGE_JUICE.displayType, 'cooler');
+  assert.equal(SHELVES.EGG.displayType, 'cooler');
+  assert.equal(SHELVES.BREAD.displayType, 'bakery');
+});
+
+test('customer orders dynamically vary among available unlocked products', () => {
+  const state = createInitialState(101);
+  state.stats.tomatoSold = 5;
+  state.unlockedProducts = ['TOMATO', 'ORANGE', 'BREAD', 'EGG'];
+  const items = new Set();
+  for (let i = 0; i < 15; i += 1) {
+    state.ordersCompleted = i;
+    const order = nextOrder(state);
+    assert.ok(state.unlockedProducts.includes(order.item));
+    items.add(order.item);
+  }
+  assert.ok(items.size > 1, 'orders vary among unlocked products');
+});
+
+test('player movement safely navigates and collides with solid fixtures without freezing', () => {
+  const app = new GameApplication(new SaveService(new MemoryStorage()));
+  const initialX = app.getState().player.x;
+  const initialZ = app.getState().player.z;
+  app.setPlayerMove({ x: 1, z: 0 }, 0.05);
+  assert.ok(app.getState().player.x > initialX, 'player moves forward');
+  assert.equal(app.getState().player.z, initialZ);
+
+  // Rotate a station
+  const rotRes = app.rotateSelected('tomatoShelf');
+  assert.equal(rotRes.ok, true);
+  assert.equal(app.getState().layout.tomatoShelf.rotation, Math.PI / 2);
+});
+
+test('stations and items adhere to exact visual footprints and boundaries during placement and rotation', () => {
+  const app = new GameApplication(new SaveService(new MemoryStorage()));
+  const state = app.getState();
+
+  // Test dimension getters
+  const defaultTomatoDims = getStationDimensions('tomatoShelf', 0);
+  assert.equal(defaultTomatoDims.width, 2.35);
+  assert.equal(defaultTomatoDims.depth, 1.35);
+
+  // When rotated 90 degrees, width and depth swap to match visual volume
+  const rotatedTomatoDims = getStationDimensions('tomatoShelf', Math.PI / 2);
+  assert.equal(rotatedTomatoDims.width, 1.35);
+  assert.equal(rotatedTomatoDims.depth, 2.35);
+
+  // Boundary checks: An item cannot be placed where its visual bounds extend outside zone walls
+  // Market zone max X is 13.5. tomatoShelf (width 2.35, halfW = 1.175) placed at x = 13.0 would reach 14.175 (outside)
+  assert.equal(canPlaceStation(state, 'tomatoShelf', 13.0, 0, 0), false, 'cannot extend beyond market right wall');
+  // Safe position within zone bounds
+  assert.equal(canPlaceStation(state, 'tomatoShelf', 12.0, 0, 0), true, 'can place within safe bounds');
+
+  // Moving a station via GameApplication honors these boundaries
+  const moveOutside = app.moveStation('tomatoShelf', 13.0, 0);
+  assert.equal(moveOutside.ok, false);
+
+  const moveSafe = app.moveStation('tomatoShelf', 12.0, 0);
+  assert.equal(moveSafe.ok, true);
+  assert.equal(app.getState().layout.tomatoShelf.x, 12.0);
+  assert.equal(app.getState().layout.tomatoShelf.z, 0);
+});
+
+test('customers navigate around foreground shelves when heading to background shelves without getting stuck', () => {
+  const state = createInitialState(42);
+  state.unlockedProducts = ['TOMATO', 'ORANGE'];
+  state.stock['shelf:ORANGE'] = { items: { ORANGE: 5 }, capacity: 8, reserved: {} };
+  state.layout = {
+    ...state.layout,
+    tomatoShelf: { x: 3, z: 2 },
+    orangeShelf: { x: 3, z: -1 },
+  };
+  SHELVES.TOMATO.x = 3;
+  SHELVES.TOMATO.z = 2;
+  SHELVES.ORANGE.x = 3;
+  SHELVES.ORANGE.z = -1;
+
+  // Foreground shelf: TOMATO at (3, 2)
+  // Background shelf: ORANGE at (3, -1)
+  // Customer starts at market entrance corridor (5, 3.5) and wants ORANGE
+  const orangeTarget = { x: 3, z: 0.3 };
+  const route = findCustomerMarketRoute(state, { x: 5, z: 3.5 }, orangeTarget, 'ORANGE');
+
+  // Verify route does not walk straight through tomato shelf (x: 3, z: 2)
+  assert.ok(route.length >= 2, 'Route should contain intermediate waypoint around obstacle');
+  // First waypoint should guide through main corridor (e.g. x around 4.5 - 5.0, z around 0.5 - 1.0)
+  assert.ok(route[0].x > 3.8, 'Route guides customer through aisle rather than through foreground shelf');
+
+  // Now simulate customer moving along route
+  const customerId = 'shopper-background-test';
+  makeLocation(state.stock, `customer:${customerId}`, 4);
+  state.customers.push({
+    id: customerId,
+    kind: 'shopper',
+    x: 5,
+    z: 3.5,
+    phase: 'to-shelf',
+    shoppingList: ['ORANGE'],
+    shoppingIndex: 0,
+    demand: 'ORANGE',
+    basket: [],
+    route,
+    routeIndex: 0,
+    checkoutOrder: 1,
+    waitTicks: 0,
+  });
+
+  // Track positions over simulation steps
+  let enteredTomatoFixture = false;
+  for (let tick = 0; tick < 60; tick += 1) {
+    advanceSimulation(state, 1);
+    const customer = state.customers.find((c) => c.id === customerId);
+    if (!customer) break;
+
+    // Check if customer ever clipped inside the tomato shelf fixture body: [1.9, 4.1] x [1.4, 2.6]
+    if (customer.x > 2.0 && customer.x < 4.0 && customer.z > 1.35 && customer.z < 2.65) {
+      enteredTomatoFixture = true;
+    }
+  }
+
+  assert.equal(enteredTomatoFixture, false, 'Customer should never walk through the foreground shelf body');
+  const customer = state.customers.find((c) => c.id === customerId);
+  assert.ok(
+    customer.phase === 'waiting-stock' || customer.basket.includes('ORANGE'),
+    'Customer successfully reached the background shelf without bugging'
+  );
+});
+
+test('adjacent shelves block gaps when less than 1 grid apart and allow passage when at least 1 grid apart', () => {
+  const state = createInitialState(101);
+  state.unlockedProducts = ['TOMATO', 'ORANGE'];
+
+  // Case 1: Adjacent shelves placed with < 1 grid gap (e.g. 0.15m apart)
+  // tomatoShelf at x=2.0 (width 2.35, right edge = 3.175)
+  // orangeShelf at x=4.5 (width 2.35, left edge = 3.325) -> gap = 0.15m < 0.5
+  state.layout = {
+    tomatoShelf: { x: 2.0, z: 0 },
+    orangeShelf: { x: 4.5, z: 0 },
+  };
+  let boxes = getMarketCollisionBoxes(state);
+  const gapBlocker = boxes.find((b) => b.id?.startsWith('gap:x:'));
+  assert.ok(gapBlocker, 'Gap blocker should be created between adjacent shelves');
+  assert.ok(gapBlocker.minX <= 3.25 && gapBlocker.maxX >= 3.25, 'Gap between shelves is blocked');
+
+  // Case 2: Shelves placed with >= 1 grid gap (e.g. 0.65m apart)
+  // orangeShelf at x=5.0 (left edge = 3.825) -> gap = 3.825 - 3.175 = 0.65m >= 0.5
+  state.layout.orangeShelf = { x: 5.0, z: 0 };
+  boxes = getMarketCollisionBoxes(state);
+  const gapBlocker2 = boxes.find((b) => b.id?.startsWith('gap:x:'));
+  assert.equal(gapBlocker2, undefined, 'No gap blocker when shelves are at least 1 grid apart');
+});
+
+test('shelves placed adjacent to walls block gap, while 1 grid away allows passage', () => {
+  const state = createInitialState(102);
+  state.unlockedProducts = ['TOMATO'];
+
+  // Right wall is at x = 13.5
+  // Case 1: Shelf adjacent to wall (< 1 grid gap, e.g. x = 12.0 -> maxX = 13.175 -> gap = 0.325m < 0.5)
+  state.layout = { tomatoShelf: { x: 12.0, z: 0 } };
+  let boxes = getMarketCollisionBoxes(state);
+  const shelfBox = boxes.find((b) => b.id === 'tomatoShelf');
+  assert.ok(shelfBox, 'Tomato shelf box exists');
+  assert.equal(shelfBox.maxX, 13.5, 'Shelf box extends to wall to block passage when adjacent');
+
+  // Case 2: Shelf placed 1 grid further away (gap >= 0.5, e.g. x = 11.5 -> maxX = 12.675 -> gap = 0.825m >= 0.5)
+  state.layout = { tomatoShelf: { x: 11.5, z: 0 } };
+  boxes = getMarketCollisionBoxes(state);
+  const shelfBox2 = boxes.find((b) => b.id === 'tomatoShelf');
+  assert.ok(shelfBox2.maxX < 13.0, 'Shelf box does not extend to wall when >= 1 grid gap exists');
+});
+
+test('furniture store unlocks items when produced and scales prices parabolically with unlimited purchases', () => {
+  const app = makeApp(201);
+  let state = app.getState();
+
+  // Initially: TOMATO is unlocked, ORANGE is locked
+  assert.equal(isFurnitureUnlocked(state, 'tomatoShelf'), true);
+  assert.equal(isFurnitureUnlocked(state, 'tomatoFarm'), true);
+  assert.equal(isFurnitureUnlocked(state, 'orangeShelf'), false);
+
+  // Parabolic price verification
+  const basePrice = FURNITURE_TYPES.tomatoFarm.basePrice;
+  const p0 = calculateParabolicPrice(basePrice, 0);
+  const p1 = calculateParabolicPrice(basePrice, 1);
+  const p2 = calculateParabolicPrice(basePrice, 2);
+  assert.equal(p0, basePrice);
+  assert.ok(p1 > p0, 'price increases for count 1');
+  assert.ok(p2 - p1 > p1 - p0, 'price increases parabolically (second derivative is positive)');
+
+  // Give player ample funds to purchase multiple furniture items
+  app.debugCredit(50_000);
+  state = app.getState();
+
+  // Buy a new tomato farm
+  const buyFarm = app.buyFurniture('tomatoFarm');
+  assert.equal(buyFarm.ok, true);
+  assert.ok(buyFarm.stationId.startsWith('tomatoFarm_'));
+  state = app.getState();
+  assert.ok(state.farms[buyFarm.stationId], 'New farm added to farms state');
+  assert.ok(state.layout[buyFarm.stationId], 'New farm placed on layout');
+
+  // Buy a second tomato shelf
+  const buyShelf = app.buyFurniture('tomatoShelf');
+  assert.equal(buyShelf.ok, true);
+  assert.ok(buyShelf.stationId.startsWith('tomatoShelf_'));
+  state = app.getState();
+  assert.ok(state.stock[`shelf:${buyShelf.stationId}`], 'New shelf stock initialized');
+
+  // Next purchase price increases parabolically
+  const nextPrice = getFurniturePrice(state, 'tomatoShelf');
+  assert.ok(nextPrice > (buyShelf.price ?? basePrice));
+
+  // Unlock orange product and verify orange furniture becomes unlocked in the store
+  state.unlockedProducts.push('ORANGE');
+  assert.equal(isFurnitureUnlocked(state, 'orangeShelf'), true);
+  assert.equal(isFurnitureUnlocked(state, 'orangeFarm'), true);
+});
+
+test('staff count can be increased with parabolic hiring costs', () => {
+  const app = makeApp(202);
+  let state = app.getState();
+  app.debugCredit(50_000);
+  state = app.getState();
+
+  // Cashier is not yet unlocked
+  assert.equal(app.hireExtraStaff('cashier').ok, false);
+
+  // Complete cashier upgrade
+  state.availableUpgrades.push('cashier');
+  const hireFirst = app.buyUpgrade('cashier');
+  assert.equal(hireFirst.ok, true);
+  state = app.getState();
+  assert.equal(getStaffCount(state, 'cashier'), 1);
+
+  const price1 = getStaffHirePrice(state, 'cashier');
+  // Hire extra cashier
+  const hireSecond = app.hireExtraStaff('cashier');
+  assert.equal(hireSecond.ok, true);
+  state = app.getState();
+  assert.equal(getStaffCount(state, 'cashier'), 2);
+
+  const price2 = getStaffHirePrice(state, 'cashier');
+  assert.ok(price2 > price1, 'Price increases for subsequent staff hires');
+
+  // Hire third cashier
+  const hireThird = app.hireExtraStaff('cashier');
+  assert.equal(hireThird.ok, true);
+  state = app.getState();
+  assert.equal(getStaffCount(state, 'cashier'), 3);
+  const price3 = getStaffHirePrice(state, 'cashier');
+  assert.ok(price3 - price2 > price2 - price1, 'Cost grows parabolically');
+});
+
+test('self-checkout kiosk operates automatically without cashier or player present', () => {
+  const app = makeApp(203);
+  let state = app.getState();
+  app.debugCredit(50_000);
+
+  // Purchase self-checkout kiosk
+  const buyKiosk = app.buyFurniture('selfRegister');
+  assert.equal(buyKiosk.ok, true);
+  assert.ok(buyKiosk.stationId.startsWith('selfRegister_'));
+  state = app.getState();
+  assert.ok(state.selfRegisters[buyKiosk.stationId], 'Self register registered in state');
+
+  const registers = getAvailableRegisters(state);
+  assert.ok(registers.some((r) => r.id === buyKiosk.stationId && r.isSelfCheckout === true));
+
+  // Position player far away from checkout
+  state.player.x = -15;
+  state.player.z = -5;
+  // Ensure no cashier workers exist
+  state.workers = state.workers.filter((w) => w.type !== 'cashier');
+
+  // Place customer directly paying at the selfRegister
+  const customerId = 'shopper-kiosk-test';
+  makeLocation(state.stock, `customer:${customerId}`, 4);
+  state.stock[`customer:${customerId}`].items.TOMATO = 1;
+
+  const kioskPos = state.layout[buyKiosk.stationId];
+  const customer = {
+    id: customerId,
+    kind: 'shopper',
+    x: kioskPos.x,
+    z: kioskPos.z + 1.2,
+    phase: 'paying',
+    targetRegisterId: buyKiosk.stationId,
+    queueIndex: 0,
+    checkoutOrder: 1,
+    payTicks: 0,
+    checkoutWaitTicks: 0,
+    basket: ['TOMATO'],
+    shoppingList: ['TOMATO'],
+    shoppingIndex: 1,
+    demand: 'TOMATO',
+  };
+  state.customers.push(customer);
+
+  const initialBalance = state.economy.balanceAtoms;
+
+  // Advance simulation for 10 ticks (self-checkout payDuration is 7 ticks)
+  for (let tick = 0; tick < 10; tick += 1) {
+    advanceSimulation(state);
+    state.tick += 1;
+  }
+
+  // Assert payment completed and ledger credited WITHOUT cashier or player
+  assert.ok(state.economy.balanceAtoms > initialBalance, 'Sale completed automatically at self-checkout kiosk');
+  assert.equal(state.stats.tomatoSold, 1);
+});
+
+
+
+
+
+

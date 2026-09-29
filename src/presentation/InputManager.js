@@ -18,8 +18,14 @@ export class InputManager {
     this.joystickZone = document.getElementById('joystick-zone');
     this.joystickThumb = document.getElementById('joystick-thumb');
     this.pointerStart = null;
+    this.touchPointers = new Map();
+    this.pinchDistance = null;
+    this.multiTouchGesture = false;
+    this.layoutMode = false;
+    this.selectedStation = null;
     this.#bindKeyboard();
     this.#bindJoystick();
+    this.#bindCameraZoom();
     this.#bindWorldTap();
   }
 
@@ -32,6 +38,12 @@ export class InputManager {
       if (this.enabled && (event.code === 'KeyE' || event.code === 'Space') && !event.repeat) {
         event.preventDefault();
         this.onInteract();
+      }
+      if (this.enabled && event.code === 'KeyR' && !event.repeat) {
+        if (this.layoutMode && this.selectedStation) {
+          event.preventDefault();
+          this.rotateCurrentSelection();
+        }
       }
     });
     window.addEventListener('keyup', (event) => this.keys.delete(event.code));
@@ -89,9 +101,51 @@ export class InputManager {
     this.joystickThumb.style.transform = 'translate(0, 0)';
   }
 
+  #bindCameraZoom() {
+    this.canvas.addEventListener('wheel', (event) => {
+      if (!this.enabled) return;
+      event.preventDefault();
+      const deltaScale = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? this.canvas.clientHeight : 1;
+      this.world.engine.zoomBy(Math.exp(-event.deltaY * deltaScale * 0.001));
+    }, { passive: false });
+
+    this.canvas.addEventListener('pointerdown', (event) => {
+      if (!this.enabled || event.pointerType !== 'touch') return;
+      this.touchPointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      if (this.touchPointers.size >= 2) {
+        this.multiTouchGesture = true;
+        this.pointerStart = null;
+        this.pinchDistance = this.#getPinchDistance();
+      }
+    });
+
+    this.canvas.addEventListener('pointermove', (event) => {
+      if (!this.enabled || !this.touchPointers.has(event.pointerId)) return;
+      this.touchPointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      if (this.touchPointers.size < 2) return;
+      const distance = this.#getPinchDistance();
+      if (this.pinchDistance && distance > 0) this.world.engine.zoomBy(distance / this.pinchDistance);
+      this.pinchDistance = distance;
+    });
+
+    const finishTouch = (event) => {
+      if (!this.touchPointers.delete(event.pointerId)) return;
+      if (this.touchPointers.size >= 2) this.pinchDistance = this.#getPinchDistance();
+      else this.pinchDistance = null;
+      if (this.touchPointers.size === 0) this.multiTouchGesture = false;
+    };
+    this.canvas.addEventListener('pointerup', finishTouch);
+    this.canvas.addEventListener('pointercancel', finishTouch);
+  }
+
+  #getPinchDistance() {
+    const [first, second] = [...this.touchPointers.values()];
+    return first && second ? Math.hypot(second.x - first.x, second.y - first.y) : 0;
+  }
+
   #bindWorldTap() {
     this.canvas.addEventListener('pointerdown', (event) => {
-      if (!this.enabled || event.target.closest('[data-ui]')) return;
+      if (!this.enabled || this.multiTouchGesture || event.target.closest('[data-ui]')) return;
       if (event.pointerType === 'mouse' && event.button !== 0) return;
       this.pointerStart = { x: event.clientX, y: event.clientY, pointerId: event.pointerId };
     });
@@ -101,13 +155,60 @@ export class InputManager {
       this.pointerStart = null;
       if (distance > 18 || event.target.closest('[data-ui]')) return;
       const target = this.world.screenToWorld(event.clientX, event.clientY);
+      if (this.layoutMode) {
+        if (!target) return;
+        if (!this.selectedStation) {
+          const state = this.app.getState();
+          const decorationId = this.world.decorationAt(state, target.x, target.z);
+          this.selectedStation = decorationId
+            ? 'decor:' + decorationId
+            : this.world.stationAt(state, target.x, target.z);
+          this.world.selectStation(this.selectedStation, state);
+          this.onLayoutMessage?.(this.selectedStation ? 'Yeni konum için dokun veya R ile döndür.' : 'Taşımak için bir yapıya dokun.');
+          this.onSelectionChange?.(this.selectedStation);
+        } else {
+          const result = this.selectedStation.startsWith('decor:')
+            ? this.app.moveDecoration(this.selectedStation.slice(6), target.x, target.z)
+            : this.app.moveStation(this.selectedStation, target.x, target.z);
+          this.onLayoutMessage?.(result.ok ? 'Yerleşim kaydedildi. Başka bir yapı seçebilirsin.' : 'Bu kare dolu veya alanın dışında. Başka bir kare seç.');
+          if (result.ok) {
+            this.selectedStation = null;
+            this.world.selectStation(null);
+            this.onSelectionChange?.(null);
+          }
+        }
+        return;
+      }
       if (target && target.x > -55 && target.x < 18 && target.z > -16 && target.z < 30) this.app.setPlayerTarget(target.x, target.z);
     });
     this.canvas.addEventListener('pointercancel', () => { this.pointerStart = null; });
+    this.canvas.addEventListener('pointermove', (event) => {
+      if (!this.enabled || this.multiTouchGesture || !this.layoutMode || !this.selectedStation) return;
+      const target = this.world.screenToWorld(event.clientX, event.clientY);
+      if (target) this.world.previewPlacement(this.app.getState(), target.x, target.z);
+    });
+  }
+
+  setLayoutMode(enabled) {
+    this.layoutMode = enabled;
+    this.selectedStation = null;
+    this.world.selectStation(null);
+    this.app.clearPlayerTarget();
+    this.world.setLayoutMode(enabled);
+    this.onSelectionChange?.(null);
+  }
+
+  rotateCurrentSelection() {
+    if (!this.layoutMode || !this.selectedStation) return;
+    const result = this.app.rotateSelected(this.selectedStation);
+    this.onLayoutMessage?.(result.ok ? 'Döndürüldü (90°). Yeni konumu seçebilirsin.' : 'Döndürülemedi.');
+    if (result.ok) {
+      this.world.refreshPreview(this.app.getState());
+    }
   }
 
   getMovementVector() {
-    if (!this.enabled) return { x: 0, z: 0 };
+    if (!this.enabled || this.layoutMode) return { x: 0, z: 0 };
     let x = this.joystick.x;
     let z = this.joystick.z;
     for (const code of this.keys) {
@@ -122,6 +223,9 @@ export class InputManager {
   reset() {
     this.keys.clear();
     this.pointerStart = null;
+    this.touchPointers.clear();
+    this.pinchDistance = null;
+    this.multiTouchGesture = false;
     this.#resetJoystick();
   }
 

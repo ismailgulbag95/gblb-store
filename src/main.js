@@ -66,6 +66,30 @@ function boot() {
     setPaused();
   });
   input = new InputManager(world.getCanvas(), world, app, () => document.getElementById('btn-interact').click());
+  const layoutButton = document.getElementById('btn-layout');
+  const layoutHelp = document.getElementById('layout-help');
+  const layoutHelpText = document.getElementById('layout-help-text');
+  const rotateButton = document.getElementById('btn-rotate-layout');
+  input.onLayoutMessage = (message) => {
+    if (layoutHelpText) layoutHelpText.textContent = message;
+    else layoutHelp.textContent = message;
+  };
+  input.onSelectionChange = (selected) => {
+    if (rotateButton) rotateButton.classList.toggle('hidden', !selected);
+  };
+  rotateButton?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    input.rotateCurrentSelection();
+  });
+  layoutButton.addEventListener('click', () => {
+    const enabled = !input.layoutMode;
+    input.setLayoutMode(enabled);
+    layoutButton.setAttribute('aria-pressed', String(enabled));
+    layoutHelp.classList.toggle('hidden', !enabled);
+    if (layoutHelpText) layoutHelpText.textContent = 'Taşımak için bir yapıya dokun, sonra boş bir kareye dokun. Bitirmek için ▦ düğmesine bas.';
+    else layoutHelp.textContent = 'Taşımak için bir yapıya dokun, sonra boş bir kareye dokun. Bitirmek için ▦ düğmesine bas.';
+    if (rotateButton) rotateButton.classList.add('hidden');
+  });
   if (app.recovered) hud.toast('Yedek kayıttan devam edildi.');
   if (app.getState().paused) {
     pauseReasons.add('resume-required');
@@ -77,6 +101,7 @@ function boot() {
   app.setEventHandler((event) => {
     if (event.type === 'toast' || event.type === 'sale' || event.type === 'production' || event.type === 'tip-ready') {
       hud.showEvent(event);
+      if (event.tone !== 'error') world.playEvent(event, app.getState());
     }
     if (event.type === 'save-error') {
       pauseReasons.add('save-error');

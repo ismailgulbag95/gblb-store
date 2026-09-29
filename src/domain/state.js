@@ -1,7 +1,7 @@
 import { ITEMS, SHELVES, STATIONS } from './catalog.js';
 import { syncFarmHarvest } from './farm.js';
 
-export const SAVE_VERSION = 2;
+export const SAVE_VERSION = 3;
 
 function emptyStock(capacity) {
   return { capacity, items: {}, reserved: {}, reservedCapacity: 0 };
@@ -13,6 +13,7 @@ export function createInitialState(seed = 0x51f15e) {
     'farm:TOMATO': emptyStock(60),
     'shelf:TOMATO': emptyStock(SHELVES.TOMATO.capacity),
     'checkout:queue': emptyStock(12),
+    'order:delivery': emptyStock(500),
   };
   const farms = {
     tomatoFarm: { progressTicks: 0, harvestCount: 0, readyCount: 0 },
@@ -33,6 +34,15 @@ export function createInitialState(seed = 0x51f15e) {
     player: { x: 5, z: 6, facing: 0, capacity: 6, character: 'shopkeeper' },
     farms,
     machines: {},
+    customStations: {},
+    selfRegisters: {},
+    layout: {},
+    decorations: [
+      { id: 'decoration-boxes', type: 'cardboardBoxes', x: -3.8, z: -7.5, rotation: 0 },
+    ],
+    activeOrder: null,
+    ordersCompleted: 0,
+    decorVouchers: 0,
     coops: {},
     diningTables: {},
     customers: [],
@@ -47,6 +57,7 @@ export function createInitialState(seed = 0x51f15e) {
       cornSold: 0, popcornProduced: 0, popcornSold: 0, feedProduced: 0,
       eggSold: 0, breadProduced: 0, breadSold: 0, burgerCooked: 0, pizzaCooked: 0,
       tablesServed: 0, tipsCollected: 0,
+      customersSatisfied: 0, customersUnhappy: 0,
     },
     quest: 'Domates topla, reyonu doldur ve ilk satışını yap.',
     settings: { language: 'tr', sound: true, haptics: true },
@@ -68,9 +79,16 @@ export function createInitialState(seed = 0x51f15e) {
 
 export function hydrateState(candidate) {
   if (!candidate || typeof candidate !== 'object') throw new Error('Kayıt boş veya bozuk.');
-  if (candidate.saveVersion !== SAVE_VERSION) throw new Error(`Bu kayıt sürümü desteklenmiyor (${candidate.saveVersion ?? 'bilinmiyor'}).`);
+  if (![2, SAVE_VERSION].includes(candidate.saveVersion)) throw new Error(`Bu kayıt sürümü desteklenmiyor (${candidate.saveVersion ?? 'bilinmiyor'}).`);
   const initial = createInitialState(candidate.rng);
   const hydrated = { ...initial, ...candidate };
+  hydrated.saveVersion = SAVE_VERSION;
+  hydrated.ordersCompleted = Number.isSafeInteger(candidate.ordersCompleted) && candidate.ordersCompleted >= 0 ? candidate.ordersCompleted : 0;
+  hydrated.decorVouchers = Number.isSafeInteger(candidate.decorVouchers) && candidate.decorVouchers >= 0 ? candidate.decorVouchers : 0;
+  hydrated.activeOrder = candidate.activeOrder && ITEMS[candidate.activeOrder.item]
+    && Number.isSafeInteger(candidate.activeOrder.quantity) && candidate.activeOrder.quantity > 0
+    && Number.isSafeInteger(candidate.activeOrder.reward) && candidate.activeOrder.reward > 0
+    ? { ...candidate.activeOrder } : null;
   hydrated.player = { ...initial.player, ...(candidate.player ?? {}) };
   hydrated.economy = { ...initial.economy, ...(candidate.economy ?? {}) };
   hydrated.settings = { ...initial.settings, ...(candidate.settings ?? {}) };
@@ -81,6 +99,13 @@ export function hydrateState(candidate) {
   hydrated.stock = { ...initial.stock, ...(candidate.stock ?? {}) };
   hydrated.farms = { ...initial.farms, ...(candidate.farms ?? {}) };
   hydrated.machines = { ...initial.machines, ...(candidate.machines ?? {}) };
+  hydrated.customStations = { ...(candidate.customStations ?? {}) };
+  hydrated.selfRegisters = { ...(candidate.selfRegisters ?? {}) };
+  hydrated.layout = Object.fromEntries(Object.entries(candidate.layout ?? {}).filter(([id, point]) =>
+    (STATIONS[id] || candidate.customStations?.[id] || candidate.selfRegisters?.[id] || id.includes('_') || id.startsWith('selfRegister') || id.startsWith('custom_')) && Number.isFinite(point?.x) && Number.isFinite(point?.z)));
+  hydrated.decorations = (Array.isArray(candidate.decorations) ? candidate.decorations : []).filter((entry) =>
+    entry && typeof entry.id === 'string' && typeof entry.type === 'string'
+      && Number.isFinite(entry.x) && Number.isFinite(entry.z) && entry.placed !== false);
   hydrated.coops = { ...initial.coops, ...(candidate.coops ?? {}) };
   hydrated.diningTables = { ...initial.diningTables, ...(candidate.diningTables ?? {}) };
   hydrated.reservations = { ...initial.reservations, ...(candidate.reservations ?? {}) };
@@ -101,6 +126,9 @@ export function hydrateState(candidate) {
         : Array.isArray(customer.carriedItems) ? [...customer.carriedItems] : [],
       checkoutOrder: Number.isFinite(customer.checkoutOrder) ? customer.checkoutOrder : (Number.isFinite(idOrder) ? idOrder : index),
       routeIndex: customer.routeIndex ?? 0,
+      missedItems: customer.missedItems ?? 0,
+      checkoutWaitTicks: customer.checkoutWaitTicks ?? 0,
+      mealWaitTicks: customer.mealWaitTicks ?? 0,
     };
   });
   hydrated.farms = Object.fromEntries(Object.entries(hydrated.farms).map(([id, farm]) => [id, {

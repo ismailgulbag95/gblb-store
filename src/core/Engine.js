@@ -21,13 +21,19 @@ export class Engine {
       1000,
     );
     this.cameraOffset = new THREE.Vector3(14, 18, 14);
+    this.cameraZoomLimits = { min: 0.65, max: 2.1 };
     this.camera.position.copy(this.cameraOffset);
     this.camera.lookAt(0, 0, 0);
+    this.cameraTarget = new THREE.Vector3();
 
     // Renderer
     this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
     this.renderer.setSize(window.innerWidth, window.innerHeight);
+    this.qualityScale = 1;
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+    this.lastFrameAt = performance.now();
+    this.frameTimeSum = 0;
+    this.frameCount = 0;
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.container.appendChild(this.renderer.domElement);
@@ -66,8 +72,20 @@ export class Engine {
 
   followTarget(targetPosition, delta = 0.1) {
     const desiredPosition = targetPosition.clone().add(this.cameraOffset);
-    this.camera.position.lerp(desiredPosition, delta * 6);
-    this.camera.lookAt(targetPosition.x, targetPosition.y + 0.5, targetPosition.z);
+    const easing = Math.min(1, delta * 6);
+    this.camera.position.lerp(desiredPosition, easing);
+    this.cameraTarget.lerp(new THREE.Vector3(targetPosition.x, targetPosition.y + 0.5, targetPosition.z), easing);
+    this.camera.lookAt(this.cameraTarget);
+  }
+
+  zoomBy(factor) {
+    if (!Number.isFinite(factor) || factor <= 0) return;
+    this.camera.zoom = THREE.MathUtils.clamp(
+      this.camera.zoom * factor,
+      this.cameraZoomLimits.min,
+      this.cameraZoomLimits.max,
+    );
+    this.camera.updateProjectionMatrix();
   }
 
   onWindowResize() {
@@ -79,10 +97,30 @@ export class Engine {
     this.camera.bottom = -viewHeight / 2;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(window.innerWidth, window.innerHeight);
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5) * this.qualityScale);
   }
 
   render() {
+    const now = performance.now();
+    const elapsed = now - this.lastFrameAt;
+    this.lastFrameAt = now;
+    if (!document.hidden && elapsed < 2000) {
+      this.frameTimeSum += elapsed;
+      this.frameCount += 1;
+    }
+    if (this.frameTimeSum >= 2500 && this.frameCount > 0) {
+      const fps = this.frameCount * 1000 / this.frameTimeSum;
+      const nextScale = fps < 22 ? 0.7 : fps < 34 ? Math.min(this.qualityScale, 0.85)
+        : fps > 52 ? Math.min(1, this.qualityScale + 0.15) : this.qualityScale;
+      if (Math.abs(nextScale - this.qualityScale) > 0.01) {
+        this.qualityScale = nextScale;
+        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5) * this.qualityScale);
+      }
+      if (fps < 22 && this.renderer.shadowMap.enabled) this.renderer.shadowMap.enabled = false;
+      if (fps > 48 && !this.renderer.shadowMap.enabled) this.renderer.shadowMap.enabled = true;
+      this.frameTimeSum = 0;
+      this.frameCount = 0;
+    }
     this.renderer.render(this.scene, this.camera);
   }
 }

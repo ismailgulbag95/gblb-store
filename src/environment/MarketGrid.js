@@ -53,12 +53,14 @@ export class MarketGrid {
     sidewalk.receiveShadow = true;
     this.scene.add(sidewalk);
 
-    // 3. ZONE 1: Store Zone Floor (Clean Shiny Vibrant White Tile on Right x = -4 to 14)
+    // 3. ZONE 1: Supermarket Floor (Warm Cream/Beige Polished Porcelain Tile Grid - Matching Image 6)
+    const storeFloorTex = this.createSupermarketFloorTexture();
     const storeGeo = new THREE.PlaneGeometry(18, 18);
     const storeMat = new THREE.MeshStandardMaterial({
-      color: GAME_CONFIG.COLORS.FLOOR_STORE,
-      roughness: 0.2,
-      metalness: 0.05
+      map: storeFloorTex,
+      color: 0xffffff,
+      roughness: 0.22,
+      metalness: 0.04
     });
     const storeFloor = new THREE.Mesh(storeGeo, storeMat);
     storeFloor.rotation.x = -Math.PI / 2;
@@ -66,20 +68,32 @@ export class MarketGrid {
     storeFloor.receiveShadow = true;
     this.scene.add(storeFloor);
 
-    // 4. ZONE 2: Farm & Factory Zone Floor (Rich Soil / Vibrant Pasture on Left x = -26 to -4)
-    const farmGeo = new THREE.PlaneGeometry(22, 18);
-    const farmMat = new THREE.MeshStandardMaterial({ color: GAME_CONFIG.COLORS.FLOOR_FARM, roughness: 0.8 });
-    const farmFloor = new THREE.Mesh(farmGeo, farmMat);
-    farmFloor.rotation.x = -Math.PI / 2;
-    farmFloor.position.set(-15, 0, 0);
-    farmFloor.receiveShadow = true;
-    this.scene.add(farmFloor);
+    // 4. ZONE 2: Organic Garden & Greenhouse Farm Floor (Lush Garden Grass on Left x = -26 to -4)
+    const gardenGeo = new THREE.PlaneGeometry(22, 18);
+    const gardenMat = new THREE.MeshStandardMaterial({
+      color: 0x27ae60,
+      roughness: 0.7,
+    });
+    const gardenFloor = new THREE.Mesh(gardenGeo, gardenMat);
+    gardenFloor.rotation.x = -Math.PI / 2;
+    gardenFloor.position.set(-15, 0, 0);
+    gardenFloor.receiveShadow = true;
+    this.scene.add(gardenFloor);
+
+    // Main Garden Promenade connecting Supermarket doorway (x = -4) to Restaurant (x = -26)
+    this.createPath(-15, 0, 22, 2.8);
+
+    // Branching garden paths to crop plots & orchards
+    this.createPath(-10, 3.5, 2.2, 5.0);
+    this.createPath(-18, 3.5, 2.2, 5.0);
+    this.createPath(-10, -3.5, 2.2, 5.0);
+    this.createPath(-18, -3.5, 2.2, 5.0);
 
     // 5. ZONE 3: Gourmet Restaurant Zone Floor (Rich Warm Timber Wood on Far Left x = -48 to -26)
     const restGeo = new THREE.PlaneGeometry(22, 18);
     const restMat = new THREE.MeshStandardMaterial({
       color: GAME_CONFIG.COLORS.FLOOR_RESTAURANT,
-      roughness: 0.3
+      roughness: 0.3,
     });
     const restFloor = new THREE.Mesh(restGeo, restMat);
     restFloor.rotation.x = -Math.PI / 2;
@@ -87,15 +101,28 @@ export class MarketGrid {
     restFloor.receiveShadow = true;
     this.scene.add(restFloor);
 
-    // 6. Connecting Stone Pathways
-    this.createPath(-4, 0, 2, 18);
-    this.createPath(-26, 0, 2, 18);
-
     // 7. Store & Restaurant Walls
     this.createStoreWalls();
     this.createRestaurantWalls();
 
-    // 8. Awning & 3D Signboards
+    // 8. Supermarket Entrance & Fixtures (Directly from Reference Photo!)
+    // A. Automatic Sliding Glass Doors at entrance (x = 5, z = 9)
+    this.props.createSlidingGlassDoors(5, 9.0, 6.2, 2.7);
+
+    // B. Nested metal wire shopping carts parked outside entrance on sidewalk (x = 9.2, z = 10.2)
+    this.props.createCartStack(9.2, 10.2, 4, -Math.PI / 2);
+
+    // C. Stack of red handheld shopping baskets right inside entrance (x = 2.0, z = 7.8)
+    this.props.createBasketStack(2.0, 7.8);
+
+    // D. Decorative flower display stand & planters flanking entrance
+    this.props.createFlowerDisplayStand(1.0, 9.8, 0);
+    this.props.createFlowerDisplayStand(11.8, 9.8, 0);
+
+    // E. Modern Self-Checkout Kiosk with glowing green status beacon (x = 8.5, z = -4.2)
+    this.props.createSelfCheckoutKiosk(8.5, -4.2, 0);
+
+    // 9. Awning & 3D Signboards
     this.props.createStoreAwning(5, 2.3, 9.1, 10, 1.8);
     this.props.createStoreSign(5, 3.4, 9.0);
 
@@ -103,13 +130,13 @@ export class MarketGrid {
     this.props.createStoreAwning(-37, 2.3, 9.1, 12, 1.8);
     this.createRestaurantSign(-37, 3.4, 9.0);
 
-    // 9. Low-Poly Cars in Parking Lot (Ultra vibrant candy colors)
+    // 10. Low-Poly Cars in Parking Lot (Ultra vibrant candy colors)
     this.props.createCar(4, 16.5, -Math.PI / 2, 0xff4757); // Candy Red car
     this.props.createCar(11, 16.5, -Math.PI / 2, 0xffa502); // Bright Gold Taxi
     this.props.createCar(-10, 16.5, -Math.PI / 2, 0x1e90ff); // Electric Blue car
     this.props.createCar(-24, 16.5, -Math.PI / 2, 0xa55eea); // Sweet Lilac/Purple car
 
-    // 10. Street Lamps & Fences
+    // 11. Street Lamps & Fences
     this.props.createStreetLamp(14, 10.5);
     this.props.createStreetLamp(-4, 10.5);
     this.props.createStreetLamp(-26, 10.5);
@@ -121,7 +148,7 @@ export class MarketGrid {
     this.registerObstacle(-15, 9.0, 22, 0.4);
     this.registerObstacle(-15, -9.0, 22, 0.4);
 
-    // 11. Lush Trees
+    // 12. Lush Trees
     this.props.createOakTree(-52, 4, 1.3);
     this.props.createOakTree(-51, -6, 1.2);
     this.props.createOakTree(-8, -14, 1.1);
@@ -131,6 +158,40 @@ export class MarketGrid {
     this.props.createPineTree(18, 4, 1.2);
     this.props.createPineTree(-30, -14, 1.2);
     this.props.createPineTree(-42, -14, 1.1);
+  }
+
+  /**
+   * Procedurally generates a warm cream porcelain tile floor texture with subtle grout lines.
+   */
+  createSupermarketFloorTexture() {
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 512;
+    const ctx = canvas.getContext('2d');
+
+    // Base warm creamy tile color
+    ctx.fillStyle = '#f7f2ea';
+    ctx.fillRect(0, 0, 512, 512);
+
+    const tileSize = 64; // 8x8 tiles in 512x512
+    for (let y = 0; y < 512; y += tileSize) {
+      for (let x = 0; x < 512; x += tileSize) {
+        // Subtle organic tile variation
+        const shade = ((x + y * 7) % 3 === 0) ? '#fbf7f0' : ((x * 3 + y) % 2 === 0 ? '#f4eee4' : '#f8f3eb');
+        ctx.fillStyle = shade;
+        ctx.fillRect(x + 1, y + 1, tileSize - 2, tileSize - 2);
+
+        // Crisp grout line
+        ctx.strokeStyle = '#e2d9cd';
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(x + 0.5, y + 0.5, tileSize - 1, tileSize - 1);
+      }
+    }
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.wrapS = THREE.RepeatWrapping;
+    texture.wrapT = THREE.RepeatWrapping;
+    texture.repeat.set(6, 6);
+    return texture;
   }
 
   createPath(x, z, width, depth) {
@@ -157,6 +218,13 @@ export class MarketGrid {
 
     // Right Wall (x = 14, z = -9 to 9)
     this.addWall(14, 0, thickness, wallHeight, 18, wallMat);
+
+    // Left Wall facing Organic Garden (x = -4) with a wide doorway at center (z = -1.8 to 1.8)
+    this.addWall(-4, -5.4, thickness, wallHeight, 7.2, wallMat); // North section
+    this.addWall(-4, 5.4, thickness, wallHeight, 7.2, wallMat);  // South section
+
+    // Architectural Garden Arch & Sign over the door (x = -4, z = 0)
+    this.createGardenDoorway(-4, 0);
   }
 
   createRestaurantWalls() {
@@ -173,6 +241,101 @@ export class MarketGrid {
 
     // Left Wall (x = -48, z = -9 to 9)
     this.addWall(-48, 0, thickness, wallHeight, 18, wallMat);
+
+    // Right Wall facing Organic Garden (x = -26) with doorway at center (z = -1.8 to 1.8)
+    this.addWall(-26, -5.4, thickness, wallHeight, 7.2, wallMat);
+    this.addWall(-26, 5.4, thickness, wallHeight, 7.2, wallMat);
+    this.createRestaurantGardenDoorway(-26, 0);
+  }
+
+  createGardenDoorway(x, z) {
+    const group = new THREE.Group();
+    group.position.set(x, 0, z);
+
+    const woodMat = new THREE.MeshStandardMaterial({ color: 0x5d4037, roughness: 0.7 });
+
+    // Sturdy timber door posts flanking the passage
+    for (const pz of [-2.0, 2.0]) {
+      const post = new THREE.Mesh(new THREE.BoxGeometry(0.5, 2.7, 0.5), woodMat);
+      post.position.set(0, 1.35, pz);
+      post.castShadow = true;
+      group.add(post);
+
+      const lamp = new THREE.Mesh(new THREE.DodecahedronGeometry(0.18), new THREE.MeshStandardMaterial({
+        color: 0xfffa65, emissive: 0xffa502, emissiveIntensity: 0.8,
+      }));
+      lamp.position.set(0, 2.2, pz + (pz < 0 ? 0.35 : -0.35));
+      group.add(lamp);
+    }
+
+    // Top overhead timber pergola beam
+    const lintel = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.45, 4.6), woodMat);
+    lintel.position.set(0, 2.8, 0);
+    lintel.castShadow = true;
+    group.add(lintel);
+
+    // Garden Arch Signboard
+    const signBoard = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.8, 3.4), woodMat);
+    signBoard.position.set(0, 2.8, 0);
+    group.add(signBoard);
+
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 128;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#27ae60';
+    ctx.fillRect(0, 0, 512, 128);
+    ctx.lineWidth = 8;
+    ctx.strokeStyle = '#f1c40f';
+    ctx.strokeRect(6, 6, 500, 116);
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 34px Fredoka, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('🌿 ORGANİK BAHÇE & ÇİFTLİK', 256, 64);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    const signMat = new THREE.MeshBasicMaterial({ map: texture });
+
+    for (const side of [-1, 1]) {
+      const plate = new THREE.Mesh(new THREE.PlaneGeometry(3.3, 0.75), signMat);
+      plate.position.set(side * 0.085, 2.8, 0);
+      plate.rotation.y = side === 1 ? Math.PI / 2 : -Math.PI / 2;
+      group.add(plate);
+    }
+
+    // Decorative climbing ivy planters at base
+    for (const pz of [-2.35, 2.35]) {
+      const planter = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.5, 0.6), new THREE.MeshStandardMaterial({ color: 0xd35400 }));
+      planter.position.set(0, 0.25, pz);
+      group.add(planter);
+
+      const bush = new THREE.Mesh(new THREE.DodecahedronGeometry(0.42, 1), new THREE.MeshStandardMaterial({ color: 0x2ecc71, roughness: 0.6 }));
+      bush.position.set(0, 0.7, pz);
+      group.add(bush);
+    }
+
+    this.scene.add(group);
+  }
+
+  createRestaurantGardenDoorway(x, z) {
+    const group = new THREE.Group();
+    group.position.set(x, 0, z);
+
+    const darkWood = new THREE.MeshStandardMaterial({ color: 0x2c3e50, roughness: 0.5 });
+    for (const pz of [-2.0, 2.0]) {
+      const post = new THREE.Mesh(new THREE.BoxGeometry(0.5, 2.7, 0.5), darkWood);
+      post.position.set(0, 1.35, pz);
+      post.castShadow = true;
+      group.add(post);
+    }
+    const lintel = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.45, 4.6), darkWood);
+    lintel.position.set(0, 2.8, 0);
+    lintel.castShadow = true;
+    group.add(lintel);
+
+    this.scene.add(group);
   }
 
   createRestaurantSign(x, y, z) {

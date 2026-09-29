@@ -1,4 +1,7 @@
 import { ITEMS, SHELVES, STAFF, STAFF_HIRES, UPGRADES } from '../domain/catalog.js';
+import { FURNITURE_TYPES, getFurnitureCount, getFurniturePrice, getStaffCount, getStaffHirePrice, isFurnitureUnlocked } from '../domain/furnitureCatalog.js';
+import { DECORATIONS, decorBonus, decorScore } from '../domain/decorCatalog.js';
+import { decorationPrice, orderProgress } from '../domain/orders.js';
 
 const UPGRADE_ICONS = {
   tomatoFarm2: '🍅', cashier: '🧑‍💼', paste: '🥫', harvester: '🧑‍🌾', orange: '🍊',
@@ -33,7 +36,7 @@ export class HUD {
     this.app = app;
     this.input = input;
     this.onModalChange = onModalChange;
-    this.modals = ['expansion-modal', 'settings-modal', 'inventory-modal', 'recovery-modal'];
+    this.modals = ['expansion-modal', 'settings-modal', 'inventory-modal', 'decor-modal', 'recovery-modal'];
     this.lastUpgradeSignature = '';
     this.lastInventorySignature = '';
     this.lastLanguage = null;
@@ -42,8 +45,41 @@ export class HUD {
 
   #bind() {
     document.getElementById('btn-expansions').addEventListener('click', () => this.open('expansion-modal'));
+    document.getElementById('btn-furniture')?.addEventListener('click', () => {
+      this.open('expansion-modal');
+      this.#selectUpgradeTab('furniture');
+    });
     document.getElementById('btn-settings').addEventListener('click', () => this.open('settings-modal'));
     document.getElementById('btn-inventory').addEventListener('click', () => this.open('inventory-modal'));
+    document.getElementById('btn-decor').addEventListener('click', () => this.open('decor-modal'));
+    document.getElementById('btn-business-toggle').addEventListener('click', () => {
+      const open = document.getElementById('business-card').classList.toggle('mobile-open');
+      const button = document.getElementById('btn-business-toggle');
+      button.setAttribute('aria-expanded', String(open));
+      button.setAttribute('aria-label', open ? 'İşletme özetini kapat' : 'İşletme özetini aç');
+    });
+    document.getElementById('btn-order-toggle').addEventListener('click', () => {
+      const card = document.getElementById('order-card');
+      const collapsed = card.classList.toggle('collapsed');
+      document.getElementById('btn-order-toggle').setAttribute('aria-expanded', String(!collapsed));
+    });
+    document.getElementById('btn-deliver-order').addEventListener('click', () => {
+      const result = this.app.fulfillOrder();
+      if (!result.ok) this.toast('Sipariş için çantanda yeterli ürün yok.', 'error');
+      this.render(this.app.getState(), this.app.getNearbyAction(), true);
+    });
+    document.getElementById('btn-decor-top').addEventListener('click', () => this.open('decor-modal'));
+    document.getElementById('decor-list').addEventListener('click', (event) => {
+      const button = event.target.closest('[data-buy-decoration]');
+      if (!button) return;
+      const result = this.app.buyDecoration(button.dataset.buyDecoration);
+      if (result.ok) {
+        this.render(this.app.getState(), this.app.getNearbyAction(), true);
+        this.toast(result.message);
+      } else {
+        this.toast(result.reason === 'no-decoration-space' ? 'Mağazada boş yer kalmadı.' : 'Bakiye yetersiz.', 'error');
+      }
+    });
     document.getElementById('btn-interact').addEventListener('click', () => this.#interact());
     document.getElementById('btn-resume').addEventListener('click', () => this.closeAll());
     document.getElementById('btn-reset').addEventListener('click', () => this.#confirmReset());
@@ -71,6 +107,35 @@ export class HUD {
     document.getElementById('setting-haptics').addEventListener('change', (event) => this.app.setSetting('haptics', event.target.checked));
     document.querySelectorAll('[data-debug]').forEach((button) => button.addEventListener('click', () => this.#debug(button.dataset.debug)));
     document.getElementById('expansion-modal').addEventListener('click', (event) => {
+      const furnButton = event.target.closest('[data-buy-furniture]');
+      if (furnButton) {
+        const result = this.app.buyFurniture(furnButton.dataset.buyFurniture);
+        if (result.ok) {
+          this.render(this.app.getState(), this.app.getNearbyAction(), true);
+          this.toast(result.message);
+        } else {
+          const msgs = {
+            locked: 'Bu mobilya/istasyon henüz açılmadı.',
+            'no-space': 'Uygun boş alan bulunamadı. Önce mevcut alanı düzenleyin.',
+            'insufficient-funds': 'Bakiye yetersiz.',
+          };
+          this.toast(msgs[result.reason] ?? 'Satın alma yapılamadı.', 'error');
+        }
+        return;
+      }
+
+      const hireExtraButton = event.target.closest('[data-hire-extra]');
+      if (hireExtraButton) {
+        const result = this.app.hireExtraStaff(hireExtraButton.dataset.hireExtra);
+        if (result.ok) {
+          this.render(this.app.getState(), this.app.getNearbyAction(), true);
+          this.toast(result.message);
+        } else {
+          this.toast(result.reason === 'locked' ? 'Önce temel personel yükseltmesini açmalısın.' : 'Bakiye yetersiz.', 'error');
+        }
+        return;
+      }
+
       const button = event.target.closest('[data-buy-upgrade]');
       if (!button) return;
       const result = this.app.buyUpgrade(button.dataset.buyUpgrade);
@@ -156,6 +221,7 @@ export class HUD {
     this.onModalChange(true);
     if (id === 'expansion-modal') this.render(this.app.getState(), this.app.getNearbyAction(), true);
     if (id === 'inventory-modal') this.renderInventory(this.app.getState(), true);
+    if (id === 'decor-modal') this.renderDecorations(this.app.getState(), true);
     if (id === 'settings-modal') this.#syncSettings(this.app.getState());
   }
 
@@ -207,20 +273,46 @@ export class HUD {
     let shelfTotal = 0;
     for (const [id, stock] of Object.entries(state.stock)) if (id.startsWith('shelf:')) shelfTotal += Object.values(stock.items).reduce((a, b) => a + b, 0);
     document.getElementById('shelf-count').textContent = String(shelfTotal);
+    const reviews = state.stats.customersSatisfied + state.stats.customersUnhappy;
+    const satisfaction = reviews ? Math.round(state.stats.customersSatisfied / reviews * 100) : null;
+    document.getElementById('mood-count').textContent = satisfaction === null ? '—' : `${satisfaction}%`;
+    document.getElementById('business-toggle-score').textContent = satisfaction === null ? '—' : `${satisfaction}%`;
+    const order = state.activeOrder;
+    const orderCard = document.getElementById('order-card');
+    orderCard.classList.toggle('hidden', !order);
+    if (order) {
+      const held = orderProgress(state);
+      const itemName = language === 'en' ? this.#itemNameEnglish(order.item, ITEMS[order.item].name) : ITEMS[order.item].name;
+      document.getElementById('order-item').textContent = `${ITEMS[order.item].icon} ${itemName} × ${order.quantity}`;
+      document.getElementById('order-reward').textContent = `+$${order.reward}`;
+      document.getElementById('order-progress').textContent = `${held} / ${order.quantity}`;
+      document.getElementById('order-progress-fill').style.width = `${held / order.quantity * 100}%`;
+      document.getElementById('btn-deliver-order').disabled = held < order.quantity;
+      document.getElementById('order-bonus-progress').textContent = language === 'en'
+        ? `${state.ordersCompleted % 3}/3 toward a $20 decor voucher`
+        : `$20 dekor kuponuna ${state.ordersCompleted % 3}/3`;
+    }
+    const score = decorScore(state);
+    const bonus = decorBonus(state);
+    document.getElementById('decor-score').textContent = `${score} · +${(bonus * 100).toFixed(1)}%`;
+    this.renderDecorations(state);
     document.getElementById('quest-text').textContent = this.#questText(state, language);
     document.getElementById('progress-count').textContent = `${state.completedUpgrades.length} / ${UPGRADES.length}`;
     document.getElementById('progress-fill').style.width = `${Math.min(100, state.completedUpgrades.length / UPGRADES.length * 100)}%`;
     const actionButton = document.getElementById('btn-interact');
     const actionLabel = document.getElementById('action-label');
     actionButton.disabled = !action || action.actionable === false;
+    document.querySelector('#btn-interact .action-icon').textContent = action
+      ? ({ farm: '🌱', machine: '⚙️', shelf: '📦', coop: '🐔', table: '🍽️', register: '💵', upgrade: '🏗️' })[action.kind] ?? '✋' : '✋';
     actionLabel.textContent = action ? this.#actionText(action, state) : (language === 'en' ? 'Move closer to a station' : 'Bir istasyona yaklaş');
     document.getElementById('upgrade-count').textContent = String(this.app.getAvailableUpgrades().length);
     this.#syncSettings(state);
-    const signature = `${state.revision}:${balance}:${this.app.getAvailableUpgrades().map((upgrade) => upgrade.id).join(',')}:${state.completedUpgrades.join(',')}:${state.workers.map((worker) => worker.type).join(',')}`;
+    const signature = `${state.revision}:${balance}:${this.app.getAvailableUpgrades().map((upgrade) => upgrade.id).join(',')}:${state.completedUpgrades.join(',')}:${state.workers.map((worker) => worker.type).join(',')}:${Object.keys(state.layout ?? {}).length}:${Object.keys(state.selfRegisters ?? {}).length}`;
     if (force || signature !== this.lastUpgradeSignature) {
       this.lastUpgradeSignature = signature;
       this.renderUpgrades(state);
       this.renderStaff(state);
+      this.renderFurniture(state);
     }
     if (force) this.renderInventory(state, true);
   }
@@ -234,9 +326,28 @@ export class HUD {
     document.querySelectorAll('.business-row')[0].children[0].textContent = `🧑‍🤝‍🧑 ${english ? EN.customers : 'Müşteriler'}`;
     document.querySelectorAll('.business-row')[1].children[0].textContent = `🧑‍🔧 ${english ? EN.workers : 'Çalışanlar'}`;
     document.querySelectorAll('.business-row')[2].children[0].textContent = `📦 ${english ? EN.shelfStock : 'Reyon stoğu'}`;
+    document.getElementById('mood-label').textContent = english ? '😊 Satisfaction' : '😊 Memnuniyet';
+    document.getElementById('order-title').textContent = english ? 'CUSTOMER ORDER' : 'MÜŞTERİ SİPARİŞİ';
+    document.getElementById('btn-deliver-order').textContent = english ? 'Deliver order' : 'Siparişi teslim et';
     document.getElementById('btn-inventory').innerHTML = `${english ? EN.viewProducts : 'Ürünleri gör'} <span>›</span>`;
     document.querySelector('#btn-settings').setAttribute('aria-label', english ? EN.settings : 'Ayarlar');
     document.getElementById('btn-expansions').setAttribute('aria-label', english ? EN.upgrades : 'İşletme geliştirmeleri');
+    const btnFurn = document.getElementById('btn-furniture');
+    if (btnFurn) {
+      btnFurn.setAttribute('aria-label', english ? 'Furniture shop' : 'Mobilya dükkanı');
+      btnFurn.title = english ? 'Furniture shop' : 'Mobilya dükkanı';
+    }
+    document.getElementById('btn-decor-top').setAttribute('aria-label', english ? 'Decoration shop' : 'Dekorasyon mağazası');
+    document.getElementById('btn-decor-top').title = english ? 'Decoration shop' : 'Dekorasyon mağazası';
+    document.getElementById('btn-decor').innerHTML = `${english ? '🎨 Decoration shop' : '🎨 Dekorasyon mağazası'} <span>›</span>`;
+    document.getElementById('decor-title').textContent = english ? 'Decoration shop' : 'Dekorasyon mağazası';
+    document.getElementById('decor-intro').textContent = english
+      ? 'Buy decorations for your market. Each placed piece adds style and a small sales bonus.'
+      : 'Mağazan için dekorasyon satın al. Yerleştirilen her parça mağazana tarz katar ve satış kârını artırır.';
+    document.getElementById('decor-score-caption').textContent = english
+      ? 'More decorations create a more welcoming shopping experience.'
+      : 'Dekorasyon arttıkça mağaza daha davetkâr olur.';
+    document.querySelector('.decor-score-row span').textContent = english ? '✨ Decor score' : '✨ Dekor puanı';
     document.querySelector('.quest-copy .eyebrow').textContent = english ? EN.nextGoal : 'SIRADAKİ HEDEF';
     document.querySelector('#inventory-title').textContent = english ? EN.inventory : 'Ürünler';
     document.querySelector('#settings-title').textContent = english ? EN.settings : 'Ayarlar';
@@ -262,6 +373,7 @@ export class HUD {
       ? 'Invest earnings in production and staff. Every purchase adds a station to the world.'
       : 'Kazancını yeni üretim hatlarına ve ekibe yatır. Açılan her istasyon dünyaya eklenir.';
     document.querySelector('[data-upgrade-tab="business"]').textContent = english ? EN.businessTab : 'İşletme';
+    document.querySelector('[data-upgrade-tab="furniture"]').textContent = english ? 'Furniture' : 'Mobilya Dükkanı';
     document.querySelector('[data-upgrade-tab="staff"]').textContent = english ? EN.staffTab : 'Personel';
     document.querySelector('.control-hint span').textContent = english ? EN.orTap : 'veya dokunup yürü';
     document.getElementById('btn-resume').textContent = english ? EN.resume : '▶ Oyuna dön';
@@ -304,9 +416,45 @@ export class HUD {
     }).join('');
   }
 
+  renderDecorations(state, force = false) {
+    const signature = `${state.settings.language}:${state.economy.balanceAtoms}:${state.decorations?.length ?? 0}:${decorScore(state)}:${state.decorVouchers}`;
+    if (!force && signature === this.lastDecorSignature) return;
+    this.lastDecorSignature = signature;
+    const english = state.settings.language === 'en';
+    const score = decorScore(state);
+    const bonus = decorBonus(state);
+    const scoreLabel = english ? `${score} points · +${(bonus * 100).toFixed(1)}% sales` : `${score} puan · +${(bonus * 100).toFixed(1)}% satış`;
+    document.getElementById('decor-shop-score').textContent = scoreLabel;
+    document.getElementById('decor-score-caption').textContent = state.decorVouchers
+      ? (english ? `${state.decorVouchers} voucher(s): $20 off your next decoration.` : `${state.decorVouchers} kupon: sonraki dekorasyonda $20 indirim.`)
+      : (english ? 'More decorations create a more welcoming shopping experience.' : 'Dekorasyon arttıkça mağaza daha davetkâr olur.');
+    document.getElementById('decor-score').textContent = `${score} · +${(bonus * 100).toFixed(1)}%`;
+    document.getElementById('decor-list').innerHTML = Object.entries(DECORATIONS).map(([id, item]) => {
+      const owned = state.decorations.filter((entry) => entry.type === id).length;
+      const name = item.name[state.settings.language];
+      const price = decorationPrice(state, item.price);
+      return `<article class="decor-item"><div class="decor-item-icon">${this.#decorationIcon(id)}</div><div class="upgrade-copy"><strong>${name}</strong><small>✨ +${item.score} ${english ? 'style points' : 'dekor puanı'} · ${owned} ${english ? 'placed' : 'mağazada'}</small></div><button class="buy-button" data-buy-decoration="${id}" ${state.economy.balanceAtoms < price * 10_000 ? 'disabled' : ''}>$ ${price}</button></article>`;
+    }).join('');
+  }
+
+  #decorationIcon(id) {
+    return ({
+      petalPlanter: '🪴',
+      farmhouseSign: '🪧',
+      orchardLantern: '💡',
+      welcomeMat: '🚪',
+      pennantBanner: '🚩',
+      harvestBasket: '🛒',
+      citrusTopiary: '🍊',
+      windowDisplay: '💐',
+      cardboardBoxes: '📦',
+    })[id] ?? '✨';
+  }
+
   renderStaff(state) {
     const list = document.getElementById('staff-list');
     if (!list) return;
+    const english = state.settings.language === 'en';
     list.innerHTML = STAFF_HIRES.map((hire) => {
       const upgrade = UPGRADES.find((entry) => entry.id === hire.upgradeId);
       const hiredCount = state.workers.filter((worker) => hire.staffTypes.includes(worker.type)).length;
@@ -319,10 +467,55 @@ export class HUD {
       const unlock = state.settings.language === 'en' ? EN.staffUnlock[hire.upgradeId] : hire.unlock;
       const subtitle = hired ? (state.settings.language === 'en' ? `On staff · ${hiredCount || hire.staffTypes.length}` : `Ekibinde · ${hiredCount || hire.staffTypes.length} kişi`)
         : unlocked ? effect : unlock;
-      const button = hired
-        ? `<button class="buy-button staff-status" disabled>${state.settings.language === 'en' ? 'Hired' : 'İşe alındı'}</button>`
-        : `<button class="buy-button" data-buy-upgrade="${hire.upgradeId}" ${unlocked && affordable ? '' : 'disabled'}>${!unlocked ? (state.settings.language === 'en' ? 'Locked' : 'Kilitli') : !affordable ? (state.settings.language === 'en' ? 'Need funds' : 'Bakiye yok') : (state.settings.language === 'en' ? 'Hire' : 'İşe al')} · $${upgrade.price}</button>`;
+
+      let button = '';
+      if (!hired) {
+        button = `<button class="buy-button" data-buy-upgrade="${hire.upgradeId}" ${unlocked && affordable ? '' : 'disabled'}>${!unlocked ? (english ? 'Locked' : 'Kilitli') : !affordable ? (english ? 'Need funds' : 'Bakiye yok') : (english ? 'Hire' : 'İşe al')} · $${upgrade.price}</button>`;
+      } else {
+        const extraPrice = getStaffHirePrice(state, hire.upgradeId);
+        const extraAffordable = state.economy.balanceAtoms >= extraPrice * 10_000;
+        button = `<button class="buy-button extra-staff-btn" data-hire-extra="${hire.upgradeId}" ${extraAffordable ? '' : 'disabled'}>${extraAffordable ? (english ? '+1 Hire' : '+1 Ekle') : (english ? 'Need funds' : 'Bakiye yok')} · $${extraPrice}</button>`;
+      }
+
       return `<article class="upgrade-card staff-card${hired ? ' hired' : ''}"><div class="upgrade-icon">${STAFF[hire.staffTypes[0]]?.icon ?? '🧑‍🔧'}</div><div class="upgrade-copy"><strong>${state.settings.language === 'en' ? englishTitle : title}</strong><small>${subtitle}</small></div>${button}</article>`;
+    }).join('');
+  }
+
+  renderFurniture(state) {
+    const list = document.getElementById('furniture-list');
+    if (!list) return;
+    const english = state.settings.language === 'en';
+
+    list.innerHTML = Object.entries(FURNITURE_TYPES).map(([type, item]) => {
+      const unlocked = isFurnitureUnlocked(state, type);
+      const count = getFurnitureCount(state, type);
+      const price = getFurniturePrice(state, type);
+      const affordable = state.economy.balanceAtoms >= price * 10_000;
+      const title = english ? item.nameEn : item.name;
+      const desc = item.description;
+      const countLabel = english ? `Owned: ${count}` : `Sahip olunan: ${count} adet`;
+      const isSelfReg = type === 'selfRegister';
+
+      const button = unlocked
+        ? `<button class="buy-button" data-buy-furniture="${type}" ${affordable ? '' : 'disabled'}>${affordable ? (english ? 'Buy' : 'Satın Al') : (english ? 'Need funds' : 'Bakiye yok')} · $${price}</button>`
+        : `<button class="buy-button" disabled>${english ? 'Locked' : 'Kilitli'}</button>`;
+
+      const badge = isSelfReg
+        ? `<span class="furniture-badge auto-badge">🤖 ${english ? 'Automated' : 'Personelsiz Kasa'}</span>`
+        : `<span class="furniture-badge">${countLabel}</span>`;
+
+      return `<article class="upgrade-card furniture-card${isSelfReg ? ' self-register-card' : ''}">
+        <div class="upgrade-icon">${item.icon}</div>
+        <div class="upgrade-copy">
+          <div class="furniture-title-row">
+            <strong>${title}</strong>
+            ${badge}
+          </div>
+          <small>${unlocked ? desc : (english ? 'Unlocks when this product is available.' : 'Bu ürünün üretimi açıldığında kullanılabilir.')}</small>
+          ${isSelfReg && unlocked ? `<small class="highlight-text">${countLabel} · Kasiyersiz otomatik çalışır</small>` : ''}
+        </div>
+        ${button}
+      </article>`;
     }).join('');
   }
 
@@ -341,6 +534,7 @@ export class HUD {
     if (state.settings.language !== 'en') return action.label;
     if (action.kind === 'upgrade') return `${this.#upgradeNameEnglish(action.id, action.title)} · $${action.price}`;
     if (action.kind === 'farm') {
+      if (action.actionable === false) return action.label === 'Çanta dolu' ? 'Bag full' : 'Crops growing';
       const names = { TOMATO: 'Harvest tomatoes', ORANGE: 'Harvest oranges', CORN: 'Harvest corn', WHEAT: 'Harvest wheat' };
       return names[action.item] ?? 'Harvest';
     }
@@ -396,19 +590,26 @@ export class HUD {
 
   toast(message, tone = 'success') {
     const container = document.getElementById('toast-container');
+    if (!container) return;
     const toast = document.createElement('div');
     toast.className = `toast-msg${tone === 'error' ? ' error' : ''}`;
     toast.textContent = message;
     container.appendChild(toast);
+    while (container.children.length > 3) {
+      container.firstElementChild.remove();
+    }
     window.setTimeout(() => toast.remove(), 2600);
   }
 
   showEvent(event) {
     let message = event.message;
+    if (event.type === 'sale' || event.type === 'production' || event.type === 'tip-ready') {
+      this.#eventSound(event.type);
+    }
     if (this.app.getState().settings.language === 'en') {
       if (event.type === 'sale') {
         const sold = (event.items ?? [event.item]).map((itemId) => `${ITEMS[itemId]?.icon ?? '📦'} ${this.#itemNameEnglish(itemId, ITEMS[itemId]?.name ?? itemId)}`);
-        message = `+$${event.amount} · ${sold.join(', ')} sold.`;
+        message = `+$${event.amount.toFixed(2)} · ${sold.join(', ')} sold${event.decorationBonus ? ` · +${(event.decorationBonus * 100).toFixed(1)}% decor bonus` : ''}.`;
       }
       if (event.type === 'production') message = `${ITEMS[event.item]?.icon ?? '📦'} ${this.#itemNameEnglish(event.item, ITEMS[event.item]?.name ?? event.item)} ready.`;
       if (event.type === 'tip-ready') message = '💵 A customer left a tip.';
@@ -423,6 +624,32 @@ export class HUD {
       if (message.includes('eklendi.')) message = 'Credits added.';
     }
     this.toast(message, event.tone);
+  }
+
+  #eventSound(type) {
+    if (!this.app.getState().settings.sound) return;
+    const now = performance.now();
+    if (now - (this.lastEventSoundTime ?? 0) < 180) return;
+    this.lastEventSoundTime = now;
+    const AudioContextType = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextType) return;
+    try {
+      this.audioContext ??= new AudioContextType();
+      if (this.audioContext.state === 'suspended') this.audioContext.resume();
+      const frequencies = { sale: [620, 840], production: [450, 580], 'tip-ready': [740, 980] };
+      const tones = frequencies[type] ?? [600];
+      tones.forEach((frequency, index) => {
+        const oscillator = this.audioContext.createOscillator();
+        const gain = this.audioContext.createGain();
+        const start = this.audioContext.currentTime + index * 0.075;
+        oscillator.type = 'sine'; oscillator.frequency.value = frequency;
+        gain.gain.setValueAtTime(0.0001, start);
+        gain.gain.exponentialRampToValueAtTime(0.025, start + 0.012);
+        gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.12);
+        oscillator.connect(gain); gain.connect(this.audioContext.destination);
+        oscillator.start(start); oscillator.stop(start + 0.12);
+      });
+    } catch { /* sound is optional */ }
   }
 
   showRecovery(message) {

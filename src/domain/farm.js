@@ -1,10 +1,13 @@
 import { STATIONS } from './catalog.js';
 
+export const FARM_YIELD = 4;
+
 // Farm stock is pooled by item. Keep each plot's ripe batch in step with that pool.
 export function syncFarmHarvest(state) {
   const byItem = new Map();
   for (const [farmId, farm] of Object.entries(state.farms)) {
-    const item = STATIONS[farmId]?.item;
+    const station = STATIONS[farmId] ?? state.customStations?.[farmId];
+    const item = farm.item ?? station?.item;
     if (!item) continue;
     farm.readyCount = Number.isSafeInteger(farm.readyCount) && farm.readyCount >= 0 ? farm.readyCount : 0;
     if (!byItem.has(item)) byItem.set(item, []);
@@ -15,7 +18,7 @@ export function syncFarmHarvest(state) {
     let difference = stock - farms.reduce((sum, farm) => sum + farm.readyCount, 0);
     if (difference > 0) {
       for (const farm of farms) {
-        const added = Math.min(difference, Math.max(0, 3 - farm.readyCount));
+        const added = Math.min(difference, Math.max(0, FARM_YIELD - farm.readyCount));
         farm.readyCount += added;
         difference -= added;
         if (!difference) break;

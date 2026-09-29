@@ -59,77 +59,265 @@ export class CharacterFactory {
   createShopkeeperMesh() {
     const group = new THREE.Group();
 
-    const bodyGeo = new THREE.CylinderGeometry(0.32, 0.28, 0.7, 10);
-    const bodyMat = new THREE.MeshStandardMaterial({ color: 0x3498db, roughness: 0.5 });
-    const body = new THREE.Mesh(bodyGeo, bodyMat);
-    body.position.y = 0.65;
-    body.castShadow = true;
-    group.add(body);
+    // 1. Materials - Vibrant stylized supermarket palette
+    const skinMat = new THREE.MeshStandardMaterial({ color: 0xffd8b3, roughness: 0.65 });
+    const blushMat = new THREE.MeshStandardMaterial({ color: 0xff9999, roughness: 0.8 });
+    const hairBrownMat = new THREE.MeshStandardMaterial({ color: 0x4a2c11, roughness: 0.7 });
+    const shirtRedMat = new THREE.MeshStandardMaterial({ color: 0xe74c3c, roughness: 0.5 });
+    const collarWhiteMat = new THREE.MeshStandardMaterial({ color: 0xf5f6fa, roughness: 0.6 });
+    const apronGreenMat = new THREE.MeshStandardMaterial({ color: 0x27ae60, roughness: 0.45 });
+    const apronPocketMat = new THREE.MeshStandardMaterial({ color: 0x219653, roughness: 0.5 });
+    const strapMat = new THREE.MeshStandardMaterial({ color: 0x1e824c, roughness: 0.6 });
+    const penGoldMat = new THREE.MeshStandardMaterial({ color: 0xf1c40f, metalness: 0.8, roughness: 0.2 });
+    const capRedMat = new THREE.MeshStandardMaterial({ color: 0xd63031, roughness: 0.45 });
+    const capLogoMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3 });
+    const pantsNavyMat = new THREE.MeshStandardMaterial({ color: 0x2c3e50, roughness: 0.7 });
+    const beltBrownMat = new THREE.MeshStandardMaterial({ color: 0x5d4037, roughness: 0.8 });
+    const buckleMat = new THREE.MeshStandardMaterial({ color: 0xd4af37, metalness: 0.7, roughness: 0.3 });
+    const scannerMat = new THREE.MeshStandardMaterial({ color: 0x1e272e, roughness: 0.4 });
+    const scannerLaserMat = new THREE.MeshStandardMaterial({ color: 0xf39c12, emissive: 0x553300 });
+    const badgeMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.2 });
+    const badgePhotoMat = new THREE.MeshBasicMaterial({ color: 0x3498db });
+    const lanyardMat = new THREE.MeshStandardMaterial({ color: 0x2980b9, roughness: 0.5 });
+    const eyeWhiteMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+    const eyeIrisMat = new THREE.MeshBasicMaterial({ color: 0x2980b9 });
+    const eyePupilMat = new THREE.MeshBasicMaterial({ color: 0x111111 });
+    const eyeGlintMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+    const eyebrowMat = new THREE.MeshBasicMaterial({ color: 0x3d2314 });
+    const mouthMat = new THREE.MeshBasicMaterial({ color: 0xb71c1c });
+    const shoeRedMat = new THREE.MeshStandardMaterial({ color: 0xd63031, roughness: 0.5 });
+    const soleWhiteMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3 });
+    const watchMat = new THREE.MeshStandardMaterial({ color: 0x111111, metalness: 0.5, roughness: 0.3 });
 
-    const apronGeo = new THREE.BoxGeometry(0.35, 0.45, 0.1);
-    const apronMat = new THREE.MeshStandardMaterial({ color: 0x27ae60 });
-    const apron = new THREE.Mesh(apronGeo, apronMat);
-    apron.position.set(0, 0.6, 0.22);
-    group.add(apron);
+    // 2. Pelvis & Waist Belt with Barcode Scanner Holster
+    const pelvis = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.18, 0.28), pantsNavyMat);
+    pelvis.position.y = 0.48;
+    pelvis.castShadow = true;
+    group.add(pelvis);
 
-    const headGeo = new THREE.SphereGeometry(0.3, 12, 10);
-    const skinMat = new THREE.MeshStandardMaterial({ color: 0xffdbac, roughness: 0.6 });
-    const head = new THREE.Mesh(headGeo, skinMat);
-    head.position.y = 1.25;
-    head.castShadow = true;
-    group.add(head);
+    const belt = new THREE.Mesh(new THREE.CylinderGeometry(0.23, 0.23, 0.06, 12), beltBrownMat);
+    belt.position.y = 0.57;
+    group.add(belt);
 
-    const capGeo = new THREE.CylinderGeometry(0.32, 0.32, 0.12, 10);
-    const capMat = new THREE.MeshStandardMaterial({ color: 0xe74c3c });
-    const cap = new THREE.Mesh(capGeo, capMat);
-    cap.position.y = 1.45;
-    cap.castShadow = true;
+    const buckle = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.07, 0.03), buckleMat);
+    buckle.position.set(0, 0.57, 0.22);
+    group.add(buckle);
 
-    const visorGeo = new THREE.BoxGeometry(0.28, 0.04, 0.2);
-    const visor = new THREE.Mesh(visorGeo, capMat);
-    visor.position.set(0, 1.42, 0.22);
-    group.add(cap, visor);
+    // Supermarket Mobile Barcode Scanner on right hip
+    const scannerHolster = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.14, 0.1), scannerMat);
+    scannerHolster.position.set(0.24, 0.54, 0.05);
+    const scannerTip = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.03, 0.06), scannerLaserMat);
+    scannerTip.position.set(0.24, 0.46, 0.05);
+    group.add(scannerHolster, scannerTip);
 
-    const eyeMat = new THREE.MeshBasicMaterial({ color: 0x2c3e50 });
-    const leftEye = new THREE.Mesh(new THREE.SphereGeometry(0.04, 6, 6), eyeMat);
-    leftEye.position.set(-0.1, 1.28, 0.26);
-    const rightEye = leftEye.clone();
-    rightEye.position.x = 0.1;
-    group.add(leftEye, rightEye);
+    // 3. Torso: Red Polo Shirt with White Collar & Green Store Apron
+    const chest = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.24, 0.44, 12), shirtRedMat);
+    chest.position.y = 0.78;
+    chest.castShadow = true;
+    group.add(chest);
 
-    const armGeo = new THREE.CylinderGeometry(0.08, 0.07, 0.45, 8);
-    const armMat = new THREE.MeshStandardMaterial({ color: 0x3498db });
+    const collarL = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.12, 0.04), collarWhiteMat);
+    collarL.position.set(-0.07, 0.98, 0.18);
+    collarL.rotation.z = -0.3;
+    const collarR = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.12, 0.04), collarWhiteMat);
+    collarR.position.set(0.07, 0.98, 0.18);
+    collarR.rotation.z = 0.3;
+    const placket = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.22, 0.02), collarWhiteMat);
+    placket.position.set(0, 0.88, 0.22);
+    group.add(collarL, collarR, placket);
 
-    this.leftArm = new THREE.Group();
-    this.leftArm.position.set(-0.35, 0.85, 0);
-    const lArmMesh = new THREE.Mesh(armGeo, armMat);
-    lArmMesh.position.y = -0.2;
-    this.leftArm.add(lArmMesh);
+    // Signature Supermarket Apron with Front Pockets
+    const apronBody = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.46, 0.07), apronGreenMat);
+    apronBody.position.set(0, 0.72, 0.21);
+    apronBody.castShadow = true;
+    group.add(apronBody);
 
-    this.rightArm = new THREE.Group();
-    this.rightArm.position.set(0.35, 0.85, 0);
-    const rArmMesh = new THREE.Mesh(armGeo, armMat);
-    rArmMesh.position.y = -0.2;
-    this.rightArm.add(rArmMesh);
-    group.add(this.leftArm, this.rightArm);
+    const apronPocket = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.16, 0.03), apronPocketMat);
+    apronPocket.position.set(0, 0.62, 0.25);
+    group.add(apronPocket);
 
-    const legGeo = new THREE.CylinderGeometry(0.1, 0.09, 0.35, 8);
-    const legMat = new THREE.MeshStandardMaterial({ color: 0x2c3e50 });
-    
-    this.leftLeg = new THREE.Group();
-    this.leftLeg.position.set(-0.16, 0.35, 0);
-    const lLegMesh = new THREE.Mesh(legGeo, legMat);
-    lLegMesh.position.y = -0.17;
-    lLegMesh.castShadow = true;
-    this.leftLeg.add(lLegMesh);
+    // Gold pen tucked into pocket
+    const pen = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.14, 6), penGoldMat);
+    pen.position.set(0.09, 0.72, 0.26);
+    pen.rotation.z = 0.12;
+    group.add(pen);
 
-    this.rightLeg = new THREE.Group();
-    this.rightLeg.position.set(0.16, 0.35, 0);
-    const rLegMesh = new THREE.Mesh(legGeo, legMat);
-    rLegMesh.position.y = -0.17;
-    rLegMesh.castShadow = true;
-    this.rightLeg.add(rLegMesh);
-    group.add(this.leftLeg, this.rightLeg);
+    // Neck loop strap for apron
+    const neckLoop = new THREE.Mesh(new THREE.TorusGeometry(0.18, 0.02, 6, 12, Math.PI), strapMat);
+    neckLoop.position.set(0, 0.94, 0.08);
+    neckLoop.rotation.x = Math.PI / 2;
+    group.add(neckLoop);
+
+    // Supermarket Staff / Manager ID Badge
+    const badge = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.08, 0.02), badgeMat);
+    badge.position.set(-0.1, 0.86, 0.26);
+    badge.rotation.z = -0.06;
+    const badgePhoto = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.04, 0.005), badgePhotoMat);
+    badgePhoto.position.set(-0.13, 0.87, 0.272);
+    const badgeLanyard = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.1, 4), lanyardMat);
+    badgeLanyard.position.set(-0.1, 0.93, 0.24);
+    badgeLanyard.rotation.z = 0.1;
+    group.add(badge, badgePhoto, badgeLanyard);
+
+    // 4. Head, Cute Face, Cap & Hair
+    const headGroup = new THREE.Group();
+    headGroup.position.set(0, 1.24, 0);
+
+    const headBall = new THREE.Mesh(new THREE.SphereGeometry(0.29, 14, 12), skinMat);
+    headBall.castShadow = true;
+    headGroup.add(headBall);
+
+    // Ears
+    const earL = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 8), skinMat);
+    earL.position.set(-0.28, -0.01, 0);
+    earL.scale.set(0.5, 1, 0.7);
+    const earR = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 8), skinMat);
+    earR.position.set(0.28, -0.01, 0);
+    earR.scale.set(0.5, 1, 0.7);
+    headGroup.add(earL, earR);
+
+    // Blush cheeks
+    const blushL = new THREE.Mesh(new THREE.SphereGeometry(0.065, 8, 8), blushMat);
+    blushL.position.set(-0.16, -0.07, 0.22);
+    blushL.scale.set(1, 0.55, 0.3);
+    const blushR = blushL.clone();
+    blushR.position.x = 0.16;
+    headGroup.add(blushL, blushR);
+
+    // Animated expressive eyes
+    for (const side of [-1, 1]) {
+      const eyeWhite = new THREE.Mesh(new THREE.SphereGeometry(0.062, 8, 8), eyeWhiteMat);
+      eyeWhite.position.set(side * 0.1, 0.03, 0.24);
+      eyeWhite.scale.set(0.85, 1.1, 0.4);
+
+      const eyeIris = new THREE.Mesh(new THREE.SphereGeometry(0.042, 8, 8), eyeIrisMat);
+      eyeIris.position.set(side * 0.1, 0.03, 0.26);
+      eyeIris.scale.set(0.85, 1.05, 0.3);
+
+      const eyePupil = new THREE.Mesh(new THREE.SphereGeometry(0.025, 6, 6), eyePupilMat);
+      eyePupil.position.set(side * 0.1, 0.03, 0.272);
+      eyePupil.scale.set(0.8, 1, 0.2);
+
+      const eyeGlint = new THREE.Mesh(new THREE.SphereGeometry(0.012, 4, 4), eyeGlintMat);
+      eyeGlint.position.set(side * 0.09, 0.05, 0.28);
+
+      headGroup.add(eyeWhite, eyeIris, eyePupil, eyeGlint);
+    }
+
+    // Friendly curved eyebrows
+    const browL = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.022, 0.02), eyebrowMat);
+    browL.position.set(-0.1, 0.12, 0.26);
+    browL.rotation.z = 0.08;
+    const browR = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.022, 0.02), eyebrowMat);
+    browR.position.set(0.1, 0.12, 0.26);
+    browR.rotation.z = -0.08;
+    headGroup.add(browL, browR);
+
+    // Cute button nose & smile
+    const nose = new THREE.Mesh(new THREE.SphereGeometry(0.038, 8, 8), skinMat);
+    nose.position.set(0, -0.03, 0.28);
+    const mouth = new THREE.Mesh(new THREE.TorusGeometry(0.05, 0.012, 6, 10, Math.PI), mouthMat);
+    mouth.position.set(0, -0.11, 0.26);
+    mouth.rotation.x = Math.PI;
+    headGroup.add(nose, mouth);
+
+    // Hair under cap
+    const hairBack = new THREE.Mesh(new THREE.SphereGeometry(0.24, 10, 8), hairBrownMat);
+    hairBack.position.set(0, 0.04, -0.12);
+    hairBack.scale.set(1.1, 0.9, 0.9);
+    const sideburnL = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.14, 0.08), hairBrownMat);
+    sideburnL.position.set(-0.26, -0.04, 0.06);
+    const sideburnR = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.14, 0.08), hairBrownMat);
+    sideburnR.position.set(0.26, -0.04, 0.06);
+    headGroup.add(hairBack, sideburnL, sideburnR);
+
+    // Supermarket Cap with Visor & Logo
+    const capDome = new THREE.Mesh(new THREE.SphereGeometry(0.295, 12, 10, 0, Math.PI * 2, 0, Math.PI / 1.85), capRedMat);
+    capDome.position.set(0, 0.08, 0.01);
+    capDome.rotation.x = -0.1;
+    capDome.castShadow = true;
+
+    const visor = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.31, 0.04, 12, 1, false, -Math.PI / 3, Math.PI * 2 / 3), capRedMat);
+    visor.position.set(0, 0.11, 0.17);
+    visor.rotation.set(-0.22, 0, 0);
+    visor.castShadow = true;
+
+    const capLogo = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.02, 8), capLogoMat);
+    capLogo.position.set(0, 0.22, 0.22);
+    capLogo.rotation.x = Math.PI / 2 - 0.2;
+    headGroup.add(capDome, visor, capLogo);
+
+    group.add(headGroup);
+
+    // 5. Left & Right Arm with Watch, Sleeves, Forearms, Hands
+    for (const [side, isLeft] of [[-1, true], [1, false]]) {
+      const armGroup = new THREE.Group();
+      armGroup.position.set(side * 0.35, 0.86, 0);
+
+      const sleeve = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.095, 0.2, 8), shirtRedMat);
+      sleeve.position.y = -0.08;
+      sleeve.castShadow = true;
+
+      const cuff = new THREE.Mesh(new THREE.CylinderGeometry(0.098, 0.098, 0.03, 8), collarWhiteMat);
+      cuff.position.y = -0.17;
+
+      const forearm = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.065, 0.24, 8), skinMat);
+      forearm.position.y = -0.28;
+      forearm.castShadow = true;
+
+      const hand = new THREE.Mesh(new THREE.SphereGeometry(0.075, 8, 8), skinMat);
+      hand.position.set(0, -0.42, 0.02);
+
+      const thumb = new THREE.Mesh(new THREE.SphereGeometry(0.035, 6, 6), skinMat);
+      thumb.position.set(side * -0.04, -0.38, 0.06);
+
+      armGroup.add(sleeve, cuff, forearm, hand, thumb);
+
+      // Smart watch on left wrist
+      if (isLeft) {
+        const watch = new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.085, 0.05, 8), watchMat);
+        watch.position.y = -0.36;
+        armGroup.add(watch);
+        this.leftArm = armGroup;
+      } else {
+        this.rightArm = armGroup;
+      }
+      group.add(armGroup);
+    }
+
+    // 6. Left & Right Leg with Navy Chino Pants, Cuffs & Modern Sneakers
+    for (const [side, isLeft] of [[-1, true], [1, false]]) {
+      const legGroup = new THREE.Group();
+      legGroup.position.set(side * 0.16, 0.38, 0);
+
+      const pants = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.095, 0.36, 8), pantsNavyMat);
+      pants.position.y = -0.16;
+      pants.castShadow = true;
+
+      const cuff = new THREE.Mesh(new THREE.CylinderGeometry(0.102, 0.102, 0.04, 8), pantsNavyMat);
+      cuff.position.y = -0.32;
+
+      // Modern Sneaker
+      const shoeUpper = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.11, 0.24), shoeRedMat);
+      shoeUpper.position.set(0, -0.36, 0.04);
+      shoeUpper.castShadow = true;
+
+      const sole = new THREE.Mesh(new THREE.BoxGeometry(0.165, 0.04, 0.27), soleWhiteMat);
+      sole.position.set(0, -0.42, 0.04);
+
+      const toeCap = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.08, 8, 1, false, 0, Math.PI), soleWhiteMat);
+      toeCap.position.set(0, -0.37, 0.155);
+      toeCap.rotation.x = Math.PI / 2;
+
+      const laces = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.02, 0.09), soleWhiteMat);
+      laces.position.set(0, -0.31, 0.05);
+
+      legGroup.add(pants, cuff, shoeUpper, sole, toeCap, laces);
+
+      if (isLeft) this.leftLeg = legGroup;
+      else this.rightLeg = legGroup;
+      group.add(legGroup);
+    }
 
     return group;
   }

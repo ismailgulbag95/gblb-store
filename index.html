@@ -17,9 +17,16 @@
         </div>
         <div class="top-actions">
           <button class="icon-btn" id="btn-expansions" aria-label="İşletme geliştirmeleri">🏗️ <span id="upgrade-count">1</span></button>
+          <button class="icon-btn" id="btn-furniture" aria-label="Mobilya dükkanı" title="Mobilya dükkanı">🛋️</button>
+          <button class="icon-btn" id="btn-layout" aria-label="Yerleşimi düzenle" aria-pressed="false" title="Yerleşimi düzenle">▦</button>
+          <button class="icon-btn" id="btn-decor-top" aria-label="Dekorasyon mağazası" title="Dekorasyon mağazası">🎨</button>
           <button class="icon-btn" id="btn-settings" aria-label="Ayarlar">⚙️</button>
         </div>
       </header>
+      <div id="layout-help" class="layout-help hidden" data-ui>
+        <span id="layout-help-text">Taşımak için bir yapıya dokun, sonra boş bir kareye dokun. Bitirmek için ▦ düğmesine bas.</span>
+        <button id="btn-rotate-layout" class="layout-rotate-btn hidden" type="button" aria-label="Seçili yapıyı döndür">↻ Döndür (R)</button>
+      </div>
 
       <section class="quest-card" aria-live="polite" data-ui>
         <div class="quest-icon">🎯</div>
@@ -27,12 +34,25 @@
         <div class="quest-progress"><span id="progress-count">0 / 17</span><div class="progress-track"><i id="progress-fill"></i></div></div>
       </section>
 
-      <aside class="business-card" data-ui>
+      <section class="order-card hidden" id="order-card" data-ui aria-live="polite">
+        <div class="order-heading"><span>📋</span><strong id="order-title">MÜŞTERİ SİPARİŞİ</strong><button id="btn-order-toggle" class="order-collapse" aria-label="Siparişi küçült" aria-expanded="true">⌃</button></div>
+        <div class="order-details"><span id="order-item"></span><strong id="order-reward"></strong></div>
+        <div class="order-progress"><span id="order-progress"></span><div class="progress-track"><i id="order-progress-fill"></i></div></div>
+        <button id="btn-deliver-order" class="order-deliver">Siparişi teslim et</button>
+        <small id="order-bonus-progress" class="order-bonus-progress"></small>
+      </section>
+
+      <button class="business-toggle" id="btn-business-toggle" data-ui aria-label="İşletme özetini aç" aria-expanded="false">🏪 <span id="business-toggle-score">—</span></button>
+
+      <aside class="business-card" id="business-card" data-ui>
         <div class="business-heading"><span>🏪</span><strong>İŞLETME</strong><span class="live-dot"></span><small>CANLI</small></div>
         <div class="business-row"><span>🧑‍🤝‍🧑 Müşteriler</span><strong id="customer-count">0</strong></div>
         <div class="business-row"><span>🧑‍🔧 Çalışanlar</span><strong id="worker-count">0</strong></div>
         <div class="business-row"><span>📦 Reyon stoğu</span><strong id="shelf-count">0</strong></div>
+        <div class="business-row"><span id="mood-label">😊 Memnuniyet</span><strong id="mood-count">—</strong></div>
         <button id="btn-inventory" class="text-button">Ürünleri gör <span>›</span></button>
+        <div class="decor-score-row"><span>✨ Dekor puanı</span><strong id="decor-score">0 · +0%</strong></div>
+        <button id="btn-decor" class="text-button decor-button">🎨 Dekorasyon mağazası <span>›</span></button>
       </aside>
 
       <div class="bottom-controls" data-ui>
@@ -49,9 +69,11 @@
           <p class="modal-intro">Kazancını yeni üretim hatlarına ve ekibe yatır. Açılan her istasyon dünyaya eklenir.</p>
           <div class="upgrade-tabs" role="tablist" aria-label="İşletme menüsü">
             <button class="upgrade-tab active" role="tab" aria-selected="true" data-upgrade-tab="business">İşletme</button>
+            <button class="upgrade-tab" role="tab" aria-selected="false" data-upgrade-tab="furniture">Mobilya Dükkanı</button>
             <button class="upgrade-tab" role="tab" aria-selected="false" data-upgrade-tab="staff">Personel</button>
           </div>
           <div class="upgrade-panel" role="tabpanel" data-upgrade-panel="business"><div id="upgrade-list" class="upgrade-list"></div></div>
+          <div class="upgrade-panel hidden" role="tabpanel" data-upgrade-panel="furniture"><div id="furniture-list" class="upgrade-list"></div></div>
           <div class="upgrade-panel hidden" role="tabpanel" data-upgrade-panel="staff"><div id="staff-list" class="upgrade-list"></div></div>
         </section>
       </div>
@@ -93,6 +115,15 @@
         <section class="modal-card inventory-card" role="dialog" aria-modal="true" aria-labelledby="inventory-title">
           <header class="modal-header"><div><span class="eyebrow">STOK DURUMU</span><h1 id="inventory-title">Ürünler</h1></div><button class="close-btn" data-close="inventory-modal" aria-label="Kapat">×</button></header>
           <div id="inventory-list" class="inventory-list"></div>
+        </section>
+      </div>
+
+      <div class="modal-overlay hidden" id="decor-modal" data-ui>
+        <section class="modal-card decor-card" role="dialog" aria-modal="true" aria-labelledby="decor-title">
+          <header class="modal-header"><div><span class="eyebrow">MAĞAZANI KİŞİSELLEŞTİR</span><h1 id="decor-title">Dekorasyon mağazası</h1></div><button class="close-btn" data-close="decor-modal" aria-label="Kapat">×</button></header>
+          <p class="modal-intro" id="decor-intro">Dekorasyon satın al; her parça mağazanda yer bulur ve satış kârını artırır.</p>
+          <div class="decor-score-banner"><span>✨</span><div><strong id="decor-shop-score">0 puan · +0%</strong><small id="decor-score-caption">Yerleştirilen dekorlar alışveriş keyfini artırır.</small></div></div>
+          <div id="decor-list" class="decor-list"></div>
         </section>
       </div>
 
