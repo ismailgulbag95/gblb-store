@@ -27,10 +27,14 @@
             <div class="order-progress"><span id="order-progress"></span><div class="progress-track"><i id="order-progress-fill"></i></div></div>
             <button id="btn-deliver-order" class="order-deliver">Siparişi teslim et</button>
             <small id="order-bonus-progress" class="order-bonus-progress"></small>
+            <div id="order-ad-offer" class="inline-ad-offer hidden" aria-live="polite">
+              <small id="order-ad-copy"></small>
+              <button id="btn-order-ad" class="ad-reward-button">İzle ve ödülü al</button>
+              <button id="btn-order-ad-decline" class="ad-decline-button">Şimdi değil</button>
+            </div>
           </section>
           <div class="top-actions">
             <button class="icon-btn" id="btn-expansions" aria-label="İşletme geliştirmeleri">🏗️ <span id="upgrade-count">1</span></button>
-            <button class="icon-btn" id="btn-furniture" aria-label="Mobilya dükkanı" title="Mobilya dükkanı">🛋️</button>
             <button class="icon-btn" id="btn-layout" aria-label="Yerleşimi düzenle" aria-pressed="false" title="Yerleşimi düzenle">▦</button>
             <button class="icon-btn" id="btn-decor-top" aria-label="Dekorasyon mağazası" title="Dekorasyon mağazası">🎨</button>
             <button class="icon-btn" id="btn-settings" aria-label="Ayarlar">⚙️</button>
@@ -59,6 +63,11 @@
         <div id="joystick-zone" aria-label="Hareket kontrolü"><div id="joystick-base"><div id="joystick-thumb"></div></div></div>
         <div class="control-hint"><kbd>WASD</kbd><span>veya dokunup yürü</span></div>
         <button id="btn-interact" class="action-button" disabled><span class="action-icon">✋</span><span id="action-label">Bir istasyona yaklaş</span><kbd>E</kbd></button>
+        <div id="machine-ad-offer" class="inline-ad-offer machine-ad-offer hidden" aria-live="polite">
+          <small id="machine-ad-copy"></small>
+          <button id="btn-machine-ad" class="ad-reward-button">İzle ve girdiyi al</button>
+          <button id="btn-machine-ad-decline" class="ad-decline-button">Şimdi değil</button>
+        </div>
       </div>
 
       <div id="toast-container" aria-live="polite"></div>
@@ -69,11 +78,9 @@
           <p class="modal-intro">Kazancını yeni üretim hatlarına ve ekibe yatır. Açılan her istasyon dünyaya eklenir.</p>
           <div class="upgrade-tabs" role="tablist" aria-label="İşletme menüsü">
             <button class="upgrade-tab active" role="tab" aria-selected="true" data-upgrade-tab="business">İşletme</button>
-            <button class="upgrade-tab" role="tab" aria-selected="false" data-upgrade-tab="furniture">Mobilya Dükkanı</button>
             <button class="upgrade-tab" role="tab" aria-selected="false" data-upgrade-tab="staff">Personel</button>
           </div>
           <div class="upgrade-panel" role="tabpanel" data-upgrade-panel="business"><div id="upgrade-list" class="upgrade-list"></div></div>
-          <div class="upgrade-panel hidden" role="tabpanel" data-upgrade-panel="furniture"><div id="furniture-list" class="upgrade-list"></div></div>
           <div class="upgrade-panel hidden" role="tabpanel" data-upgrade-panel="staff"><div id="staff-list" class="upgrade-list"></div></div>
         </section>
       </div>

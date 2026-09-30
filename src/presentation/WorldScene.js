@@ -1768,7 +1768,7 @@ export class WorldScene {
 
   #addDecoration(entry) {
     const definition = DECORATIONS[entry.type];
-    if (!definition) return;
+    if (!definition && entry.type !== 'trashBin') return;
     const group = new THREE.Group();
     // Build specialized modern supermarket procedural 3D decoration
     this.#buildDecorationFallback(group, entry.type);
@@ -1778,7 +1778,48 @@ export class WorldScene {
   }
 
   #buildDecorationFallback(group, type) {
-    if (type === 'welcomeMat') {
+    if (type === 'trashBin') {
+      const bodyMaterial = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.72, metalness: 0.18 });
+      const lidMaterial = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.42, metalness: 0.28 });
+      const darkMaterial = new THREE.MeshStandardMaterial({ color: 0x17212b, roughness: 0.9 });
+      const bin = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.24, 0.68, 18), bodyMaterial);
+      bin.position.y = 0.38;
+      bin.castShadow = true;
+      bin.receiveShadow = true;
+      group.add(bin);
+
+      const lid = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.33, 0.08, 18), lidMaterial);
+      lid.position.y = 0.76;
+      lid.castShadow = true;
+      group.add(lid);
+      const opening = new THREE.Mesh(new THREE.CircleGeometry(0.15, 18), darkMaterial);
+      opening.rotation.x = -Math.PI / 2;
+      opening.position.y = 0.805;
+      group.add(opening);
+
+      const pedal = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.055, 0.12), lidMaterial);
+      pedal.position.set(0, 0.08, 0.31);
+      group.add(pedal);
+
+      const badgeCanvas = document.createElement('canvas');
+      badgeCanvas.width = 128;
+      badgeCanvas.height = 128;
+      const badgeContext = badgeCanvas.getContext('2d');
+      badgeContext.fillStyle = '#d1fae5';
+      badgeContext.beginPath();
+      badgeContext.arc(64, 64, 60, 0, Math.PI * 2);
+      badgeContext.fill();
+      badgeContext.fillStyle = '#15803d';
+      badgeContext.font = 'bold 78px sans-serif';
+      badgeContext.textAlign = 'center';
+      badgeContext.textBaseline = 'middle';
+      badgeContext.fillText('♻', 64, 67);
+      const badgeTexture = new THREE.CanvasTexture(badgeCanvas);
+      badgeTexture.colorSpace = THREE.SRGBColorSpace;
+      const badge = new THREE.Mesh(new THREE.PlaneGeometry(0.22, 0.22), new THREE.MeshBasicMaterial({ map: badgeTexture }));
+      badge.position.set(0, 0.48, 0.299);
+      group.add(badge);
+    } else if (type === 'welcomeMat') {
       // 1. Modern Supermarket Heavy-Duty Entrance Mat (Image 6)
       const aluminumFrame = new THREE.Mesh(
         new RoundedBoxGeometry(1.65, 0.04, 1.05, 3, 0.08),

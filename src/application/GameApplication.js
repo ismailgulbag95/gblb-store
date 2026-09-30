@@ -1,42 +1,32 @@
-import { ITEMS, RECIPES, SHELVES, STATIONS, UPGRADES } from '../domain/catalog.js';
-import { FURNITURE_TYPES, getFurnitureCount, getFurniturePrice, getStaffCount, getStaffHirePrice, isFurnitureUnlocked } from '../domain/furnitureCatalog.js';
+import { AD_ONLY_UPGRADE_IDS, ITEMS, RECIPES, SHELVES, STAFF, STAFF_HIRES, STATIONS, UPGRADES, getStaffCount } from '../domain/catalog.js';
 import { EconomyLedger } from '../domain/ledger.js';
 import { canTransfer, makeLocation, quantityAt, transferStock } from '../domain/inventory.js';
 import { createInitialState, hydrateState } from '../domain/state.js';
 import { advanceSimulation } from '../domain/simulation.js';
 import { createFarmState, removeFarmReady, syncFarmHarvest } from '../domain/farm.js';
-import { ZONES, canPlaceDecoration, canPlaceStation, getAllStationIds, getMarketCollisionBoxes, getShelfLocations, isStationUnlocked, stationPosition, syncCatalogLayout } from '../domain/layout.js';
+import { canPlaceDecoration, canPlaceStation, getAllStationIds, getMarketCollisionBoxes, getShelfLocations, isStationUnlocked, stationPosition, syncCatalogLayout } from '../domain/layout.js';
 import { DECORATIONS } from '../domain/decorCatalog.js';
 import { decorationPrice, nextOrder } from '../domain/orders.js';
+import { machineProductionSeconds, machineSpeedMultiplier, machineUpgradeCost, percentGain, staffSpeedMultiplier, staffUpgradeCost } from '../domain/progression.js';
 
 function clone(value) {
   return structuredClone(value);
 }
 
-function findPlacementSlot(state, stationId, zone = 'market') {
-  const limits = ZONES[zone] ?? ZONES.market;
-  const step = 0.5;
-  const centerX = (limits.minX + limits.maxX) / 2;
-  const centerZ = (limits.minZ + limits.maxZ) / 2;
-  let bestSlot = null;
-  let bestDistance = Infinity;
-  for (let x = limits.minX + 0.5; x <= limits.maxX - 0.5; x += step) {
-    for (let z = limits.minZ + 0.5; z <= limits.maxZ - 0.5; z += step) {
-      const snappedX = Math.round(x * 2) / 2;
-      const snappedZ = Math.round(z * 2) / 2;
-      if (!canPlaceStation(state, stationId, snappedX, snappedZ, 0)) continue;
-      const distance = Math.hypot(snappedX - centerX, snappedZ - centerZ);
-      if (distance < bestDistance) {
-        bestDistance = distance;
-        bestSlot = { x: snappedX, z: snappedZ };
-      }
-    }
-  }
-  return bestSlot;
+function availablePlayerItems(state) {
+  const playerStock = state.stock.player;
+  return Object.entries(playerStock.items).reduce((total, [item, count]) =>
+    total + Math.max(0, count - (playerStock.reserved?.[item] ?? 0)), 0);
+}
+
+function carriedPlayerItems(state) {
+  return Object.values(state.stock.player.items).reduce((total, count) => total + count, 0);
 }
 
 const UPGRADE_MESSAGES = {
   tomatoFarm2: 'İkinci domates tarlası açıldı. Hasat kapasiten arttı.',
+  cornFarm2: 'İkinci mısır tarlası açıldı. Hasat kapasiten arttı.',
+  wheatFarm2: 'İkinci buğday tarlası açıldı. Hasat kapasiten arttı.',
   cashier: 'Kasiyer işe alındı. Ödemeler daha hızlı işleniyor.',
   paste: 'Salça kazanı ve yeni reyon açıldı.',
   harvester: 'Hasat işçisi önce rafları dolduruyor, ardından üretim makinelerini besliyor.',
@@ -57,9 +47,34 @@ const UPGRADE_MESSAGES = {
   chefWaiter: 'Şef ve garson işe alındı. Restoran otomasyona geçti.',
 };
 
+const AD_LIMITS = Object.freeze({
+  totalPerDay: 6,
+  recentWindowMs: 15 * 60_000,
+  recentLimit: 2,
+  globalCooldownMs: 90_000,
+  orderDoublePerDay: 3,
+  supplierDropPerDay: 2,
+  supplierCooldownMs: 15 * 60_000,
+  declinedCooldownMs: 5 * 60_000,
+});
+
+function localDayKey(timestamp = Date.now()) {
+  const date = new Date(timestamp);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function addAdEvent(ads, type, placement, rewardId = null, rewardAmount = 0, timestamp = Date.now()) {
+  ads.events.push({ type, placement, rewardId, rewardAmount, at: timestamp });
+  if (ads.events.length > 500) ads.events.splice(0, ads.events.length - 500);
+}
+
 export class GameApplication {
-  constructor(saveService, seed) {
+  constructor(saveService, seed, rewardedAdService = null) {
     this.saveService = saveService;
+    this.rewardedAdService = rewardedAdService;
+    this.adSessionTicks = 0;
+    this.adOfferSequence = 0;
+    this.shownAdOffers = new Set();
     const loaded = saveService.load();
     this.state = loaded.state ?? createInitialState(seed);
     syncCatalogLayout(this.state);
@@ -84,9 +99,10 @@ export class GameApplication {
     this.onEvent = () => {};
     this.lastDurableTick = this.state.tick;
     if (!loaded.state) this.#persist('new-game');
-    else if (migrateLegacyCharacter || needsUnlockRefresh || movedCashier) {
+    else if (loaded.migrated || migrateLegacyCharacter || needsUnlockRefresh || movedCashier) {
       this.#persist(`migration:${this.state.tick}:${legacyCharacter ?? 'none'}:${this.state.availableUpgrades.join(',')}`);
     }
+    if (this.state.ads.pending) void this.#reconcilePendingReward();
     if (loaded.recovered) this.onEvent({ type: 'toast', message: 'Yedek kayıttan devam edildi.' });
   }
 
@@ -100,6 +116,247 @@ export class GameApplication {
 
   getBalance() {
     return this.state.economy.balanceAtoms / 10_000;
+  }
+
+  isRewardedAdReady(placement) {
+    return this.rewardedAdService?.isReady(placement) === true;
+  }
+
+  canOfferRewardedAd(placement, payload = {}) {
+    const state = this.state;
+    if (!this.rewardedAdService?.isReady(placement) || state.paused || globalThis.document?.hidden
+      || state.ordersCompleted < 1 || this.adSessionTicks < 1_800) return false;
+    const now = Date.now();
+    const ads = state.ads;
+    const today = ads.dailyCounts[localDayKey(now)] ?? { completed: 0, placements: {} };
+    const recent = ads.recentCompletions.filter((at) => now - at < AD_LIMITS.recentWindowMs);
+    if (today.completed >= AD_LIMITS.totalPerDay || recent.length >= AD_LIMITS.recentLimit
+      || (ads.lastStartedAt && now - ads.lastStartedAt < AD_LIMITS.globalCooldownMs)
+      || (ads.dismissedUntil[placement] ?? 0) > now) return false;
+    if (placement === 'order-double') {
+      const orderReward = state.lastOrderReward;
+      return Boolean(orderReward && !orderReward.claimed && orderReward.id === payload.orderId
+        && (today.placements?.[placement] ?? 0) < AD_LIMITS.orderDoublePerDay);
+    }
+    if (placement === 'supplier-drop') {
+      const machine = state.machines[payload.machineId];
+      const station = STATIONS[payload.machineId];
+      const recipe = RECIPES[station?.recipe ?? machine?.recipe];
+      const lastPlacementAt = ads.lastPlacementStarts[placement] ?? 0;
+      return Boolean(machine && recipe && machine.blocked === 'missing-input'
+        && Number.isSafeInteger(machine.blockedTicks) && machine.blockedTicks >= 200
+        && now - lastPlacementAt >= AD_LIMITS.supplierCooldownMs
+        && (today.placements?.[placement] ?? 0) < AD_LIMITS.supplierDropPerDay
+        && this.#supplierDropItems(state, payload.machineId, recipe));
+    }
+    if (placement === 'farm-unlock') {
+      const upgrade = UPGRADES.find((entry) => entry.id === payload.upgradeId);
+      const baseId = payload.upgradeId?.replace(/2$/, '');
+      return Boolean(upgrade && AD_ONLY_UPGRADE_IDS.includes(upgrade.id)
+        && state.availableUpgrades.includes(upgrade.id) && !state.completedUpgrades.includes(upgrade.id)
+        && state.farms[baseId] && !state.farms[payload.upgradeId]);
+    }
+    if (placement === 'staff-hire') {
+      const hire = STAFF_HIRES.find((entry) => entry.upgradeId === payload.role);
+      return Boolean(hire && (state.availableUpgrades.includes(payload.role) || state.completedUpgrades.includes(payload.role))
+        && (!state.completedUpgrades.includes(payload.role) || getStaffCount(state, payload.role) > 0));
+    }
+    return false;
+  }
+
+  markRewardedOfferShown(placement, payload = {}) {
+    if (!this.canOfferRewardedAd(placement, payload)) return false;
+    const key = `${placement}:${payload.orderId ?? payload.upgradeId ?? payload.role ?? payload.machineId ?? ''}:${Math.floor(Date.now() / AD_LIMITS.declinedCooldownMs)}`;
+    if (this.shownAdOffers.has(key) || this.state.ads.shownOfferKeys.includes(key)) return true;
+    this.shownAdOffers.add(key);
+    return this.#command(`ad-offer-shown:${key}`, (draft) => {
+      draft.ads.shownOfferKeys.push(key);
+      if (draft.ads.shownOfferKeys.length > 128) draft.ads.shownOfferKeys.splice(0, draft.ads.shownOfferKeys.length - 128);
+      addAdEvent(draft.ads, 'offer_shown', placement);
+      return { ok: true };
+    }).ok;
+  }
+
+  declineRewardedOffer(placement, payload = {}) {
+    const key = `${placement}:${payload.orderId ?? payload.upgradeId ?? payload.role ?? payload.machineId ?? ''}:${Math.floor(Date.now() / AD_LIMITS.declinedCooldownMs)}`;
+    return this.#command(`ad-decline:${key}:${this.state.revision + 1}`, (draft) => {
+      draft.ads.dismissedUntil[placement] = Date.now() + AD_LIMITS.declinedCooldownMs;
+      addAdEvent(draft.ads, 'offer_declined', placement);
+      return { ok: true };
+    });
+  }
+
+  async watchRewardedAd(placement, payload = {}) {
+    if (!this.canOfferRewardedAd(placement, payload)) {
+      return { ok: false, reason: this.rewardedAdService?.isReady(placement) ? 'offer-unavailable' : 'ad-not-ready' };
+    }
+    const sequence = ++this.adOfferSequence;
+    const rewardId = globalThis.crypto?.randomUUID?.() ?? `reward-${Date.now()}-${this.state.revision}-${sequence}`;
+    const pending = { rewardId, placement, payload: clone(payload), createdAt: Date.now(), started: false };
+    const accepted = this.#command(`ad-accepted:${rewardId}`, (draft) => {
+      if (draft.ads.pending) return { ok: false, reason: 'ad-already-active' };
+      draft.ads.pending = pending;
+      addAdEvent(draft.ads, 'offer_accepted', placement, rewardId);
+      return { ok: true };
+    });
+    if (!accepted.ok) return accepted;
+
+    let outcome = null;
+    const result = await this.rewardedAdService.show(placement, {
+      onLoaded: () => this.#recordAdLifecycle(rewardId, 'ad_loaded'),
+      onStarted: () => this.#startRewardedAd(pending),
+      onCompleted: (receipt) => { outcome = this.#completeRewardedAd(pending, receipt); },
+      onFailed: (error) => this.#failRewardedAd(pending, error),
+      onClosed: () => this.#failRewardedAd(pending, new Error('Ad closed before reward completion.')),
+    }, { rewardId, payload: clone(payload) });
+    return result && outcome?.ok && outcome.granted
+      ? { ok: true, rewardId, rewardAmount: outcome.rewardAmount ?? 0 }
+      : { ok: false, reason: result ? 'reward-unavailable' : 'ad-not-completed' };
+  }
+
+  async #reconcilePendingReward() {
+    const pending = clone(this.state.ads.pending);
+    if (!pending) return;
+    this.state.paused = true;
+    let receipts = [];
+    try { receipts = await this.rewardedAdService?.getCompletedRewardReceipts?.() ?? []; } catch { /* unresolved means no reward */ }
+    const receipt = receipts.find((entry) => entry.rewardId === pending.rewardId && entry.rewarded === true);
+    if (receipt) this.#completeRewardedAd(pending, receipt);
+    else this.#failRewardedAd(pending, new Error('Interrupted rewarded ad was not completed.'));
+  }
+
+  #recordAdLifecycle(rewardId, eventType) {
+    const pending = this.state.ads.pending;
+    if (!pending || pending.rewardId !== rewardId) return;
+    this.#command(`ad-event:${eventType}:${rewardId}`, (draft) => {
+      addAdEvent(draft.ads, eventType, pending.placement, rewardId);
+      return { ok: true };
+    });
+  }
+
+  #startRewardedAd(pending) {
+    if (this.state.ads.pending?.rewardId !== pending.rewardId) return;
+    const now = Date.now();
+    this.#command(`ad-start:${pending.rewardId}`, (draft) => {
+      if (draft.ads.pending?.rewardId !== pending.rewardId) return { ok: false, reason: 'stale-ad' };
+      draft.ads.pending.started = true;
+      draft.ads.lastStartedAt = now;
+      draft.ads.lastPlacementStarts[pending.placement] = now;
+      addAdEvent(draft.ads, 'ad_started', pending.placement, pending.rewardId, 0, now);
+      return { ok: true };
+    });
+    this.onEvent({ type: 'ad-start' });
+  }
+
+  #failRewardedAd(pending, error) {
+    if (this.state.ads.pending?.rewardId !== pending.rewardId) return;
+    this.#command(`ad-failed:${pending.rewardId}`, (draft) => {
+      if (draft.ads.pending?.rewardId !== pending.rewardId) return { ok: false, reason: 'stale-ad' };
+      addAdEvent(draft.ads, 'ad_failed', pending.placement, pending.rewardId);
+      draft.ads.pending = null;
+      return { ok: true };
+    });
+    this.onEvent({ type: 'ad-end' });
+    if (error) this.onEvent({ type: 'ad-failed', message: error.message });
+  }
+
+  #completeRewardedAd(pending) {
+    if (this.state.ads.completedAdIds.includes(pending.rewardId)) {
+      const granted = this.state.ads.grantedRewardIds.includes(pending.rewardId);
+      return { ok: granted, granted, duplicate: true };
+    }
+    const now = Date.now();
+    let granted = false;
+    let rewardAmount = 0;
+    const result = this.#command(`ad-complete:${pending.rewardId}`, (draft) => {
+      if (draft.ads.pending?.rewardId !== pending.rewardId) return { ok: false, reason: 'stale-ad' };
+      draft.ads.completedAdIds.push(pending.rewardId);
+      if (draft.ads.completedAdIds.length > 256) draft.ads.completedAdIds.splice(0, draft.ads.completedAdIds.length - 256);
+      draft.ads.recentCompletions = draft.ads.recentCompletions.filter((at) => now - at < AD_LIMITS.recentWindowMs);
+      draft.ads.recentCompletions.push(now);
+      const day = localDayKey(now);
+      draft.ads.dailyCounts[day] ??= { completed: 0, placements: {} };
+      draft.ads.dailyCounts[day].completed += 1;
+      draft.ads.dailyCounts[day].placements ??= {};
+      draft.ads.dailyCounts[day].placements[pending.placement] = (draft.ads.dailyCounts[day].placements[pending.placement] ?? 0) + 1;
+      addAdEvent(draft.ads, 'ad_completed', pending.placement, pending.rewardId, 0, now);
+      const reward = this.#applyRewardedPlacement(draft, pending);
+      granted = reward.ok;
+      rewardAmount = reward.amount ?? 0;
+      if (granted) {
+        draft.ads.grantedRewardIds.push(pending.rewardId);
+        if (draft.ads.grantedRewardIds.length > 256) draft.ads.grantedRewardIds.splice(0, draft.ads.grantedRewardIds.length - 256);
+        addAdEvent(draft.ads, 'reward_granted', pending.placement, pending.rewardId, rewardAmount, now);
+      }
+      draft.ads.pending = null;
+      return { ok: true, granted };
+    });
+    if (result.ok) this.onEvent({ type: 'ad-end' });
+    return result.ok && granted
+      ? { ok: true, granted: true, rewardAmount }
+      : { ok: false, granted: false, reason: 'reward-no-longer-available' };
+  }
+
+  #applyRewardedPlacement(state, pending) {
+    const { placement, payload } = pending;
+    if (placement === 'order-double') {
+      const order = state.lastOrderReward;
+      if (!order || order.claimed || order.id !== payload.orderId) return { ok: false };
+      new EconomyLedger(state.economy).credit(`order-ad-bonus:${pending.rewardId}`, order.reward, 'rewarded-ad:order-double');
+      order.claimed = true;
+      return { ok: true, amount: order.reward, message: `Sipariş reklam ödülü: +$${order.reward}.` };
+    }
+    if (placement === 'supplier-drop') {
+      const station = STATIONS[payload.machineId];
+      const machine = state.machines[payload.machineId];
+      const recipe = RECIPES[station?.recipe ?? machine?.recipe];
+      const missing = recipe && this.#supplierDropItems(state, payload.machineId, recipe);
+      if (!missing || machine.blockedTicks < 200) return { ok: false };
+      const input = state.stock[`machine:${payload.machineId}:input`];
+      for (const [item, quantity] of Object.entries(missing)) input.items[item] = (input.items[item] ?? 0) + quantity;
+      machine.blockedTicks = 0;
+      machine.blockedSinceTick = null;
+      return { ok: true, amount: 0, message: 'Bir tariflik girdi makineye teslim edildi.' };
+    }
+    if (placement === 'farm-unlock') {
+      const id = payload.upgradeId;
+      if (!state.availableUpgrades.includes(id) || state.completedUpgrades.includes(id) || state.farms[id]) return { ok: false };
+      state.completedUpgrades.push(id);
+      state.unlocked[id] = true;
+      this.#applyUpgrade(state, id);
+      state.quest = this.#questFor(state);
+      return { ok: true, amount: 0, message: UPGRADE_MESSAGES[id] };
+    }
+    if (placement === 'staff-hire') {
+      const role = payload.role;
+      const hire = STAFF_HIRES.find((entry) => entry.upgradeId === role);
+      if (!hire || (!state.availableUpgrades.includes(role) && !state.completedUpgrades.includes(role))) return { ok: false };
+      if (!state.completedUpgrades.includes(role)) {
+        state.completedUpgrades.push(role);
+        state.unlocked[role] = true;
+        this.#applyUpgrade(state, role);
+      } else if (role === 'chefWaiter') {
+        this.#hire(state, 'chefWaiter');
+        this.#hire(state, 'waiter');
+      } else {
+        this.#hire(state, role);
+      }
+      return { ok: true, amount: 0, message: `${STAFF[role]?.title ?? role} reklamla ekibe katıldı.` };
+    }
+    return { ok: false };
+  }
+
+  #supplierDropItems(state, machineId, recipe) {
+    const input = state.stock[`machine:${machineId}:input`];
+    const output = state.stock[`machine:${machineId}:output`];
+    if (!input || !output || output.capacity - Object.values(output.items).reduce((sum, value) => sum + value, 0)
+      - (output.reservedCapacity ?? 0) < 1) return null;
+    const missing = Object.fromEntries(Object.entries(recipe.inputs).map(([item, amount]) => [item,
+      Math.max(0, amount - (input.items[item] ?? 0))]).filter(([, amount]) => amount > 0));
+    const needed = Object.values(missing).reduce((sum, amount) => sum + amount, 0);
+    const inputUsed = Object.values(input.items).reduce((sum, value) => sum + value, 0);
+    if (!needed || needed > 12 || input.capacity - inputUsed - (input.reservedCapacity ?? 0) < needed) return null;
+    return missing;
   }
 
   fulfillOrder() {
@@ -116,6 +373,13 @@ export class GameApplication {
       delete draft.stock['order:delivery'].items[current.item];
       new EconomyLedger(draft.economy).credit(`order-reward:${draft.ordersCompleted + 1}`, current.reward, 'customer-order');
       draft.ordersCompleted += 1;
+      draft.lastOrderReward = {
+        id: `order:${draft.ordersCompleted}`,
+        reward: current.reward,
+        item: current.item,
+        quantity: current.quantity,
+        claimed: false,
+      };
       if (draft.ordersCompleted % 3 === 0) draft.decorVouchers += 1;
       draft.activeOrder = nextOrder(draft);
       return { ok: true, message: `Sipariş teslim edildi: +$${current.reward}.` };
@@ -202,31 +466,13 @@ export class GameApplication {
   }
 
   hireExtraStaff(role) {
-    const validRoles = ['cashier', 'harvester', 'factoryFeeder', 'caretaker', 'chefWaiter'];
-    if (!validRoles.includes(role)) return { ok: false, reason: 'unknown-role' };
-
-    if (!this.state.completedUpgrades.includes(role)) {
-      return { ok: false, reason: 'locked' };
-    }
-
-    const price = getStaffHirePrice(this.state, role);
-    if (this.state.economy.balanceAtoms < price * 10_000) return { ok: false, reason: 'insufficient-funds' };
-
-    return this.#command(`hire-extra:${role}:${this.state.revision + 1}`, (draft) => {
-      new EconomyLedger(draft.economy).debit(`staff-hire:${role}:${draft.nextEntityId}`, price, `staff:${role}`);
-      if (role === 'chefWaiter') {
-        this.#hire(draft, 'chefWaiter');
-        this.#hire(draft, 'waiter');
-      } else {
-        this.#hire(draft, role);
-      }
-      return { ok: true, message: `Yeni ${STAFF[role]?.title ?? role} ekibe katıldı (-$${price}).` };
-    });
+    return this.watchRewardedAd('staff-hire', { role });
   }
 
   getAvailableUpgrades() {
     return UPGRADES.filter((upgrade) => this.state.availableUpgrades.includes(upgrade.id)
-      && !this.state.completedUpgrades.includes(upgrade.id));
+      && !this.state.completedUpgrades.includes(upgrade.id)
+      && !AD_ONLY_UPGRADE_IDS.includes(upgrade.id));
   }
 
   #persist(transactionId, draft = this.state) {
@@ -251,6 +497,7 @@ export class GameApplication {
   }
 
   buyUpgrade(upgradeId) {
+    if (AD_ONLY_UPGRADE_IDS.includes(upgradeId)) return { ok: false, reason: 'rewarded-ad-required' };
     const upgrade = UPGRADES.find((entry) => entry.id === upgradeId);
     if (!upgrade) return { ok: false, reason: 'unknown-upgrade' };
     return this.#command(`upgrade:${upgradeId}:${this.state.revision + 1}`, (draft) => {
@@ -266,136 +513,36 @@ export class GameApplication {
     });
   }
 
-  buyFurniture(type) {
-    const definition = FURNITURE_TYPES[type];
-    if (!definition) return { ok: false, reason: 'unknown-furniture' };
-
-    return this.#command(`buy-furniture:${type}:${this.state.revision + 1}`, (draft) => {
-      if (!isFurnitureUnlocked(draft, type)) {
-        return { ok: false, reason: 'locked' };
-      }
-
-      const price = getFurniturePrice(draft, type);
-      if (draft.economy.balanceAtoms < price * 10_000) {
-        return { ok: false, reason: 'insufficient-funds', price };
-      }
-
-      const stationId = `${type}_${draft.nextEntityId++}`;
-      draft.customStations ??= {};
-      draft.layout ??= {};
-
-      draft.customStations[stationId] = {
-        id: stationId,
-        baseType: type,
-        kind: definition.kind,
-        item: definition.item,
-        recipe: definition.recipe,
-        zone: definition.zone ?? 'market',
-        title: definition.name,
-      };
-      const zone = definition.zone ?? 'market';
-      const slot = findPlacementSlot(draft, stationId, zone);
-      if (!slot) return { ok: false, reason: 'no-space', price };
-
-      const txId = `buy-furniture:${type}:${draft.revision + 1}:${draft.nextEntityId}`;
-      new EconomyLedger(draft.economy).debit(txId, price, `furniture:${type}`);
-      draft.layout[stationId] = { x: slot.x, z: slot.z, rotation: 0 };
-      Object.assign(draft.customStations[stationId], { x: slot.x, z: slot.z });
-
-      if (definition.kind === 'farm') {
-        draft.farms ??= {};
-        draft.farms[stationId] = createFarmState(draft.tick, stationId);
-        draft.customStations[stationId] = {
-          id: stationId,
-          baseType: type,
-          kind: 'farm',
-          item: definition.item,
-          zone: 'farm',
-          title: definition.name,
-        };
-        makeLocation(draft.stock, `farm:${definition.item}`, 60);
-      } else if (definition.kind === 'shelf') {
-        const shelfDef = SHELVES[definition.item];
-        const capacity = shelfDef?.capacity ?? 8;
-        draft.customStations[stationId] = {
-          id: stationId,
-          baseType: type,
-          kind: 'shelf',
-          item: definition.item,
-          zone: 'market',
-          title: definition.name,
-          capacity,
-          displayType: definition.displayType ?? shelfDef?.displayType ?? 'gondola',
-        };
-        makeLocation(draft.stock, `shelf:${stationId}`, capacity);
-      } else if (definition.kind === 'machine') {
-        draft.machines ??= {};
-        draft.machines[stationId] = { progressTicks: 0, recipe: definition.recipe, blocked: false };
-        draft.customStations[stationId] = {
-          id: stationId,
-          baseType: type,
-          kind: 'machine',
-          recipe: definition.recipe,
-          zone: definition.zone ?? 'market',
-          title: definition.name,
-        };
-        makeLocation(draft.stock, `machine:${stationId}:input`, 12);
-        makeLocation(draft.stock, `machine:${stationId}:output`, 8);
-      } else if (definition.kind === 'selfRegister') {
-        draft.selfRegisters ??= {};
-        draft.selfRegisters[stationId] = {
-          id: stationId,
-          x: slot.x,
-          z: slot.z,
-          isSelfCheckout: true,
-          title: definition.name,
-        };
-      } else if (definition.kind === 'table') {
-        draft.diningTables ??= {};
-        draft.diningTables[stationId] = {
-          customerId: null,
-          meal: null,
-          tipAtoms: 0,
-          eatTicks: 0,
-        };
-      }
-
-      return {
-        ok: true,
-        stationId,
-        price,
-        message: `${definition.name} satın alındı ve yerleştirildi!`,
-      };
+  upgradeMachine(machineId) {
+    const machine = this.state.machines[machineId];
+    if (!machine || !STATIONS[machineId]) return { ok: false, reason: 'unknown-machine' };
+    return this.#command(`machine-upgrade:${machineId}:${this.state.revision + 1}`, (draft) => {
+      const current = draft.machines[machineId];
+      const level = current.upgradeLevel ?? 0;
+      const cost = machineUpgradeCost(machineId, level);
+      if (draft.economy.balanceAtoms < cost * 10_000) return { ok: false, reason: 'insufficient-funds', cost };
+      new EconomyLedger(draft.economy).debit(`machine-upgrade:${machineId}:${level + 1}`, cost, `machine-upgrade:${machineId}`);
+      current.upgradeLevel = level + 1;
+      current.speedModifier = machineSpeedMultiplier(current.upgradeLevel);
+      const nextSeconds = machineProductionSeconds(machineId, current.upgradeLevel);
+      return { ok: true, level: current.upgradeLevel, cost, nextSeconds, message: `${STATIONS[machineId].title} geliştirildi.` };
     });
   }
 
-  hireExtraStaff(role) {
-    return this.#command(`hire-staff:${role}:${this.state.revision + 1}`, (draft) => {
-      const isUnlocked = draft.completedUpgrades.includes(role);
-      if (!isUnlocked) {
-        return { ok: false, reason: 'locked' };
-      }
-
-      const price = getStaffHirePrice(draft, role);
-      if (draft.economy.balanceAtoms < price * 10_000) {
-        return { ok: false, reason: 'insufficient-funds', price };
-      }
-
-      const txId = `hire-staff:${role}:${draft.revision + 1}:${draft.nextEntityId}`;
-      new EconomyLedger(draft.economy).debit(txId, price, `staff:${role}`);
-      this.#hire(draft, role);
-
-      const count = getStaffCount(draft, role);
-      return {
-        ok: true,
-        role,
-        count,
-        price,
-        message: `Yeni personel işe alındı! Toplam: ${count}`,
-      };
+  upgradeStaff(workerId) {
+    const worker = this.state.workers.find((entry) => entry.id === workerId);
+    if (!worker) return { ok: false, reason: 'unknown-staff' };
+    return this.#command(`staff-upgrade:${workerId}:${this.state.revision + 1}`, (draft) => {
+      const current = draft.workers.find((entry) => entry.id === workerId);
+      const level = current.upgradeLevel ?? 0;
+      const cost = staffUpgradeCost(current.type === 'waiter' ? 'chefWaiter' : current.type, level);
+      if (draft.economy.balanceAtoms < cost * 10_000) return { ok: false, reason: 'insufficient-funds', cost };
+      new EconomyLedger(draft.economy).debit(`staff-upgrade:${workerId}:${level + 1}`, cost, `staff-upgrade:${current.type}`);
+      current.upgradeLevel = level + 1;
+      current.speedModifier = staffSpeedMultiplier(current.upgradeLevel);
+      return { ok: true, level: current.upgradeLevel, cost, message: `${STAFF[current.type]?.title ?? current.type} geliştirildi.` };
     });
   }
-
 
   #applyUpgrade(state, upgradeId) {
     const shelfFor = (itemId) => {
@@ -407,7 +554,7 @@ export class GameApplication {
     const addMachine = (id) => {
       const station = STATIONS[id];
       const recipe = RECIPES[station.recipe];
-      state.machines[id] = { progressTicks: 0, recipe: station.recipe, blocked: false };
+      state.machines[id] = { progressTicks: 0, recipe: station.recipe, blocked: false, blockedTicks: 0, blockedSinceTick: null, upgradeLevel: 0, speedModifier: 1 };
       makeLocation(state.stock, `machine:${id}:input`, 12);
       makeLocation(state.stock, `machine:${id}:output`, 8);
       if (recipe.output !== 'CHICKEN_FEED') shelfFor(recipe.output);
@@ -423,6 +570,8 @@ export class GameApplication {
     };
 
     if (upgradeId === 'tomatoFarm2') addFarm('tomatoFarm2');
+    if (upgradeId === 'cornFarm2') addFarm('cornFarm2');
+    if (upgradeId === 'wheatFarm2') addFarm('wheatFarm2');
     if (upgradeId === 'cashier') this.#hire(state, 'cashier');
     if (upgradeId === 'paste') { addMachine('paste'); unlockProduct('TOMATO_PASTE'); }
     if (upgradeId === 'harvester') this.#hire(state, 'harvester');
@@ -465,11 +614,11 @@ export class GameApplication {
 
   #hire(state, type) {
     const positions = {
-      cashier: [STATIONS.register.x, STATIONS.register.z - 1.75], harvester: [-10, 5], factoryFeeder: [-10, 0],
+      cashier: [STATIONS.register.x, STATIONS.register.z - 1.75], harvester: [-10, 7], factoryFeeder: [-10, 0],
       caretaker: [-18, 0], chefWaiter: [-30, 0], waiter: [-35, 0],
     };
     const [x, z] = positions[type] ?? [-8, 0];
-    state.workers.push({ id: `worker-${state.nextEntityId++}`, type, x, z, facing: 0, task: null });
+    state.workers.push({ id: `worker-${state.nextEntityId++}`, type, x, z, facing: 0, unlocked: true, upgradeLevel: 0, speedModifier: 1, task: null });
   }
 
   #refreshUpgrades(state) {
@@ -481,12 +630,14 @@ export class GameApplication {
       factoryFeeder: state.stats.juiceSold > 0,
       orangeFarm2: state.stats.juiceSold > 0,
       corn: state.stats.juiceSold > 0,
+      cornFarm2: state.stats.cornSold > 0,
       popcorn: state.stats.cornSold > 0,
       feed: state.stats.popcornSold > 0,
       coop: state.stats.feedProduced > 0,
       chicken2: state.stats.eggSold > 0,
       caretaker: state.stats.eggSold > 0,
       bakery: state.stats.eggSold > 0,
+      wheatFarm2: state.stats.eggSold > 0,
       flourMill: state.stats.breadSold > 0,
       orangeTartKitchen: state.stats.flourProduced > 0 && state.stats.juiceSold > 0,
       chicken3: state.completedUpgrades.includes('chicken2'),
@@ -525,6 +676,29 @@ export class GameApplication {
     const player = state.player;
     const upgrade = UPGRADES.find((entry) => entry.id === targetId);
     if (upgrade && !state.completedUpgrades.includes(targetId)) return this.buyUpgrade(targetId);
+    const trashBin = state.decorations.find((entry) => entry.id === targetId && entry.type === 'trashBin');
+    if (trashBin) {
+      if (Math.hypot(player.x - trashBin.x, player.z - trashBin.z) > 2.5) return { ok: false, reason: 'too-far' };
+      return this.#command(`trash-bin:${targetId}:${state.revision + 1}`, (draft) => {
+        const playerStock = draft.stock.player;
+        let discarded = 0;
+        for (const [item, count] of Object.entries(playerStock.items)) {
+          const reserved = Math.min(count, Math.max(0, playerStock.reserved?.[item] ?? 0));
+          const available = count - reserved;
+          if (available <= 0) continue;
+          discarded += available;
+          if (reserved > 0) playerStock.items[item] = reserved;
+          else delete playerStock.items[item];
+        }
+        if (!discarded) {
+          return { ok: false, reason: Object.keys(playerStock.items).length ? 'items-reserved' : 'empty' };
+        }
+        const message = state.settings.language === 'en'
+          ? `${discarded} item(s) thrown away.`
+          : `${discarded} ürün çöpe atıldı.`;
+        return { ok: true, discarded, message };
+      });
+    }
     const station = STATIONS[targetId] ?? state.customStations?.[targetId];
     if (!station) return { ok: false, reason: 'unknown-station' };
     const isUnlocked = isStationUnlocked(state, targetId);
@@ -722,10 +896,24 @@ export class GameApplication {
     for (const upgrade of this.getAvailableUpgrades()) {
       candidates.push({ ...upgrade, kind: 'upgrade', distance: Math.hypot(player.x - upgrade.x, player.z - upgrade.z) });
     }
+    for (const trashBin of state.decorations.filter((entry) => entry.type === 'trashBin')) {
+      const available = availablePlayerItems(state);
+      const carried = carriedPlayerItems(state);
+      candidates.push({
+        id: trashBin.id,
+        kind: 'trashBin',
+        x: trashBin.x,
+        z: trashBin.z,
+        distance: Math.hypot(player.x - trashBin.x, player.z - trashBin.z),
+        label: available ? 'Çöp kovası · Çantayı boşalt' : carried ? 'Çöp kovası · Ürünler ayrılmış' : 'Çöp kovası · Çanta boş',
+        actionable: available > 0,
+      });
+    }
     candidates.sort((a, b) => a.distance - b.distance);
     const nearest = candidates[0];
     if (!nearest || nearest.distance > 2.2) return null;
     if (nearest.kind === 'upgrade') return { ...nearest, label: `${nearest.title} · $${nearest.price}` };
+    if (nearest.kind === 'trashBin') return nearest;
     if (nearest.kind === 'farm') {
       const ready = state.farms[nearest.id]?.readyCount ?? 0;
       const carried = Object.values(state.stock.player.items).reduce((total, count) => total + count, 0);
@@ -759,6 +947,7 @@ export class GameApplication {
 
   tick() {
     const draft = clone(this.state);
+    this.adSessionTicks += 1;
     const { events, durable } = advanceSimulation(draft);
     draft.tick += 1;
     this.#refreshUpgrades(draft);

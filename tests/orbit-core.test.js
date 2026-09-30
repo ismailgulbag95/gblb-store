@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { GameApplication } from '../src/application/GameApplication.js';
 import { advanceSimulation, findCustomerMarketRoute } from '../src/domain/simulation.js';
 import { createInitialState, hydrateState } from '../src/domain/state.js';
+import { createFarmState } from '../src/domain/farm.js';
 import {
   canTransfer,
   makeLocation,
@@ -13,13 +14,13 @@ import {
 } from '../src/domain/inventory.js';
 import { EconomyLedger, InsufficientBalanceError } from '../src/domain/ledger.js';
 import { SaveRecoveryError, SaveService } from '../src/infrastructure/SaveService.js';
-import { SHELVES, STATIONS } from '../src/domain/catalog.js';
+import { getStaffCount, SHELVES, STATIONS } from '../src/domain/catalog.js';
 import { canPlaceStation, getDecorationDimensions, getMarketCollisionBoxes, getStationDimensions } from '../src/domain/layout.js';
 import { CharacterFactory } from '../src/presentation/CharacterFactory.js';
 import { customerMood, saleMoodMultiplier, tipForMood } from '../src/domain/customerExperience.js';
 import { decorationPrice, nextOrder, orderProgress } from '../src/domain/orders.js';
-import { FURNITURE_TYPES, calculateParabolicPrice, getFurnitureCount, getFurniturePrice, getStaffCount, getStaffHirePrice, isFurnitureUnlocked } from '../src/domain/furnitureCatalog.js';
-import { getAvailableRegisters } from '../src/domain/simulation.js';
+import { machineProductionSeconds, machineSpeedMultiplier, machineUpgradeCost, staffSpeedMultiplier, staffUpgradeCost } from '../src/domain/progression.js';
+import { AdMobRewardedProvider, RewardedAdService } from '../src/infrastructure/RewardedAdProvider.js';
 
 class MemoryStorage {
   values = new Map();
@@ -42,7 +43,7 @@ test('older v2 saves migrate customer and order fields without losing inventory'
   old.customers.push({ id: 'customer-90', kind: 'shopper', x: 5, z: 5, phase: 'leaving',
     shoppingList: ['TOMATO'], basket: [], demand: 'TOMATO' });
   const migrated = hydrateState(old);
-  assert.equal(migrated.saveVersion, 5);
+  assert.equal(migrated.saveVersion, 6);
   assert.equal(migrated.stock.player.items.TOMATO, 2);
   assert.equal(migrated.customers[0].checkoutWaitTicks, 0);
   assert.equal(migrated.ordersCompleted, 0);
@@ -148,9 +149,9 @@ test('collecting a partial ripe batch gives the exact amount and preserves each 
   assert.equal(app.getState().farms.tomatoFarm.readyCount, 1);
 });
 
-test('harvesting one of two plots leaves the other plot ripe', () => {
-  const app = new GameApplication(new SaveService(new MemoryStorage()));
-  assert.equal(app.buyUpgrade('tomatoFarm2').ok, true);
+test('harvesting one of two plots leaves the other plot ripe', async () => {
+  const { app } = makeAdApp();
+  assert.equal((await app.watchRewardedAd('farm-unlock', { upgradeId: 'tomatoFarm2' })).ok, true);
   assert.deepEqual(app.getState().farms.tomatoFarm2.plants.map((plant) => plant.nextReadyTick), [52, 63, 74, 85]);
   for (let tick = 0; tick < 85; tick += 1) app.tick();
   assert.equal(app.getState().farms.tomatoFarm.readyCount, 4);
@@ -170,7 +171,7 @@ test('legacy farm saves retain ripe quantity and upgrade to independent timers',
   delete legacy.farms.tomatoFarm.plants;
 
   const migrated = hydrateState(legacy);
-  assert.equal(migrated.saveVersion, 5);
+  assert.equal(migrated.saveVersion, 6);
   assert.equal(migrated.farms.tomatoFarm.plants.length, 4);
   assert.equal(migrated.farms.tomatoFarm.plants.filter((plant) => plant.ready).length, 3);
   assert.equal(migrated.stock['farm:TOMATO'].items.TOMATO, 3);
@@ -191,7 +192,7 @@ test('version four farm timers migrate to one evenly phased cycle without losing
 
   const migrated = hydrateState(legacy);
   const plants = migrated.farms.tomatoFarm.plants;
-  assert.equal(migrated.saveVersion, 5);
+  assert.equal(migrated.saveVersion, 6);
   assert.equal(migrated.farms.tomatoFarm.readyCount, 1);
   assert.equal(migrated.stock['farm:TOMATO'].items.TOMATO, 1);
   assert.deepEqual(plants.map((plant) => plant.cycleTicks), [45, 45, 45, 45]);
@@ -264,8 +265,9 @@ test('a shopper purchase consumes one shelf item and credits the ledger once', (
   initial.stock['shelf:TOMATO'].items.TOMATO = 1;
   makeLocation(initial.stock, 'customer:buyer-1', 2);
   initial.customers.push({
-    id: 'buyer-1', kind: 'shopper', x: 3, z: 2, targetX: 3, targetZ: 2,
-    phase: 'to-shelf', demand: 'TOMATO', payTicks: 0,
+    id: 'buyer-1', kind: 'shopper', x: 3, z: 3.3, targetX: 3, targetZ: 3.3,
+    phase: 'waiting-stock', targetShelfId: 'tomatoShelf', shoppingList: ['TOMATO'], shoppingIndex: 0,
+    demand: 'TOMATO', basket: [], checkoutOrder: 1, waitTicks: 0, payTicks: 0,
   });
   initial.workers.push({ id: 'cashier-test', type: 'cashier', x: 5, z: -4, task: null });
   new SaveService(storage).commit(initial, 'fixture:sale');
@@ -342,7 +344,7 @@ test('all five original player models build and animate as complete character ri
   }
 });
 
-test('staff hiring options unlock from saved progress and purchasing adds a working employee', () => {
+test('staff hiring options stay out of cash purchases and rewarded hire adds a working employee', async () => {
   const storage = new MemoryStorage();
   const saved = createInitialState(19);
   saved.stats.tomatoSold = 1;
@@ -350,9 +352,13 @@ test('staff hiring options unlock from saved progress and purchasing adds a work
   new SaveService(storage).commit(saved, 'fixture:staff-unlock');
 
   const app = new GameApplication(new SaveService(storage));
-  assert.equal(app.getAvailableUpgrades().some((upgrade) => upgrade.id === 'cashier'), true);
-  assert.equal(app.buyUpgrade('cashier').ok, true);
-  assert.equal(app.getBalance(), 65);
+  app.rewardedAdService = new RewardedAdService(new FakeRewardedProvider());
+  app.adSessionTicks = 1_800;
+  app.getState().ordersCompleted = 1;
+  assert.equal(app.getAvailableUpgrades().some((upgrade) => upgrade.id === 'cashier'), false);
+  assert.equal(app.buyUpgrade('cashier').reason, 'rewarded-ad-required');
+  assert.equal((await app.watchRewardedAd('staff-hire', { role: 'cashier' })).ok, true);
+  assert.equal(app.getBalance(), 100);
   assert.deepEqual(app.getState().workers.map((worker) => worker.type), ['cashier']);
 });
 
@@ -470,12 +476,16 @@ test('caretaker stocks eggs even when the coop feed bin is full', () => {
   const state = createInitialState(73);
   makeLocation(state.stock, 'coop:feed', 20);
   makeLocation(state.stock, 'coop:eggs', 20);
+  makeLocation(state.stock, 'shelf:EGG', SHELVES.EGG.capacity);
   state.stock['coop:feed'].items.CHICKEN_FEED = 20;
   state.stock['machine:feed:output'].items.CHICKEN_FEED = 1;
   state.stock['coop:eggs'].items.EGG = 1;
+  state.coops.coop = { chickens: 1, progressTicks: 0 };
+  state.unlockedProducts.push('EGG');
   state.workers.push({ id: 'caretaker-1', type: 'caretaker', x: -23, z: 3.5, task: null });
   runTicks(state, 140);
-  assert.equal(quantityAt(state.stock, 'shelf:EGG', 'EGG'), 1);
+  assert.equal(state.stockTransactions.some((entry) => entry.to === 'shelf:EGG' && entry.item === 'EGG'
+    && entry.id.startsWith('worker-delivery:')), true);
   assert.equal(quantityAt(state.stock, 'coop:eggs', 'EGG'), 0);
 });
 
@@ -483,6 +493,7 @@ test('corn production unlocks the full feed, egg, bread, and restaurant chain', 
   const app = new GameApplication(new SaveService(new MemoryStorage()));
   app.debugCredit(2000);
   const state = app.getState();
+  state.customerSpawnTicks = -10_000;
   state.stats.tomatoSold = 1;
   state.stats.juiceSold = 1;
   state.workers.push({ id: 'cashier-chain', type: 'cashier', x: 5, z: -5.75, task: null });
@@ -495,8 +506,9 @@ test('corn production unlocks the full feed, egg, bread, and restaurant chain', 
     const id = `chain-${item}`;
     makeLocation(app.getState().stock, `customer:${id}`, 4);
     app.getState().customers.push({
-      id, kind: 'shopper', x: SHELVES[item].x, z: SHELVES[item].z + 1.3,
-      phase: 'waiting-stock', shoppingList: [item], shoppingIndex: 0, demand: item,
+      id, kind: 'shopper', x: 5, z: 6,
+      phase: 'to-shelf', shoppingList: [item], shoppingIndex: 0, demand: item,
+      targetShelfId: Object.entries(STATIONS).find(([, station]) => station.kind === 'shelf' && station.item === item)?.[0],
       basket: [], checkoutOrder: app.getState().nextEntityId++, waitTicks: 0, payTicks: 0,
     });
     for (let tick = 0; tick < 90 && app.getState().stats[stat] === before; tick += 1) app.tick();
@@ -554,8 +566,7 @@ test('corn production unlocks the full feed, egg, bread, and restaurant chain', 
   for (let tick = 0; tick < 80; tick += 1) app.tick();
   assert.ok(app.getState().diningTables.table1.tipAtoms > 0);
   assert.equal(app.interact('table1').ok, true);
-  assert.equal(app.buyUpgrade('chefWaiter').ok, true);
-  assert.deepEqual(app.getState().workers.filter((worker) => ['chefWaiter', 'waiter'].includes(worker.type)).map((worker) => worker.type), ['chefWaiter', 'waiter']);
+  assert.equal(app.buyUpgrade('chefWaiter').reason, 'rewarded-ad-required');
 });
 
 test('specialized display fixtures categorize products into produce, cooler, bakery, and gondola types', () => {
@@ -735,148 +746,257 @@ test('shelves placed adjacent to walls block gap, while 1 grid away allows passa
   assert.ok(shelfBox2.maxX < 13.0, 'Shelf box does not extend to wall when >= 1 grid gap exists');
 });
 
-test('furniture store unlocks items when produced and scales prices parabolically with unlimited purchases', () => {
-  const app = makeApp(201);
-  let state = app.getState();
+class FakeRewardedProvider {
+  constructor(mode = 'complete', ready = true) {
+    this.mode = mode;
+    this.ready = ready;
+    this.showCount = 0;
+    this.context = null;
+  }
 
-  // Initially: TOMATO is unlocked, ORANGE is locked
-  assert.equal(isFurnitureUnlocked(state, 'tomatoShelf'), true);
-  assert.equal(isFurnitureUnlocked(state, 'tomatoFarm'), true);
-  assert.equal(isFurnitureUnlocked(state, 'orangeShelf'), false);
+  isReady() { return this.ready; }
 
-  // Parabolic price verification
-  const basePrice = FURNITURE_TYPES.tomatoFarm.basePrice;
-  const p0 = calculateParabolicPrice(basePrice, 0);
-  const p1 = calculateParabolicPrice(basePrice, 1);
-  const p2 = calculateParabolicPrice(basePrice, 2);
-  assert.equal(p0, basePrice);
-  assert.ok(p1 > p0, 'price increases for count 1');
-  assert.ok(p2 - p1 > p1 - p0, 'price increases parabolically (second derivative is positive)');
+  async show(_placement, callbacks, context) {
+    this.showCount += 1;
+    this.context = context;
+    callbacks.onLoaded?.();
+    callbacks.onStarted?.();
+    if (this.mode === 'complete') {
+      callbacks.onCompleted?.({ rewardId: context.rewardId, rewarded: true });
+      callbacks.onCompleted?.({ rewardId: context.rewardId, rewarded: true });
+      return { rewarded: true, rewardId: context.rewardId };
+    }
+    if (this.mode === 'closed') callbacks.onClosed?.();
+    else callbacks.onFailed?.(new Error('ad failed'));
+    return false;
+  }
 
-  // Give player ample funds to purchase multiple furniture items
-  app.debugCredit(50_000);
-  state = app.getState();
+  async getCompletedRewardReceipts() { return []; }
+}
 
-  // Buy a new tomato farm
-  const buyFarm = app.buyFurniture('tomatoFarm');
-  assert.equal(buyFarm.ok, true);
-  assert.ok(buyFarm.stationId.startsWith('tomatoFarm_'));
-  state = app.getState();
-  assert.ok(state.farms[buyFarm.stationId], 'New farm added to farms state');
-  assert.ok(state.layout[buyFarm.stationId], 'New farm placed on layout');
+function makeAdApp(provider = new FakeRewardedProvider(), storage = new MemoryStorage()) {
+  const app = new GameApplication(new SaveService(storage), 1, new RewardedAdService(provider));
+  app.adSessionTicks = 1_800;
+  app.getState().ordersCompleted = 1;
+  return { app, provider, storage };
+}
 
-  // Buy a second tomato shelf
-  const buyShelf = app.buyFurniture('tomatoShelf');
-  assert.equal(buyShelf.ok, true);
-  assert.ok(buyShelf.stationId.startsWith('tomatoShelf_'));
-  state = app.getState();
-  assert.ok(state.stock[`shelf:${buyShelf.stationId}`], 'New shelf stock initialized');
-
-  // Next purchase price increases parabolically
-  const nextPrice = getFurniturePrice(state, 'tomatoShelf');
-  assert.ok(nextPrice > (buyShelf.price ?? basePrice));
-
-  // Unlock orange product and verify orange furniture becomes unlocked in the store
-  state.unlockedProducts.push('ORANGE');
-  assert.equal(isFurnitureUnlocked(state, 'orangeShelf'), true);
-  assert.equal(isFurnitureUnlocked(state, 'orangeFarm'), true);
-});
-
-test('staff count can be increased with parabolic hiring costs', () => {
-  const app = makeApp(202);
-  let state = app.getState();
-  app.debugCredit(50_000);
-  state = app.getState();
-
-  // Cashier is not yet unlocked
-  assert.equal(app.hireExtraStaff('cashier').ok, false);
-
-  // Complete cashier upgrade
-  state.availableUpgrades.push('cashier');
-  const hireFirst = app.buyUpgrade('cashier');
-  assert.equal(hireFirst.ok, true);
-  state = app.getState();
-  assert.equal(getStaffCount(state, 'cashier'), 1);
-
-  const price1 = getStaffHirePrice(state, 'cashier');
-  // Hire extra cashier
-  const hireSecond = app.hireExtraStaff('cashier');
-  assert.equal(hireSecond.ok, true);
-  state = app.getState();
-  assert.equal(getStaffCount(state, 'cashier'), 2);
-
-  const price2 = getStaffHirePrice(state, 'cashier');
-  assert.ok(price2 > price1, 'Price increases for subsequent staff hires');
-
-  // Hire third cashier
-  const hireThird = app.hireExtraStaff('cashier');
-  assert.equal(hireThird.ok, true);
-  state = app.getState();
-  assert.equal(getStaffCount(state, 'cashier'), 3);
-  const price3 = getStaffHirePrice(state, 'cashier');
-  assert.ok(price3 - price2 > price2 - price1, 'Cost grows parabolically');
-});
-
-test('self-checkout kiosk operates automatically without cashier or player present', () => {
-  const app = makeApp(203);
-  let state = app.getState();
-  app.debugCredit(50_000);
-
-  // Purchase self-checkout kiosk
-  const buyKiosk = app.buyFurniture('selfRegister');
-  assert.equal(buyKiosk.ok, true);
-  assert.ok(buyKiosk.stationId.startsWith('selfRegister_'));
-  state = app.getState();
-  assert.ok(state.selfRegisters[buyKiosk.stationId], 'Self register registered in state');
-
-  const registers = getAvailableRegisters(state);
-  assert.ok(registers.some((r) => r.id === buyKiosk.stationId && r.isSelfCheckout === true));
-
-  // Position player far away from checkout
-  state.player.x = -15;
-  state.player.z = -5;
-  // Ensure no cashier workers exist
-  state.workers = state.workers.filter((w) => w.type !== 'cashier');
-
-  // Place customer directly paying at the selfRegister
-  const customerId = 'shopper-kiosk-test';
-  makeLocation(state.stock, `customer:${customerId}`, 4);
-  state.stock[`customer:${customerId}`].items.TOMATO = 1;
-
-  const kioskPos = state.layout[buyKiosk.stationId];
-  const customer = {
-    id: customerId,
-    kind: 'shopper',
-    x: kioskPos.x,
-    z: kioskPos.z + 1.2,
-    phase: 'paying',
-    targetRegisterId: buyKiosk.stationId,
-    queueIndex: 0,
-    checkoutOrder: 1,
-    payTicks: 0,
-    checkoutWaitTicks: 0,
-    basket: ['TOMATO'],
-    shoppingList: ['TOMATO'],
-    shoppingIndex: 1,
-    demand: 'TOMATO',
+test('legacy furniture save migration removes dynamic assets, their stock, and incomplete work without refund', () => {
+  const legacy = createInitialState(555);
+  legacy.saveVersion = 5;
+  legacy.customStations.legacyFarm = { id: 'legacyFarm', kind: 'farm', item: 'TOMATO', title: 'Old farm' };
+  legacy.customStations.legacyShelf = { id: 'legacyShelf', kind: 'shelf', item: 'TOMATO_PASTE', title: 'Old shelf' };
+  legacy.customStations.legacyMachine = { id: 'legacyMachine', kind: 'machine', recipe: 'paste', title: 'Old machine' };
+  legacy.customStations.legacyTable = { id: 'legacyTable', kind: 'table', title: 'Old table' };
+  legacy.selfRegisters.legacyRegister = { id: 'legacyRegister', title: 'Old register' };
+  legacy.farms.legacyFarm = createFarmState(legacy.tick, 'legacyFarm');
+  legacy.farms.legacyFarm.plants[0].ready = true;
+  legacy.farms.legacyFarm.readyCount = 1;
+  legacy.farms.tomatoFarm.plants[0].ready = true;
+  legacy.farms.tomatoFarm.readyCount = 1;
+  legacy.stock['farm:TOMATO'].items.TOMATO = 2;
+  legacy.machines.legacyMachine = { recipe: 'paste', progressTicks: 4, blocked: false };
+  makeLocation(legacy.stock, 'shelf:legacyShelf', 6);
+  makeLocation(legacy.stock, 'machine:legacyMachine:input', 12);
+  makeLocation(legacy.stock, 'machine:legacyMachine:output', 8);
+  legacy.stock['machine:legacyMachine:output'].items.TOMATO_PASTE = 1;
+  legacy.stock['machine:legacyMachine:output'].reserved.TOMATO_PASTE = 1;
+  legacy.stock['shelf:legacyShelf'].reservedCapacity = 1;
+  makeLocation(legacy.stock, 'worker:legacy-worker', 6);
+  legacy.stock['worker:legacy-worker'].items.TOMATO_PASTE = 1;
+  legacy.reservations['legacy-reservation'] = {
+    from: 'machine:legacyMachine:output',
+    to: 'shelf:legacyShelf',
+    origin: 'machine:legacyMachine:output',
+    item: 'TOMATO_PASTE',
+    quantity: 1,
   };
-  state.customers.push(customer);
+  legacy.workers.push({
+    id: 'legacy-worker', type: 'harvester', x: -10, z: 5, task: {
+      reservationId: 'legacy-reservation', from: 'machine:legacyMachine:output',
+      to: 'shelf:legacyShelf', item: 'TOMATO_PASTE', quantity: 1,
+      phase: 'to-source', carrier: 'worker:legacy-worker', farmId: 'legacyFarm',
+    },
+  });
+  legacy.diningTables.legacyTable = { customerId: 'legacy-diner', meal: 'BURGER', tipAtoms: 0, eatTicks: 0 };
+  legacy.customers.push({
+    id: 'legacy-diner', kind: 'diner', x: -38, z: 4, demand: 'BURGER', basket: [], shoppingList: [],
+    phase: 'eating', tableId: 'legacyTable',
+  });
+  legacy.layout = {
+    legacyFarm: { x: -3, z: -3 }, legacyShelf: { x: 4, z: 4 }, legacyMachine: { x: 5, z: 5 },
+    legacyRegister: { x: 6, z: 6 }, tomatoFarm: { x: -10, z: 5 },
+  };
 
-  const initialBalance = state.economy.balanceAtoms;
+  const storage = new MemoryStorage();
+  const originalBalance = legacy.economy.balanceAtoms;
+  new SaveService(storage).commit(legacy, 'legacy-furniture-save');
+  const app = new GameApplication(new SaveService(storage), 1);
+  const state = app.getState();
 
-  // Advance simulation for 10 ticks (self-checkout payDuration is 7 ticks)
-  for (let tick = 0; tick < 10; tick += 1) {
+  assert.equal(state.economy.balanceAtoms, originalBalance, 'migration does not refund old purchases');
+  assert.deepEqual(state.customStations, {});
+  assert.deepEqual(state.selfRegisters, {});
+  assert.equal(state.farms.legacyFarm, undefined);
+  assert.equal(state.farms.tomatoFarm.readyCount, 1, 'the built-in farm keeps its ripe product');
+  assert.equal(state.stock['farm:TOMATO'].items.TOMATO, 1, 'the removed farm contribution is discarded');
+  assert.equal(state.machines.legacyMachine, undefined);
+  assert.equal(state.stock['shelf:legacyShelf'], undefined);
+  assert.equal(state.stock['machine:legacyMachine:input'], undefined);
+  assert.equal(state.stock['machine:legacyMachine:output'], undefined);
+  assert.equal(state.stock['worker:legacy-worker'], undefined);
+  assert.equal(state.workers[0].task, null, 'unfinished furniture-related job is canceled');
+  assert.equal(Object.keys(state.reservations).length, 0);
+  assert.equal(state.diningTables.legacyTable, undefined);
+  assert.equal(state.customers.some((customer) => customer.id === 'legacy-diner'), false);
+  assert.deepEqual(state.layout, { tomatoFarm: { x: -10, z: 5 } });
+  assert.equal(state.saveVersion, 6);
+});
+
+test('AdMob browser adapter remains not ready until a native bridge is supplied', async () => {
+  const provider = new AdMobRewardedProvider(null);
+  assert.equal(provider.isReady('farm-unlock'), false);
+  assert.equal(await provider.show('farm-unlock', { onCompleted() {} }), false);
+  assert.deepEqual(await provider.getCompletedRewardReceipts(), []);
+});
+
+test('rewarded order completion grants the order reward only once despite duplicate callbacks', async () => {
+  const { app } = makeAdApp();
+  const state = app.getState();
+  state.lastOrderReward = { id: 'order:12', reward: 24, item: 'TOMATO', quantity: 2, claimed: false };
+  const before = app.getBalance();
+
+  const result = await app.watchRewardedAd('order-double', { orderId: 'order:12' });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.rewardAmount, 24);
+  assert.equal(app.getBalance(), before + 24);
+  assert.equal(app.getState().lastOrderReward.claimed, true);
+  assert.equal(app.getState().ads.grantedRewardIds.length, 1);
+  assert.equal(app.getState().ads.events.filter((event) => event.type === 'reward_granted').length, 1);
+});
+
+test('failed and closed rewarded ads clear pending state without granting any reward', async () => {
+  for (const mode of ['failed', 'closed']) {
+    const { app } = makeAdApp(new FakeRewardedProvider(mode));
+    app.getState().lastOrderReward = { id: 'order-' + mode, reward: 17, item: 'TOMATO', quantity: 1, claimed: false };
+    const before = app.getBalance();
+
+    const result = await app.watchRewardedAd('order-double', { orderId: 'order-' + mode });
+
+    assert.equal(result.ok, false);
+    assert.equal(app.getBalance(), before);
+    assert.equal(app.getState().lastOrderReward.claimed, false);
+    assert.equal(app.getState().ads.pending, null);
+    assert.equal(app.getState().ads.grantedRewardIds.length, 0);
+    assert.equal(app.getState().ads.events.some((event) => event.type === 'ad_failed'), true);
+  }
+});
+
+test('not-ready ads cannot be started or rewarded', async () => {
+  const { app, provider } = makeAdApp(new FakeRewardedProvider('complete', false));
+  app.getState().lastOrderReward = { id: 'order-unready', reward: 17, item: 'TOMATO', quantity: 1, claimed: false };
+  const before = app.getBalance();
+
+  const result = await app.watchRewardedAd('order-double', { orderId: 'order-unready' });
+
+  assert.equal(result.reason, 'ad-not-ready');
+  assert.equal(provider.showCount, 0);
+  assert.equal(app.getBalance(), before);
+  assert.equal(app.getState().ads.pending, null);
+});
+
+test('second farm and staff hire use rewarded ads, never game cash', async () => {
+  const { app } = makeAdApp();
+  const startBalance = app.getBalance();
+  assert.equal(app.buyUpgrade('tomatoFarm2').reason, 'rewarded-ad-required');
+
+  const farmResult = await app.watchRewardedAd('farm-unlock', { upgradeId: 'tomatoFarm2' });
+  assert.equal(farmResult.ok, true);
+  assert.ok(app.getState().farms.tomatoFarm2);
+  assert.equal(app.getBalance(), startBalance);
+
+  app.getState().availableUpgrades.push('cashier');
+  app.getState().ads.lastStartedAt = Date.now() - 90_001;
+  app.getState().ads.recentCompletions = [];
+  const hireResult = await app.watchRewardedAd('staff-hire', { role: 'cashier' });
+  assert.equal(hireResult.ok, true);
+  assert.equal(getStaffCount(app.getState(), 'cashier'), 1);
+  assert.equal(app.getBalance(), startBalance);
+  assert.equal(app.getState().workers[0].upgradeLevel, 0);
+});
+
+test('machine upgrades keep timer progress, increase costs, stay bounded, and survive save/load', () => {
+  const storage = new MemoryStorage();
+  const app = makeApp(300);
+  app.saveService = new SaveService(storage);
+  app.debugCredit(50_000);
+  const state = app.getState();
+  state.machines.paste = {
+    recipe: 'paste', progressTicks: 11.375, blocked: false, blockedTicks: 0,
+    blockedSinceTick: null, upgradeLevel: 0, speedModifier: 1,
+  };
+  const originalProgress = state.machines.paste.progressTicks;
+  const firstCost = machineUpgradeCost('paste', 0);
+  assert.equal(app.upgradeMachine('paste').ok, true);
+  assert.equal(app.getState().machines.paste.progressTicks, originalProgress);
+  assert.ok(machineUpgradeCost('paste', 1) > firstCost);
+
+  for (let index = 1; index < 10; index += 1) assert.equal(app.upgradeMachine('paste').ok, true);
+  const upgraded = app.getState().machines.paste;
+  assert.equal(upgraded.upgradeLevel, 10);
+  assert.ok(machineProductionSeconds('paste', 10) < machineProductionSeconds('paste', 0));
+  assert.ok(machineProductionSeconds('paste', 0) / machineProductionSeconds('paste', 10) < 2);
+  assert.ok(machineSpeedMultiplier(10) <= 1.25);
+  assert.ok(machineSpeedMultiplier(10_000) <= 1.25);
+  const loaded = new GameApplication(new SaveService(storage), 1);
+  assert.equal(loaded.getState().machines.paste.upgradeLevel, 10);
+  assert.equal(loaded.getState().machines.paste.speedModifier, machineSpeedMultiplier(10));
+});
+
+test('each worker has an independent money upgrade and a safe diminishing speed cap', () => {
+  const storage = new MemoryStorage();
+  const app = new GameApplication(new SaveService(storage), 1);
+  app.debugCredit(10_000);
+  app.getState().workers = [
+    { id: 'worker-a', type: 'cashier', x: 0, z: 0, task: null, upgradeLevel: 0, speedModifier: 1 },
+    { id: 'worker-b', type: 'cashier', x: 0, z: 1, task: null, upgradeLevel: 0, speedModifier: 1 },
+  ];
+  const price0 = staffUpgradeCost('cashier', 0);
+  assert.equal(app.upgradeStaff('worker-a').ok, true);
+  assert.equal(app.getState().workers.find((worker) => worker.id === 'worker-a').upgradeLevel, 1);
+  assert.equal(app.getState().workers.find((worker) => worker.id === 'worker-b').upgradeLevel, 0);
+  assert.ok(staffUpgradeCost('cashier', 1) > price0);
+  assert.ok(staffSpeedMultiplier(1) > 1);
+  assert.ok(staffSpeedMultiplier(10_000) <= 1.2);
+  const loaded = new GameApplication(new SaveService(storage), 1);
+  assert.equal(loaded.getState().workers.find((worker) => worker.id === 'worker-a').upgradeLevel, 1);
+  assert.equal(loaded.getState().workers.find((worker) => worker.id === 'worker-b').upgradeLevel, 0);
+});
+
+test('a second farm keeps separate plant timers and ripe counts', () => {
+  const state = createInitialState(303);
+  state.farms.tomatoFarm2 = createFarmState(0, 'tomatoFarm2');
+  for (let tick = 0; tick < 45; tick += 1) {
     advanceSimulation(state);
     state.tick += 1;
   }
-
-  // Assert payment completed and ledger credited WITHOUT cashier or player
-  assert.ok(state.economy.balanceAtoms > initialBalance, 'Sale completed automatically at self-checkout kiosk');
-  assert.equal(state.stats.tomatoSold, 1);
+  assert.equal(state.farms.tomatoFarm.readyCount, 1);
+  assert.equal(state.farms.tomatoFarm2.readyCount, 0);
+  for (let tick = 0; tick < 7; tick += 1) {
+    advanceSimulation(state);
+    state.tick += 1;
+  }
+  assert.equal(state.farms.tomatoFarm.readyCount, 1);
+  assert.equal(state.farms.tomatoFarm2.readyCount, 1);
+  assert.notDeepEqual(state.farms.tomatoFarm.plants.map((plant) => plant.nextReadyTick),
+    state.farms.tomatoFarm2.plants.map((plant) => plant.nextReadyTick));
 });
 
-
-
-
-
-
+test('machine upgrades reject insufficient balance and can be bought repeatedly without state corruption', () => {
+  const app = makeApp(304);
+  app.getState().machines.paste = { recipe: 'paste', progressTicks: 0, upgradeLevel: 0, speedModifier: 1 };
+  app.getState().economy.balanceAtoms = 0;
+  assert.equal(app.upgradeMachine('paste').reason, 'insufficient-funds');
+  assert.equal(app.getState().machines.paste.upgradeLevel, 0);
+});

@@ -1,10 +1,10 @@
-import { ITEMS, SHELVES, STAFF, STAFF_HIRES, UPGRADES } from '../domain/catalog.js';
-import { FURNITURE_TYPES, getFurnitureCount, getFurniturePrice, getStaffCount, getStaffHirePrice, isFurnitureUnlocked } from '../domain/furnitureCatalog.js';
+import { ITEMS, RECIPES, SHELVES, STAFF, STAFF_HIRES, STATIONS, UPGRADES } from '../domain/catalog.js';
 import { DECORATIONS, decorBonus, decorScore } from '../domain/decorCatalog.js';
 import { decorationPrice, orderProgress } from '../domain/orders.js';
+import { machineProductionSeconds, machineSpeedMultiplier, machineUpgradeCost, percentGain, staffSpeedMultiplier, staffUpgradeCost } from '../domain/progression.js';
 
 const UPGRADE_ICONS = {
-  tomatoFarm2: '🍅', cashier: '🧑‍💼', paste: '🥫', harvester: '🧑‍🌾', orange: '🍊',
+  tomatoFarm2: '🍅', cornFarm2: '🌽', wheatFarm2: '🌾', cashier: '🧑‍💼', paste: '🥫', harvester: '🧑‍🌾', orange: '🍊',
   factoryFeeder: '🧑‍🔧', orangeFarm2: '🍊', corn: '🌽', popcorn: '🍿', feed: '🌾',
   coop: '🐔', chicken2: '🐔', chicken3: '🐔', caretaker: '🧑‍🌾', bakery: '🍞',
   flourMill: '🌾', orangeTartKitchen: '🥧',
@@ -62,10 +62,6 @@ export class HUD {
     compactOrderMedia.addEventListener('change', syncOrderLayout);
 
     document.getElementById('btn-expansions').addEventListener('click', () => this.open('expansion-modal'));
-    document.getElementById('btn-furniture')?.addEventListener('click', () => {
-      this.open('expansion-modal');
-      this.#selectUpgradeTab('furniture');
-    });
     document.getElementById('btn-settings').addEventListener('click', () => this.open('settings-modal'));
     document.getElementById('btn-inventory').addEventListener('click', () => this.open('inventory-modal'));
     document.getElementById('btn-decor').addEventListener('click', () => this.open('decor-modal'));
@@ -91,6 +87,10 @@ export class HUD {
       if (!result.ok) this.toast('Sipariş için çantanda yeterli ürün yok.', 'error');
       this.render(this.app.getState(), this.app.getNearbyAction(), true);
     });
+    document.getElementById('btn-order-ad').addEventListener('click', () => this.#watchAd('order-double', { orderId: this.app.getState().lastOrderReward?.id }));
+    document.getElementById('btn-order-ad-decline').addEventListener('click', () => this.#declineAd('order-double', { orderId: this.app.getState().lastOrderReward?.id }));
+    document.getElementById('btn-machine-ad').addEventListener('click', () => this.#watchAd('supplier-drop', { machineId: this.currentSupplierMachineId }));
+    document.getElementById('btn-machine-ad-decline').addEventListener('click', () => this.#declineAd('supplier-drop', { machineId: this.currentSupplierMachineId }));
     document.getElementById('btn-decor-top').addEventListener('click', () => this.open('decor-modal'));
     document.getElementById('decor-list').addEventListener('click', (event) => {
       const button = event.target.closest('[data-buy-decoration]');
@@ -130,32 +130,28 @@ export class HUD {
     document.getElementById('setting-haptics').addEventListener('change', (event) => this.app.setSetting('haptics', event.target.checked));
     document.querySelectorAll('[data-debug]').forEach((button) => button.addEventListener('click', () => this.#debug(button.dataset.debug)));
     document.getElementById('expansion-modal').addEventListener('click', (event) => {
-      const furnButton = event.target.closest('[data-buy-furniture]');
-      if (furnButton) {
-        const result = this.app.buyFurniture(furnButton.dataset.buyFurniture);
-        if (result.ok) {
-          this.render(this.app.getState(), this.app.getNearbyAction(), true);
-          this.toast(result.message);
-        } else {
-          const msgs = {
-            locked: 'Bu mobilya/istasyon henüz açılmadı.',
-            'no-space': 'Uygun boş alan bulunamadı. Önce mevcut alanı düzenleyin.',
-            'insufficient-funds': 'Bakiye yetersiz.',
-          };
-          this.toast(msgs[result.reason] ?? 'Satın alma yapılamadı.', 'error');
-        }
+      const adButton = event.target.closest('[data-ad-accept]');
+      if (adButton) {
+        this.#watchAd(adButton.dataset.adAccept, this.#adPayload(adButton));
         return;
       }
-
-      const hireExtraButton = event.target.closest('[data-hire-extra]');
-      if (hireExtraButton) {
-        const result = this.app.hireExtraStaff(hireExtraButton.dataset.hireExtra);
-        if (result.ok) {
-          this.render(this.app.getState(), this.app.getNearbyAction(), true);
-          this.toast(result.message);
-        } else {
-          this.toast(result.reason === 'locked' ? 'Önce temel personel yükseltmesini açmalısın.' : 'Bakiye yetersiz.', 'error');
-        }
+      const declineButton = event.target.closest('[data-ad-decline]');
+      if (declineButton) {
+        this.#declineAd(declineButton.dataset.adDecline, this.#adPayload(declineButton));
+        return;
+      }
+      const machineUpgradeButton = event.target.closest('[data-upgrade-machine]');
+      if (machineUpgradeButton) {
+        const result = this.app.upgradeMachine(machineUpgradeButton.dataset.upgradeMachine);
+        if (!result.ok) this.toast(result.reason === 'insufficient-funds' ? 'Bakiye yetersiz.' : 'Makine geliştirilemedi.', 'error');
+        this.render(this.app.getState(), this.app.getNearbyAction(), true);
+        return;
+      }
+      const staffUpgradeButton = event.target.closest('[data-upgrade-staff]');
+      if (staffUpgradeButton) {
+        const result = this.app.upgradeStaff(staffUpgradeButton.dataset.upgradeStaff);
+        if (!result.ok) this.toast(result.reason === 'insufficient-funds' ? 'Bakiye yetersiz.' : 'Personel geliştirilemedi.', 'error');
+        this.render(this.app.getState(), this.app.getNearbyAction(), true);
         return;
       }
 
@@ -181,6 +177,14 @@ export class HUD {
     if (!action) return;
     const result = this.app.interact(action.id);
     if (result.ok) { this.#feedback(); return; }
+    if (action.kind === 'trashBin') {
+      const english = this.app.getState().settings.language === 'en';
+      const message = result.reason === 'items-reserved'
+        ? (english ? 'Those items are reserved for staff.' : 'Bu ürünler personel için ayrılmış.')
+        : (english ? 'There is nothing to throw away.' : 'Çantanda atılacak ürün yok.');
+      this.toast(message, 'error');
+      return;
+    }
     const messages = {
       empty: 'Burada alınacak ürün yok.',
       'no-compatible-stock': 'Çantanda bu istasyon için uygun ürün yok.',
@@ -191,6 +195,36 @@ export class HUD {
       'too-far': 'Biraz daha yaklaş.',
     };
     this.toast(messages[result.reason] ?? 'Bu işlem şu anda yapılamıyor.', 'error');
+  }
+
+  #adPayload(button) {
+    return {
+      orderId: button.dataset.adOrder,
+      upgradeId: button.dataset.adUpgrade,
+      role: button.dataset.adRole,
+      machineId: button.dataset.adMachine,
+    };
+  }
+
+  async #watchAd(placement, payload = {}) {
+    if (!placement) return;
+    const result = await this.app.watchRewardedAd(placement, payload);
+    this.render(this.app.getState(), this.app.getNearbyAction(), true);
+    if (result.ok) {
+      const message = result.rewardAmount
+        ? `Reklam ödülü alındı: +$${result.rewardAmount}.`
+        : 'Ödül başarıyla alındı.';
+      this.toast(message);
+    } else if (result.reason === 'ad-not-completed') {
+      this.toast('Reklam tamamlanmadı; ödül verilmedi.', 'error');
+    } else if (result.reason === 'ad-not-ready') {
+      this.toast('Reklam şu anda hazır değil.', 'error');
+    }
+  }
+
+  #declineAd(placement, payload = {}) {
+    this.app.declineRewardedOffer(placement, payload);
+    this.render(this.app.getState(), this.app.getNearbyAction(), true);
   }
 
   #debug(action) {
@@ -326,18 +360,56 @@ export class HUD {
     const actionLabel = document.getElementById('action-label');
     actionButton.disabled = !action || action.actionable === false;
     document.querySelector('#btn-interact .action-icon').textContent = action
-      ? ({ farm: '🌱', machine: '⚙️', shelf: '📦', coop: '🐔', table: '🍽️', register: '💵', upgrade: '🏗️' })[action.kind] ?? '✋' : '✋';
+      ? ({ farm: '🌱', machine: '⚙️', shelf: '📦', coop: '🐔', table: '🍽️', register: '💵', upgrade: '🏗️', trashBin: '🗑️' })[action.kind] ?? '✋' : '✋';
     actionLabel.textContent = action ? this.#actionText(action, state) : (language === 'en' ? 'Move closer to a station' : 'Bir istasyona yaklaş');
     document.getElementById('upgrade-count').textContent = String(this.app.getAvailableUpgrades().length);
+    this.renderAdOffers(state, action);
     this.#syncSettings(state);
     const signature = `${state.revision}:${balance}:${this.app.getAvailableUpgrades().map((upgrade) => upgrade.id).join(',')}:${state.completedUpgrades.join(',')}:${state.workers.map((worker) => worker.type).join(',')}:${Object.keys(state.layout ?? {}).length}:${Object.keys(state.selfRegisters ?? {}).length}`;
     if (force || signature !== this.lastUpgradeSignature) {
       this.lastUpgradeSignature = signature;
       this.renderUpgrades(state);
       this.renderStaff(state);
-      this.renderFurniture(state);
     }
     if (force) this.renderInventory(state, true);
+  }
+
+  renderAdOffers(state, action) {
+    const english = state.settings.language === 'en';
+    const orderOffer = document.getElementById('order-ad-offer');
+    const orderReward = state.lastOrderReward;
+    const orderReady = Boolean(orderReward && !orderReward.claimed
+      && this.app.canOfferRewardedAd('order-double', { orderId: orderReward.id }));
+    orderOffer.classList.toggle('hidden', !orderReady);
+    if (orderReady) {
+      this.app.markRewardedOfferShown('order-double', { orderId: orderReward.id });
+      document.getElementById('order-ad-copy').textContent = english
+        ? `Watch a rewarded ad to double this order bonus (+$${orderReward.reward}).`
+        : `Ödüllü reklamı izle, bu sipariş kazancını ikiye katla (+$${orderReward.reward}).`;
+      document.getElementById('btn-order-ad').dataset.adOrder = orderReward.id;
+      document.getElementById('btn-order-ad').textContent = english ? `Watch · +$${orderReward.reward}` : `İzle · +$${orderReward.reward}`;
+    }
+
+    const machineOffer = document.getElementById('machine-ad-offer');
+    const machine = action?.kind === 'machine' ? state.machines[action.id] : null;
+    const supplierPayload = machine ? { machineId: action.id } : null;
+    const supplierReady = Boolean(supplierPayload && this.app.canOfferRewardedAd('supplier-drop', supplierPayload));
+    machineOffer.classList.toggle('hidden', !supplierReady);
+    this.currentSupplierMachineId = supplierReady ? action.id : null;
+    if (supplierReady) {
+      const recipe = RECIPES[machine.recipe ?? STATIONS[action.id]?.recipe];
+      const input = state.stock[`machine:${action.id}:input`];
+      const missing = Object.entries(recipe.inputs)
+        .map(([item, amount]) => [item, Math.max(0, amount - (input.items[item] ?? 0))])
+        .filter(([, amount]) => amount > 0);
+      const supplies = missing.map(([item, amount]) => `${amount} ${ITEMS[item].name}`).join(' + ');
+      this.app.markRewardedOfferShown('supplier-drop', supplierPayload);
+      document.getElementById('machine-ad-copy').textContent = english
+        ? `Machine stopped for missing inputs. Watch to deliver ${supplies} for one recipe batch.`
+        : `Makine girdisiz durdu. Bir tariflik ${supplies} girdiyi reklamla al.`;
+      document.getElementById('btn-machine-ad').dataset.adMachine = action.id;
+      document.getElementById('btn-machine-ad').textContent = english ? 'Watch and get inputs' : 'İzle ve girdiyi al';
+    }
   }
 
   #applyLanguage(language) {
@@ -364,11 +436,6 @@ export class HUD {
     document.getElementById('btn-inventory').innerHTML = `${english ? EN.viewProducts : 'Ürünleri gör'} <span>›</span>`;
     document.querySelector('#btn-settings').setAttribute('aria-label', english ? EN.settings : 'Ayarlar');
     document.getElementById('btn-expansions').setAttribute('aria-label', english ? EN.upgrades : 'İşletme geliştirmeleri');
-    const btnFurn = document.getElementById('btn-furniture');
-    if (btnFurn) {
-      btnFurn.setAttribute('aria-label', english ? 'Furniture shop' : 'Mobilya dükkanı');
-      btnFurn.title = english ? 'Furniture shop' : 'Mobilya dükkanı';
-    }
     document.getElementById('btn-decor-top').setAttribute('aria-label', english ? 'Decoration shop' : 'Dekorasyon mağazası');
     document.getElementById('btn-decor-top').title = english ? 'Decoration shop' : 'Dekorasyon mağazası';
     document.getElementById('btn-decor').innerHTML = `${english ? '🎨 Decoration shop' : '🎨 Dekorasyon mağazası'} <span>›</span>`;
@@ -405,7 +472,6 @@ export class HUD {
       ? 'Invest earnings in production and staff. Every purchase adds a station to the world.'
       : 'Kazancını yeni üretim hatlarına ve ekibe yatır. Açılan her istasyon dünyaya eklenir.';
     document.querySelector('[data-upgrade-tab="business"]').textContent = english ? EN.businessTab : 'İşletme';
-    document.querySelector('[data-upgrade-tab="furniture"]').textContent = english ? 'Furniture' : 'Mobilya Dükkanı';
     document.querySelector('[data-upgrade-tab="staff"]').textContent = english ? EN.staffTab : 'Personel';
     document.querySelector('.control-hint span').textContent = english ? EN.orTap : 'veya dokunup yürü';
     document.getElementById('btn-resume').textContent = english ? EN.resume : '▶ Oyuna dön';
@@ -437,14 +503,59 @@ export class HUD {
     const staffIds = new Set(STAFF_HIRES.map((entry) => entry.upgradeId));
     const upgrades = this.app.getAvailableUpgrades().filter((upgrade) => !staffIds.has(upgrade.id));
     const list = document.getElementById('upgrade-list');
-    if (!upgrades.length) {
-      list.innerHTML = `<div class="empty-upgrades">${state.settings.language === 'en' ? EN.noUpgrade : 'Şimdilik yeni geliştirme yok. Yeni aşamalar satış yaptıkça açılır.'}</div>`;
-      return;
-    }
-    list.innerHTML = upgrades.map((upgrade) => {
+    const english = state.settings.language === 'en';
+    const expansionCards = upgrades.map((upgrade) => {
       const affordable = state.economy.balanceAtoms >= upgrade.price * 10_000;
-      const title = state.settings.language === 'en' ? this.#upgradeNameEnglish(upgrade.id, upgrade.title) : upgrade.title;
-      return `<article class="upgrade-card"><div class="upgrade-icon">${UPGRADE_ICONS[upgrade.id] ?? '✨'}</div><div class="upgrade-copy"><strong>${title}</strong><small>${state.settings.language === 'en' ? 'Unlock a new production step' : 'Yeni bir üretim aşaması aç'}</small></div><button class="buy-button" data-buy-upgrade="${upgrade.id}" ${affordable ? '' : 'disabled'}>$${upgrade.price}</button></article>`;
+      const title = english ? this.#upgradeNameEnglish(upgrade.id, upgrade.title) : upgrade.title;
+      return `<article class="upgrade-card"><div class="upgrade-icon">${UPGRADE_ICONS[upgrade.id] ?? '✨'}</div><div class="upgrade-copy"><strong>${title}</strong><small>${english ? 'Unlock a new production step' : 'Yeni bir üretim aşaması aç'}</small></div><button class="buy-button" data-buy-upgrade="${upgrade.id}" ${affordable ? '' : 'disabled'}>$${upgrade.price}</button></article>`;
+    }).join('');
+    const farmCards = this.#farmUnlockCards(state);
+    const machineCards = Object.entries(state.machines).filter(([id]) => STATIONS[id]?.kind === 'machine').map(([id, machine]) => {
+      const level = machine.upgradeLevel ?? 0;
+      const currentSeconds = machineProductionSeconds(id, level);
+      const nextSeconds = machineProductionSeconds(id, level + 1);
+      const speedGain = percentGain(machineSpeedMultiplier(level), machineSpeedMultiplier(level + 1));
+      const cost = machineUpgradeCost(id, level);
+      const affordable = state.economy.balanceAtoms >= cost * 10_000;
+      const title = english ? this.#upgradeNameEnglish(id, STATIONS[id].title) : STATIONS[id].title;
+      const number = (value) => value.toLocaleString(english ? 'en-US' : 'tr-TR', { minimumFractionDigits: 1, maximumFractionDigits: 2 });
+      return `<article class="upgrade-card machine-upgrade-card">
+        <div class="upgrade-icon">⚙️</div><div class="upgrade-copy">
+          <strong>${title}</strong><small>${english ? `Level ${level + 1} · ${number(currentSeconds)}s → ${number(nextSeconds)}s · +${speedGain.toFixed(2)}% speed` : `Seviye ${level + 1} · ${number(currentSeconds)} sn → ${number(nextSeconds)} sn · +%${speedGain.toFixed(2)} hız`}</small>
+          <small>${english ? 'Small permanent production-time reduction' : 'Kalıcı ve küçük üretim süresi azalması'}</small>
+        </div><button class="buy-button" data-upgrade-machine="${id}" ${affordable ? '' : 'disabled'}>${english ? 'Upgrade' : 'Geliştir'} · $${cost}</button>
+      </article>`;
+    }).join('');
+    const sections = [
+      expansionCards ? `<h2 class="upgrade-section-title">${english ? 'New capacity' : 'Yeni kapasite'}</h2>${expansionCards}` : '',
+      farmCards,
+      machineCards ? `<h2 class="upgrade-section-title">${english ? 'Machine progression' : 'Makine geliştirmeleri'}</h2>${machineCards}` : '',
+    ].filter(Boolean).join('');
+    list.innerHTML = sections || `<div class="empty-upgrades">${english ? EN.noUpgrade : 'Şimdilik yeni geliştirme yok. Yeni aşamalar satış yaptıkça açılır.'}</div>`;
+  }
+
+  #farmUnlockCards(state) {
+    const english = state.settings.language === 'en';
+    const farms = [
+      ['tomatoFarm2', '🍅', english ? 'Second tomato field' : '2. Domates tarlası'],
+      ['orangeFarm2', '🍊', english ? 'Second orange grove' : '2. Portakal bahçesi'],
+      ['cornFarm2', '🌽', english ? 'Second corn field' : '2. Mısır tarlası'],
+      ['wheatFarm2', '🌾', english ? 'Second wheat field' : '2. Buğday tarlası'],
+    ];
+    return farms.map(([id, icon, title]) => {
+      const baseId = id.replace(/2$/, '');
+      if (!state.farms[baseId]) return '';
+      if (state.farms[id]) return `<article class="upgrade-card farm-ad-card hired"><div class="upgrade-icon">${icon}</div><div class="upgrade-copy"><strong>${title}</strong><small>${english ? 'Permanently unlocked' : 'Kalıcı olarak açık'}</small></div><span class="ad-open-badge">${english ? 'Opened' : 'Açıldı'}</span></article>`;
+      const available = state.availableUpgrades.includes(id);
+      const payload = { upgradeId: id };
+      const ready = available && this.app.canOfferRewardedAd('farm-unlock', payload);
+      if (ready) this.app.markRewardedOfferShown('farm-unlock', payload);
+      const buttonText = !available ? (english ? 'Locked by progress' : 'İlerleme bekleniyor')
+        : !this.app.isRewardedAdReady('farm-unlock') ? (english ? 'AdMob setup pending' : 'AdMob bağlantısı bekleniyor')
+          : (english ? 'Rewarded ad not ready' : 'Reklam şu anda hazır değil');
+      return `<article class="upgrade-card farm-ad-card"><div class="upgrade-icon">${icon}</div><div class="upgrade-copy"><strong>${title}</strong><small>${english ? 'Unlock permanently by completing a rewarded ad.' : 'Ödüllü reklamı tamamlayarak kalıcı aç.'}</small></div>
+        ${ready ? `<div class="ad-action-group"><button class="buy-button ad-reward-button" data-ad-accept="farm-unlock" data-ad-upgrade="${id}">${english ? 'Watch ad · Unlock' : 'Reklam izle · Aç'}</button><button class="ad-decline-button" data-ad-decline="farm-unlock" data-ad-upgrade="${id}">${english ? 'Not now' : 'Şimdi değil'}</button></div>` : `<button class="buy-button" disabled>${buttonText}</button>`}
+      </article>`;
     }).join('');
   }
 
@@ -487,68 +598,46 @@ export class HUD {
     const list = document.getElementById('staff-list');
     if (!list) return;
     const english = state.settings.language === 'en';
-    list.innerHTML = STAFF_HIRES.map((hire) => {
+    const hireCards = STAFF_HIRES.map((hire) => {
       const upgrade = UPGRADES.find((entry) => entry.id === hire.upgradeId);
       const hiredCount = state.workers.filter((worker) => hire.staffTypes.includes(worker.type)).length;
       const hired = hiredCount > 0 || state.completedUpgrades.includes(hire.upgradeId);
       const unlocked = state.availableUpgrades.includes(hire.upgradeId) && !state.completedUpgrades.includes(hire.upgradeId);
-      const affordable = state.economy.balanceAtoms >= upgrade.price * 10_000;
+      const canHire = unlocked || state.completedUpgrades.includes(hire.upgradeId);
       const title = STAFF[hire.upgradeId]?.title ?? hire.staffTypes.map((type) => STAFF[type]?.title ?? type).join(' ve ');
       const englishTitle = hire.staffTypes.length > 1 ? 'Chef and waiter' : ({ cashier: 'Cashier', harvester: 'Harvester', factoryFeeder: 'Factory feeder', caretaker: 'Farm caretaker' })[hire.staffTypes[0]];
       const effect = state.settings.language === 'en' ? EN.staffEffect[hire.upgradeId] : hire.effect;
       const unlock = state.settings.language === 'en' ? EN.staffUnlock[hire.upgradeId] : hire.unlock;
       const subtitle = hired ? (state.settings.language === 'en' ? `On staff · ${hiredCount || hire.staffTypes.length}` : `Ekibinde · ${hiredCount || hire.staffTypes.length} kişi`)
         : unlocked ? effect : unlock;
-
-      let button = '';
-      if (!hired) {
-        button = `<button class="buy-button" data-buy-upgrade="${hire.upgradeId}" ${unlocked && affordable ? '' : 'disabled'}>${!unlocked ? (english ? 'Locked' : 'Kilitli') : !affordable ? (english ? 'Need funds' : 'Bakiye yok') : (english ? 'Hire' : 'İşe al')} · $${upgrade.price}</button>`;
-      } else {
-        const extraPrice = getStaffHirePrice(state, hire.upgradeId);
-        const extraAffordable = state.economy.balanceAtoms >= extraPrice * 10_000;
-        button = `<button class="buy-button extra-staff-btn" data-hire-extra="${hire.upgradeId}" ${extraAffordable ? '' : 'disabled'}>${extraAffordable ? (english ? '+1 Hire' : '+1 Ekle') : (english ? 'Need funds' : 'Bakiye yok')} · $${extraPrice}</button>`;
-      }
-
-      return `<article class="upgrade-card staff-card${hired ? ' hired' : ''}"><div class="upgrade-icon">${STAFF[hire.staffTypes[0]]?.icon ?? '🧑‍🔧'}</div><div class="upgrade-copy"><strong>${state.settings.language === 'en' ? englishTitle : title}</strong><small>${subtitle}</small></div>${button}</article>`;
+      const payload = { role: hire.upgradeId };
+      const ready = canHire && this.app.canOfferRewardedAd('staff-hire', payload);
+      if (ready) this.app.markRewardedOfferShown('staff-hire', payload);
+      const disabledText = !canHire ? (english ? 'Locked' : 'Kilitli')
+        : !this.app.isRewardedAdReady('staff-hire') ? (english ? 'AdMob setup pending' : 'AdMob bağlantısı bekleniyor')
+          : (english ? 'Rewarded ad not ready' : 'Reklam şu anda hazır değil');
+      const hireAction = hire.staffTypes.length > 1
+        ? (english ? (hired ? 'Watch ad · Add chef + waiter' : 'Watch ad · Hire chef + waiter')
+          : (hired ? 'Reklam izle · Şef + garson ekle' : 'Reklam izle · Şef + garson al'))
+        : (english ? (hired ? 'Watch ad · +1 hire' : 'Watch ad · Hire')
+          : (hired ? 'Reklam izle · +1 al' : 'Reklam izle · İşe al'));
+      const button = ready
+        ? `<div class="ad-action-group"><button class="buy-button ad-reward-button" data-ad-accept="staff-hire" data-ad-role="${hire.upgradeId}">${hireAction}</button><button class="ad-decline-button" data-ad-decline="staff-hire" data-ad-role="${hire.upgradeId}">${english ? 'Not now' : 'Şimdi değil'}</button></div>`
+        : `<button class="buy-button" disabled>${disabledText}</button>`;
+      return `<article class="upgrade-card staff-card${hired ? ' hired' : ''}"><div class="upgrade-icon">${STAFF[hire.staffTypes[0]]?.icon ?? '🧑‍🔧'}</div><div class="upgrade-copy"><strong>${english ? englishTitle : title}</strong><small>${subtitle}</small></div>${button}</article>`;
     }).join('');
-  }
-
-  renderFurniture(state) {
-    const list = document.getElementById('furniture-list');
-    if (!list) return;
-    const english = state.settings.language === 'en';
-
-    list.innerHTML = Object.entries(FURNITURE_TYPES).map(([type, item]) => {
-      const unlocked = isFurnitureUnlocked(state, type);
-      const count = getFurnitureCount(state, type);
-      const price = getFurniturePrice(state, type);
-      const affordable = state.economy.balanceAtoms >= price * 10_000;
-      const title = english ? item.nameEn : item.name;
-      const desc = item.description;
-      const countLabel = english ? `Owned: ${count}` : `Sahip olunan: ${count} adet`;
-      const isSelfReg = type === 'selfRegister';
-
-      const button = unlocked
-        ? `<button class="buy-button" data-buy-furniture="${type}" ${affordable ? '' : 'disabled'}>${affordable ? (english ? 'Buy' : 'Satın Al') : (english ? 'Need funds' : 'Bakiye yok')} · $${price}</button>`
-        : `<button class="buy-button" disabled>${english ? 'Locked' : 'Kilitli'}</button>`;
-
-      const badge = isSelfReg
-        ? `<span class="furniture-badge auto-badge">🤖 ${english ? 'Automated' : 'Personelsiz Kasa'}</span>`
-        : `<span class="furniture-badge">${countLabel}</span>`;
-
-      return `<article class="upgrade-card furniture-card${isSelfReg ? ' self-register-card' : ''}">
-        <div class="upgrade-icon">${item.icon}</div>
-        <div class="upgrade-copy">
-          <div class="furniture-title-row">
-            <strong>${title}</strong>
-            ${badge}
-          </div>
-          <small>${unlocked ? desc : (english ? 'Unlocks when this product is available.' : 'Bu ürünün üretimi açıldığında kullanılabilir.')}</small>
-          ${isSelfReg && unlocked ? `<small class="highlight-text">${countLabel} · Kasiyersiz otomatik çalışır</small>` : ''}
-        </div>
-        ${button}
-      </article>`;
+    const staffUpgrades = state.workers.map((worker) => {
+      const level = worker.upgradeLevel ?? 0;
+      const cost = staffUpgradeCost(worker.type === 'waiter' ? 'chefWaiter' : worker.type, level);
+      const affordable = state.economy.balanceAtoms >= cost * 10_000;
+      const currentSpeed = 3.4 * staffSpeedMultiplier(level);
+      const nextSpeed = 3.4 * staffSpeedMultiplier(level + 1);
+      const gain = percentGain(currentSpeed, nextSpeed);
+      const title = english ? ({ cashier: 'Cashier', harvester: 'Harvester', factoryFeeder: 'Factory feeder', caretaker: 'Farm caretaker', chefWaiter: 'Chef', waiter: 'Waiter' })[worker.type] : (STAFF[worker.type]?.title ?? (worker.type === 'waiter' ? 'Garson' : worker.type));
+      const number = (value) => value.toLocaleString(english ? 'en-US' : 'tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      return `<article class="upgrade-card staff-upgrade-card"><div class="upgrade-icon">${STAFF[worker.type]?.icon ?? '🧑‍🔧'}</div><div class="upgrade-copy"><strong>${title} · ${worker.id}</strong><small>${english ? `Level ${level + 1} · speed ${number(currentSpeed)} → ${number(nextSpeed)} units/s · +${gain.toFixed(2)}%` : `Seviye ${level + 1} · hız ${number(currentSpeed)} → ${number(nextSpeed)} birim/sn · +%${gain.toFixed(2)}`}</small><small>${english ? 'Safe cap: 4.08 units/s' : 'Güvenli hız tavanı: 4,08 birim/sn'}</small></div><button class="buy-button" data-upgrade-staff="${worker.id}" ${affordable ? '' : 'disabled'}>${english ? 'Upgrade' : 'Geliştir'} · $${cost}</button></article>`;
     }).join('');
+    list.innerHTML = `<h2 class="upgrade-section-title">${english ? 'Hire new staff' : 'Yeni personel al'}</h2>${hireCards}${staffUpgrades ? `<h2 class="upgrade-section-title">${english ? 'Individual staff upgrades' : 'Personel bazlı geliştirme'}</h2>${staffUpgrades}` : ''}`;
   }
 
   #upgradeNameEnglish(id, fallback) {
@@ -567,6 +656,10 @@ export class HUD {
   #actionText(action, state) {
     if (state.settings.language !== 'en') return action.label;
     if (action.kind === 'upgrade') return `${this.#upgradeNameEnglish(action.id, action.title)} · $${action.price}`;
+    if (action.kind === 'trashBin') {
+      if (action.actionable !== false) return 'Discard bag items';
+      return action.label.includes('ayrılmış') ? 'Items reserved for staff' : 'Bag is empty';
+    }
     if (action.kind === 'farm') {
       if (action.actionable === false) return action.label === 'Çanta dolu' ? 'Bag full' : 'Crops growing';
       const names = { TOMATO: 'Harvest tomatoes', ORANGE: 'Harvest oranges', CORN: 'Harvest corn', WHEAT: 'Harvest wheat' };

@@ -59,7 +59,14 @@ export class SaveService {
         this.sequence = selected.sequence;
         this.lastTransactionId = selected.transactionId;
         this.lastPayloadChecksum = checksum(JSON.stringify(selected.payload));
-        return { state, recovered: !current || selected.sequence !== current.sequence, sequence: this.sequence };
+        return {
+          state,
+          recovered: !current || selected.sequence !== current.sequence,
+          migrated: selected.payload.saveVersion !== SAVE_VERSION || Boolean(selected.payload.ads?.pending)
+            || !Array.isArray(selected.payload.decorations)
+            || !selected.payload.decorations.some((entry) => entry?.type === 'trashBin'),
+          sequence: this.sequence,
+        };
       } catch (error) {
         validationError = error;
       }

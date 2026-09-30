@@ -6,6 +6,7 @@ import { FARM_CAPACITY, ensureFarmState, removeFarmReady, syncFarmHarvest } from
 import { customerMood, saleMoodMultiplier, tipForMood } from './customerExperience.js';
 import { nextOrder } from './orders.js';
 import { cancelReservation, capacityAt, makeLocation, pickUpReservedStock, quantityAt, reserveStock, totalAt, transferStock } from './inventory.js';
+import { staffSpeedMultiplier } from './progression.js';
 
 const TICKS_PER_SECOND = 10;
 const CUSTOMER_SPAWN_TICKS = 40;
@@ -91,17 +92,24 @@ function produceMachines(state, events) {
     if (outputFree < 1) {
       machine.blocked = 'output-full';
       machine.progressTicks = 0;
+      machine.blockedTicks = 0;
+      machine.blockedSinceTick = null;
       continue;
     }
     if (!hasInputs) {
       machine.blocked = 'missing-input';
       machine.progressTicks = 0;
+      machine.blockedSinceTick ??= state.tick;
+      machine.blockedTicks = (machine.blockedTicks ?? 0) + 1;
       continue;
     }
     machine.blocked = false;
-    machine.progressTicks += 1;
-    if (machine.progressTicks < Math.round(recipe.seconds * TICKS_PER_SECOND)) continue;
-    machine.progressTicks = 0;
+    machine.blockedTicks = 0;
+    machine.blockedSinceTick = null;
+    machine.progressTicks += Number.isFinite(machine.speedModifier) ? machine.speedModifier : 1;
+    const productionThreshold = recipe.seconds * TICKS_PER_SECOND;
+    if (machine.progressTicks < productionThreshold) continue;
+    machine.progressTicks -= productionThreshold;
     for (const [item, amount] of Object.entries(recipe.inputs)) {
       state.stock[inputId].items[item] -= amount;
       if (state.stock[inputId].items[item] === 0) delete state.stock[inputId].items[item];
@@ -147,7 +155,7 @@ function locationPosition(state, locationId) {
   }
   if (locationId.startsWith('machine:')) {
     const machineId = locationId.slice('machine:'.length).split(':')[0];
-    const station = STATIONS[machineId];
+    const station = STATIONS[machineId] ?? state.customStations?.[machineId];
     if (station) return { x: station.x, z: station.z };
     // Custom machine
     const pos = state.layout?.[machineId] ?? state.customStations?.[machineId];
@@ -157,7 +165,10 @@ function locationPosition(state, locationId) {
     const customer = state.customers.find((entry) => entry.id === locationId.slice('customer:'.length));
     return customer ? { x: customer.x, z: customer.z } : null;
   }
-  if (locationId.startsWith('coop:')) return { x: STATIONS.coop.x, z: STATIONS.coop.z };
+  if (locationId.startsWith('coop:')) {
+    const coop = stationPosition(state, 'coop');
+    return coop ? { x: coop.x, z: coop.z } : null;
+  }
   return null;
 }
 
@@ -420,8 +431,215 @@ function prioritizeShelfRestock(state, worker) {
   task.reservationId = reservationId;
   task.phase = 'to-target';
   task.purpose = 'shelf-restock';
+  clearWorkerRoute(task);
   delete task.farmId;
   return true;
+}
+
+function clearWorkerRoute(task) {
+  delete task.route;
+  delete task.routeIndex;
+  delete task.routeTarget;
+  delete task.routeObstacles;
+}
+
+function getWorkerObstacles(state) {
+  const boxes = [...getMarketCollisionBoxes(state), ...CUSTOMER_WALLS.map((wall, index) => ({
+    id: `wall:${index}`,
+    minX: wall.min.x,
+    maxX: wall.max.x,
+    minZ: wall.min.z,
+    maxZ: wall.max.z,
+  }))];
+  const stations = { ...STATIONS, ...(state.customStations ?? {}) };
+  for (const [id, station] of Object.entries(stations)) {
+    const active = station.kind === 'machine' ? Boolean(state.machines?.[id])
+      : station.kind === 'table' ? Boolean(state.diningTables?.[id])
+        : station.kind === 'coop' ? Boolean(state.coops?.coop) : false;
+    if (!active) continue;
+    const position = stationPosition(state, id);
+    if (!position) continue;
+    const dimensions = getStationDimensions(id, position.rotation ?? 0);
+    boxes.push({
+      id,
+      minX: position.x - dimensions.width / 2,
+      maxX: position.x + dimensions.width / 2,
+      minZ: position.z - dimensions.depth / 2,
+      maxZ: position.z + dimensions.depth / 2,
+    });
+  }
+  for (const decoration of state.decorations ?? []) {
+    if (decoration.type === 'welcomeMat') continue;
+    const dimensions = getDecorationDimensions(decoration.type, decoration.rotation ?? 0);
+    boxes.push({
+      id: decoration.id,
+      minX: decoration.x - dimensions.width / 2,
+      maxX: decoration.x + dimensions.width / 2,
+      minZ: decoration.z - dimensions.depth / 2,
+      maxZ: decoration.z + dimensions.depth / 2,
+    });
+  }
+  return boxes.map((box) => ({
+    id: box.id,
+    minX: box.minX - WORKER_RADIUS,
+    maxX: box.maxX + WORKER_RADIUS,
+    minZ: box.minZ - WORKER_RADIUS,
+    maxZ: box.maxZ + WORKER_RADIUS,
+  }));
+}
+
+function isWorkerPointBlocked(point, obstacles) {
+  return obstacles.some((box) => point.x >= box.minX && point.x <= box.maxX
+    && point.z >= box.minZ && point.z <= box.maxZ);
+}
+
+function workerStationAccessPoint(state, stationId, worker, obstacles) {
+  const station = stationPosition(state, stationId);
+  if (!station) return null;
+  const dimensions = getStationDimensions(stationId, station.rotation ?? 0);
+  const offset = WORKER_RADIUS + 0.12;
+  const candidates = [
+    { x: station.x - dimensions.width / 2 - offset, z: station.z },
+    { x: station.x + dimensions.width / 2 + offset, z: station.z },
+    { x: station.x, z: station.z - dimensions.depth / 2 - offset },
+    { x: station.x, z: station.z + dimensions.depth / 2 + offset },
+  ];
+  return candidates.filter((point) => !isWorkerPointBlocked(point, obstacles))
+    .sort((a, b) => Math.hypot(a.x - worker.x, a.z - worker.z) - Math.hypot(b.x - worker.x, b.z - worker.z))[0] ?? null;
+}
+
+function workerTaskTarget(state, worker, task, obstacles) {
+  if (task.phase === 'to-source' && task.farmId) {
+    const farm = stationPosition(state, task.farmId);
+    if (farm) return { x: farm.x, z: farm.z };
+  }
+  const locationId = task.phase === 'to-source' ? task.from : task.to;
+  if (locationId.startsWith('shelf:')) {
+    const shelf = getShelfLocations(state, task.item).find((entry) => entry.stockId === locationId);
+    if (shelf) return workerStationAccessPoint(state, shelf.id, worker, obstacles);
+  }
+  if (locationId.startsWith('machine:')) {
+    const machineId = locationId.slice('machine:'.length).split(':')[0];
+    return workerStationAccessPoint(state, machineId, worker, obstacles);
+  }
+  if (locationId.startsWith('coop:')) return workerStationAccessPoint(state, 'coop', worker, obstacles);
+  return locationPosition(state, locationId);
+}
+
+function workerObstacleSignature(obstacles) {
+  return obstacles.map((box) => `${box.id}:${box.minX},${box.maxX},${box.minZ},${box.maxZ}`).join('|');
+}
+
+function findWorkerRoute(start, target, obstacles) {
+  if (!obstacles.some((box) => segmentIntersectsBox(start, target, box))) return [{ x: target.x, z: target.z }];
+
+  const cellSize = 0.5;
+  const margin = 2;
+  const minX = Math.floor((Math.min(start.x, target.x) - margin) / cellSize) * cellSize;
+  const maxX = Math.ceil((Math.max(start.x, target.x) + margin) / cellSize) * cellSize;
+  const minZ = Math.floor((Math.min(start.z, target.z) - margin) / cellSize) * cellSize;
+  const maxZ = Math.ceil((Math.max(start.z, target.z) + margin) / cellSize) * cellSize;
+  const cols = Math.round((maxX - minX) / cellSize) + 1;
+  const rows = Math.round((maxZ - minZ) / cellSize) + 1;
+  const toCol = (x) => Math.max(0, Math.min(cols - 1, Math.round((x - minX) / cellSize)));
+  const toRow = (z) => Math.max(0, Math.min(rows - 1, Math.round((z - minZ) / cellSize)));
+  const toX = (column) => minX + column * cellSize;
+  const toZ = (row) => minZ + row * cellSize;
+  const key = (column, row) => row * cols + column;
+  const startKey = key(toCol(start.x), toRow(start.z));
+  const targetKey = key(toCol(target.x), toRow(target.z));
+  const blocked = new Uint8Array(cols * rows);
+  for (let row = 0; row < rows; row += 1) {
+    const z = toZ(row);
+    for (let column = 0; column < cols; column += 1) {
+      const point = { x: toX(column), z };
+      if (isWorkerPointBlocked(point, obstacles)) blocked[key(column, row)] = 1;
+    }
+  }
+  blocked[startKey] = 0;
+  blocked[targetKey] = 0;
+
+  const open = new Set([startKey]);
+  const previous = new Map();
+  const cost = new Float32Array(cols * rows).fill(Infinity);
+  const estimate = new Float32Array(cols * rows).fill(Infinity);
+  cost[startKey] = 0;
+  estimate[startKey] = Math.hypot(start.x - target.x, start.z - target.z);
+  const directions = [[0, 1, 1], [0, -1, 1], [1, 0, 1], [-1, 0, 1],
+    [1, 1, 1.414], [-1, 1, 1.414], [1, -1, 1.414], [-1, -1, 1.414]];
+  let current = null;
+  while (open.size) {
+    let bestEstimate = Infinity;
+    for (const entry of open) {
+      if (estimate[entry] < bestEstimate) {
+        current = entry;
+        bestEstimate = estimate[entry];
+      }
+    }
+    if (current === targetKey) break;
+    open.delete(current);
+    const column = current % cols;
+    const row = Math.floor(current / cols);
+    for (const [dc, dr, stepCost] of directions) {
+      const nextColumn = column + dc;
+      const nextRow = row + dr;
+      if (nextColumn < 0 || nextColumn >= cols || nextRow < 0 || nextRow >= rows) continue;
+      const next = key(nextColumn, nextRow);
+      if (blocked[next]) continue;
+      if (dc && dr && (blocked[key(column + dc, row)] || blocked[key(column, row + dr)])) continue;
+      const nextCost = cost[current] + stepCost * cellSize;
+      if (nextCost >= cost[next]) continue;
+      previous.set(next, current);
+      cost[next] = nextCost;
+      estimate[next] = nextCost + Math.hypot(toX(nextColumn) - target.x, toZ(nextRow) - target.z);
+      open.add(next);
+    }
+  }
+  if (current !== targetKey) return [];
+
+  const gridPath = [];
+  for (let cursor = targetKey; cursor !== undefined; cursor = previous.get(cursor)) {
+    gridPath.push({ x: toX(cursor % cols), z: toZ(Math.floor(cursor / cols)) });
+  }
+  gridPath.reverse();
+  const points = [start, ...gridPath, target];
+  const route = [];
+  let index = 0;
+  while (index < points.length - 1) {
+    let farthest = index + 1;
+    for (let candidate = points.length - 1; candidate > index; candidate -= 1) {
+      if (!obstacles.some((box) => segmentIntersectsBox(points[index], points[candidate], box))) {
+        farthest = candidate;
+        break;
+      }
+    }
+    if (obstacles.some((box) => segmentIntersectsBox(points[index], points[farthest], box))) return [];
+    route.push({ x: points[farthest].x, z: points[farthest].z });
+    index = farthest;
+  }
+  return route;
+}
+
+function moveWorkerAlongRoute(worker, task, distance) {
+  let remaining = distance;
+  while (remaining > 0 && task.routeIndex < task.route.length) {
+    const point = task.route[task.routeIndex];
+    const dx = point.x - worker.x;
+    const dz = point.z - worker.z;
+    const length = Math.hypot(dx, dz);
+    if (length > 0.0001) worker.facing = Math.atan2(dx, dz);
+    if (length <= remaining) {
+      worker.x = point.x;
+      worker.z = point.z;
+      task.routeIndex += 1;
+      remaining -= length;
+    } else {
+      worker.x += dx / length * remaining;
+      worker.z += dz / length * remaining;
+      remaining = 0;
+    }
+  }
+  return task.routeIndex >= task.route.length;
 }
 
 function workerTick(state) {
@@ -436,17 +654,24 @@ function workerTick(state) {
       if (!worker.task) continue;
     }
     const task = worker.task;
-    const targetLocation = task.phase === 'to-source' ? task.from : task.to;
-    const target = task.phase === 'to-source' && task.farmId
-      ? (STATIONS[task.farmId] ?? state.layout?.[task.farmId] ?? state.customStations?.[task.farmId]) : locationPosition(state, targetLocation);
+    const obstacles = getWorkerObstacles(state);
+    const target = workerTaskTarget(state, worker, task, obstacles);
     if (!target) continue;
-    worker.facing = Math.atan2(target.x - worker.x, target.z - worker.z);
-    if (!moveToward(worker, target.x, target.z, 0.34)) continue;
+    const obstacleSignature = workerObstacleSignature(obstacles);
+    if (!Array.isArray(task.route) || task.routeTarget?.x !== target.x || task.routeTarget?.z !== target.z
+      || task.routeObstacles !== obstacleSignature) {
+      task.route = findWorkerRoute(worker, target, obstacles);
+      task.routeIndex = 0;
+      task.routeTarget = { x: target.x, z: target.z };
+      task.routeObstacles = obstacleSignature;
+    }
+    if (!task.route.length || !moveWorkerAlongRoute(worker, task, 0.34)) continue;
     if (task.phase === 'to-source') {
       const picked = pickUpReservedStock(state, task.reservationId, task.carrier);
       if (picked.ok) {
         if (task.farmId && state.farms[task.farmId]) removeFarmReady(state.farms[task.farmId], task.quantity, state.tick);
         task.phase = 'to-target';
+        clearWorkerRoute(task);
         durable = true;
       }
       continue;
@@ -789,9 +1014,17 @@ function shelfQueuePosition(item, index, state, shelfId = null) {
     ?? chooseShelfLocation(state, item);
   if (!shelf) return { x: 5, z: 1.3 + index * 0.85 };
   const distance = 1.3 + index * 0.85;
-  return {
-    x: shelf.x + Math.sin(shelf.rotation) * distance,
-    z: shelf.z + Math.cos(shelf.rotation) * distance,
+  const forward = { x: Math.sin(shelf.rotation), z: Math.cos(shelf.rotation) };
+  const directions = [forward, { x: -forward.x, z: -forward.z },
+    { x: forward.z, z: -forward.x }, { x: -forward.z, z: forward.x }];
+  const obstacles = getMarketObstacles(state);
+  return directions.map((direction) => ({
+    x: shelf.x + direction.x * distance,
+    z: shelf.z + direction.z * distance,
+  })).find((position) => !obstacles.some((box) => position.x >= box.minX && position.x <= box.maxX
+    && position.z >= box.minZ && position.z <= box.maxZ)) ?? {
+    x: shelf.x + forward.x * distance,
+    z: shelf.z + forward.z * distance,
   };
 }
 

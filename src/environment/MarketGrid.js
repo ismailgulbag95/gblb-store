@@ -119,9 +119,6 @@ export class MarketGrid {
     this.props.createFlowerDisplayStand(1.0, 9.8, 0);
     this.props.createFlowerDisplayStand(11.8, 9.8, 0);
 
-    // E. Modern Self-Checkout Kiosk with glowing green status beacon (x = 8.5, z = -4.2)
-    this.props.createSelfCheckoutKiosk(8.5, -4.2, 0);
-
     // 9. Awning & 3D Signboards
     this.props.createStoreAwning(5, 2.3, 9.1, 10, 1.8);
     this.props.createStoreSign(5, 3.4, 9.0);

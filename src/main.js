@@ -1,6 +1,7 @@
 import './style.css';
 import { GameApplication } from './application/GameApplication.js';
 import { SaveService } from './infrastructure/SaveService.js';
+import { AdMobRewardedProvider, RewardedAdService } from './infrastructure/RewardedAdProvider.js';
 import { HUD } from './presentation/HUD.js';
 import { InputManager } from './presentation/InputManager.js';
 import { WorldScene } from './presentation/WorldScene.js';
@@ -34,7 +35,7 @@ function boot() {
   let app;
   try {
     saveService = new SaveService();
-    app = new GameApplication(saveService);
+    app = new GameApplication(saveService, undefined, new RewardedAdService(new AdMobRewardedProvider()));
   } catch (error) {
     if (saveService && error.name === 'SaveRecoveryError') showRecovery(saveService, error);
     else showFatal(error.message);
@@ -99,6 +100,14 @@ function boot() {
   }
 
   app.setEventHandler((event) => {
+    if (event.type === 'ad-start') {
+      pauseReasons.add('rewarded-ad');
+      setPaused();
+    }
+    if (event.type === 'ad-end') {
+      pauseReasons.delete('rewarded-ad');
+      setPaused();
+    }
     if (event.type === 'toast' || event.type === 'sale' || event.type === 'production' || event.type === 'tip-ready') {
       hud.showEvent(event);
       if (event.tone !== 'error') world.playEvent(event, app.getState());

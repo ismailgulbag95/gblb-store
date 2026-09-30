@@ -51,6 +51,14 @@ export function staffUpgradeBaseCost(role) {
   return Math.ceil(Math.max(25, (expansion?.price ?? 50) * 0.45));
 }
 
+export function machineUpgradeCost(machineId, level = 0) {
+  return progressionUpgradeCost(machineUpgradeBaseCost(machineId), level);
+}
+
+export function staffUpgradeCost(role, level = 0) {
+  return progressionUpgradeCost(staffUpgradeBaseCost(role), level);
+}
+
 export function percentGain(currentValue, nextValue) {
   if (!Number.isFinite(currentValue) || currentValue <= 0 || !Number.isFinite(nextValue) || nextValue <= 0) return 0;
   return Math.max(0, (nextValue / currentValue - 1) * 100);

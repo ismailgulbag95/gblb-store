@@ -63,6 +63,7 @@ export const STATION_FOOTPRINTS = Object.freeze({
 export const DEFAULT_STATION_FOOTPRINT = Object.freeze({ width: 2.0, depth: 2.0 });
 
 export const DECORATION_FOOTPRINTS = Object.freeze({
+  trashBin: { width: 0.8, depth: 0.8 },
   welcomeMat: { width: 1.65, depth: 1.05 },
   petalPlanter: { width: 1.0, depth: 1.0 },
   farmhouseSign: { width: 1.1, depth: 0.9 },

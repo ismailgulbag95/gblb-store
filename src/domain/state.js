@@ -1,7 +1,9 @@
 import { ITEMS, SHELVES, STATIONS } from './catalog.js';
 import { createFarmState, ensureFarmState, syncFarmHarvest } from './farm.js';
+import { canPlaceDecoration } from './layout.js';
+import { machineSpeedMultiplier, staffSpeedMultiplier } from './progression.js';
 
-export const SAVE_VERSION = 5;
+export const SAVE_VERSION = 6;
 
 function emptyStock(capacity) {
   return { capacity, items: {}, reserved: {}, reservedCapacity: 0 };
@@ -31,6 +33,18 @@ export function createInitialState(seed = 0x51f15e) {
     stock,
     stockTransactions: [],
     reservations: {},
+    ads: {
+      lastStartedAt: 0,
+      lastPlacementStarts: {},
+      recentCompletions: [],
+      dailyCounts: {},
+      dismissedUntil: {},
+      grantedRewardIds: [],
+      completedAdIds: [],
+      shownOfferKeys: [],
+      events: [],
+      pending: null,
+    },
     player: { x: 5, z: 6, facing: 0, capacity: 6, character: 'shopkeeper' },
     farms,
     machines: {},
@@ -39,8 +53,10 @@ export function createInitialState(seed = 0x51f15e) {
     layout: {},
     decorations: [
       { id: 'decoration-boxes', type: 'cardboardBoxes', x: -3.8, z: -7.5, rotation: 0 },
+      { id: 'trash-bin', type: 'trashBin', x: -2.5, z: -7.5, rotation: 0 },
     ],
     activeOrder: null,
+    lastOrderReward: null,
     ordersCompleted: 0,
     decorVouchers: 0,
     coops: {},
@@ -78,9 +94,140 @@ export function createInitialState(seed = 0x51f15e) {
   return state;
 }
 
+function removeLegacyFurniture(candidate) {
+  const legacyStations = candidate.customStations && typeof candidate.customStations === 'object'
+    ? candidate.customStations : {};
+  const removedIds = new Set(Object.keys(legacyStations));
+  const removedStockIds = new Set();
+  const removedCustomers = new Set();
+  const removedReservations = new Set();
+  const state = structuredClone(candidate);
+  state.stock ??= {};
+  state.farms ??= {};
+  state.machines ??= {};
+  state.selfRegisters ??= {};
+  state.diningTables ??= {};
+  for (const id of [...Object.keys(state.farms), ...Object.keys(state.machines), ...Object.keys(state.selfRegisters), ...Object.keys(state.diningTables)]) {
+    if (!STATIONS[id]) removedIds.add(id);
+  }
+
+  for (const [id, station] of Object.entries(legacyStations)) {
+    if (station.kind === 'farm') {
+      const farm = state.farms[id];
+      const item = farm?.item ?? station.item;
+      const stockId = item ? `farm:${item}` : null;
+      if (stockId && state.stock[stockId]) {
+        const location = state.stock[stockId];
+        const quantity = Math.max(0, Math.floor(farm?.readyCount ?? 0));
+        const stored = location.items?.[item] ?? 0;
+        const reserved = location.reserved?.[item] ?? 0;
+        const available = Math.max(0, stored - reserved);
+        const remaining = stored - Math.min(quantity, available);
+        if (remaining) location.items[item] = remaining;
+        else delete location.items[item];
+      }
+      delete state.farms[id];
+    }
+    if (station.kind === 'shelf') removedStockIds.add(`shelf:${id}`);
+    if (station.kind === 'machine') {
+      delete state.machines[id];
+      removedStockIds.add(`machine:${id}:input`);
+      removedStockIds.add(`machine:${id}:output`);
+    }
+    if (station.kind === 'selfRegister') delete state.selfRegisters[id];
+    if (station.kind === 'table') {
+      const dinerId = state.diningTables[id]?.customerId;
+      if (dinerId) removedCustomers.add(dinerId);
+      delete state.diningTables[id];
+    }
+  }
+
+  // Older furniture saves sometimes kept these maps even when customStations
+  // had already been partially removed.
+  for (const id of Object.keys(state.selfRegisters)) {
+    removedIds.add(id);
+    delete state.selfRegisters[id];
+  }
+  for (const id of Object.keys(state.diningTables)) {
+    if (STATIONS[id]?.kind === 'table') continue;
+    const dinerId = state.diningTables[id]?.customerId;
+    if (dinerId) removedCustomers.add(dinerId);
+    removedIds.add(id);
+    delete state.diningTables[id];
+  }
+  for (const id of Object.keys(state.farms)) {
+    if (STATIONS[id]) continue;
+    if (!removedIds.has(id)) continue;
+    delete state.farms[id];
+  }
+  for (const id of Object.keys(state.machines)) {
+    if (STATIONS[id]) continue;
+    if (!removedIds.has(id)) continue;
+    delete state.machines[id];
+  }
+
+  for (const stockId of Object.keys(state.stock)) {
+    if (stockId.startsWith('shelf:')) {
+      const stationId = stockId.slice('shelf:'.length);
+      const isSharedProductShelf = Object.values(SHELVES).some((shelf) => shelf.id === stockId);
+      if (!isSharedProductShelf && (removedIds.has(stationId) || STATIONS[stationId]?.kind !== 'shelf')) removedStockIds.add(stockId);
+    }
+    if (stockId.startsWith('machine:')) {
+      const stationId = stockId.slice('machine:'.length).split(':')[0];
+      if (removedIds.has(stationId) || STATIONS[stationId]?.kind !== 'machine') removedStockIds.add(stockId);
+    }
+  }
+  for (const customer of state.customers ?? []) {
+    if (removedCustomers.has(customer.id) || removedIds.has(customer.tableId)
+      || removedIds.has(customer.registerId) || removedIds.has(customer.targetRegisterId)) {
+      removedCustomers.add(customer.id);
+    }
+  }
+  const removedWorkers = new Set();
+  for (const worker of state.workers ?? []) {
+    const task = worker.task;
+    if (task && (removedIds.has(task.farmId) || removedIds.has(task.tableId) || removedCustomers.has(task.customerId)
+      || removedStockIds.has(task.from) || removedStockIds.has(task.to))) {
+      removedWorkers.add(worker.id);
+      if (task.reservationId) removedReservations.add(task.reservationId);
+      if (task.carrier) removedStockIds.add(task.carrier);
+      removedStockIds.add(`worker:${worker.id}`);
+      worker.task = null;
+      worker.carrying = null;
+    }
+  }
+  for (const id of removedCustomers) removedStockIds.add(`customer:${id}`);
+  for (const id of removedWorkers) removedStockIds.add(`worker:${id}`);
+  for (const id of removedStockIds) delete state.stock[id];
+
+  state.customers = (state.customers ?? []).filter((customer) => !removedCustomers.has(customer.id));
+  state.reservations = Object.fromEntries(Object.entries(state.reservations ?? {}).filter(([id, reservation]) => (
+    !removedStockIds.has(reservation.from) && !removedStockIds.has(reservation.to)
+      && !removedStockIds.has(reservation.origin) && !removedWorkers.has(reservation.workerId)
+      && !removedReservations.has(id) && state.stock[reservation.from] && state.stock[reservation.to]
+      && state.stock[reservation.origin]
+  )));
+  for (const location of Object.values(state.stock)) {
+    location.reserved = {};
+    location.reservedCapacity = 0;
+  }
+  for (const reservation of Object.values(state.reservations)) {
+    const source = state.stock[reservation.from];
+    const target = state.stock[reservation.to];
+    if (!source || !target) continue;
+    source.reserved[reservation.item] = (source.reserved[reservation.item] ?? 0) + reservation.quantity;
+    target.reservedCapacity += reservation.quantity;
+  }
+
+  state.customStations = {};
+  state.layout = Object.fromEntries(Object.entries(state.layout ?? {}).filter(([id]) => Boolean(STATIONS[id])));
+  return state;
+}
+
 export function hydrateState(candidate) {
   if (!candidate || typeof candidate !== 'object') throw new Error('Kayıt boş veya bozuk.');
-  if (![2, 3, 4, SAVE_VERSION].includes(candidate.saveVersion)) throw new Error(`Bu kayıt sürümü desteklenmiyor (${candidate.saveVersion ?? 'bilinmiyor'}).`);
+  if (![2, 3, 4, 5, SAVE_VERSION].includes(candidate.saveVersion)) throw new Error(`Bu kayıt sürümü desteklenmiyor (${candidate.saveVersion ?? 'bilinmiyor'}).`);
+  candidate = removeLegacyFurniture(candidate);
   const initial = createInitialState(candidate.rng);
   const hydrated = { ...initial, ...candidate };
   hydrated.saveVersion = SAVE_VERSION;
@@ -90,6 +237,9 @@ export function hydrateState(candidate) {
     && Number.isSafeInteger(candidate.activeOrder.quantity) && candidate.activeOrder.quantity > 0
     && Number.isSafeInteger(candidate.activeOrder.reward) && candidate.activeOrder.reward > 0
     ? { ...candidate.activeOrder } : null;
+  hydrated.lastOrderReward = candidate.lastOrderReward && typeof candidate.lastOrderReward.id === 'string'
+    && Number.isSafeInteger(candidate.lastOrderReward.reward) && candidate.lastOrderReward.reward > 0
+    ? { ...candidate.lastOrderReward, claimed: Boolean(candidate.lastOrderReward.claimed) } : null;
   hydrated.player = { ...initial.player, ...(candidate.player ?? {}) };
   hydrated.economy = { ...initial.economy, ...(candidate.economy ?? {}) };
   hydrated.settings = { ...initial.settings, ...(candidate.settings ?? {}) };
@@ -99,7 +249,16 @@ export function hydrateState(candidate) {
   hydrated.completedUpgrades = Array.isArray(candidate.completedUpgrades) ? [...candidate.completedUpgrades] : [];
   hydrated.stock = { ...initial.stock, ...(candidate.stock ?? {}) };
   hydrated.farms = { ...initial.farms, ...(candidate.farms ?? {}) };
-  hydrated.machines = { ...initial.machines, ...(candidate.machines ?? {}) };
+  hydrated.machines = Object.fromEntries(Object.entries({ ...initial.machines, ...(candidate.machines ?? {}) }).map(([id, machine]) => {
+    const upgradeLevel = Number.isSafeInteger(machine?.upgradeLevel) && machine.upgradeLevel >= 0 ? machine.upgradeLevel : 0;
+    return [id, {
+      ...machine,
+      upgradeLevel,
+      speedModifier: machineSpeedMultiplier(upgradeLevel),
+      blockedTicks: Number.isSafeInteger(machine?.blockedTicks) && machine.blockedTicks >= 0 ? machine.blockedTicks : 0,
+      blockedSinceTick: Number.isSafeInteger(machine?.blockedSinceTick) ? machine.blockedSinceTick : null,
+    }];
+  }));
   hydrated.customStations = { ...(candidate.customStations ?? {}) };
   hydrated.selfRegisters = { ...(candidate.selfRegisters ?? {}) };
   hydrated.layout = Object.fromEntries(Object.entries(candidate.layout ?? {}).filter(([id, point]) =>
@@ -107,9 +266,40 @@ export function hydrateState(candidate) {
   hydrated.decorations = (Array.isArray(candidate.decorations) ? candidate.decorations : []).filter((entry) =>
     entry && typeof entry.id === 'string' && typeof entry.type === 'string'
       && Number.isFinite(entry.x) && Number.isFinite(entry.z) && entry.placed !== false);
+  if (!hydrated.decorations.some((entry) => entry.type === 'trashBin')) {
+    const trashBin = initial.decorations.find((entry) => entry.type === 'trashBin');
+    hydrated.decorations.push({ ...trashBin });
+    if (!canPlaceDecoration(hydrated, trashBin.id, trashBin.x, trashBin.z)) {
+      let slot = null;
+      for (let row = 0; row <= 32 && !slot; row += 1) {
+        for (let column = 0; column <= 32; column += 1) {
+          const x = -3 + column * 0.5;
+          const z = -8 + row * 0.5;
+          if (canPlaceDecoration(hydrated, trashBin.id, x, z)) { slot = { x, z }; break; }
+        }
+      }
+      if (slot) Object.assign(hydrated.decorations.at(-1), slot);
+    }
+  }
   hydrated.coops = { ...initial.coops, ...(candidate.coops ?? {}) };
   hydrated.diningTables = { ...initial.diningTables, ...(candidate.diningTables ?? {}) };
   hydrated.reservations = { ...initial.reservations, ...(candidate.reservations ?? {}) };
+  hydrated.ads = {
+    ...initial.ads,
+    ...(candidate.ads ?? {}),
+    lastPlacementStarts: candidate.ads?.lastPlacementStarts && typeof candidate.ads.lastPlacementStarts === 'object'
+      ? { ...candidate.ads.lastPlacementStarts } : {},
+    recentCompletions: Array.isArray(candidate.ads?.recentCompletions) ? candidate.ads.recentCompletions.filter(Number.isFinite).slice(-32) : [],
+    dailyCounts: candidate.ads?.dailyCounts && typeof candidate.ads.dailyCounts === 'object' ? { ...candidate.ads.dailyCounts } : {},
+    dismissedUntil: candidate.ads?.dismissedUntil && typeof candidate.ads.dismissedUntil === 'object' ? { ...candidate.ads.dismissedUntil } : {},
+    grantedRewardIds: Array.isArray(candidate.ads?.grantedRewardIds) ? [...new Set(candidate.ads.grantedRewardIds.filter((id) => typeof id === 'string'))].slice(-256) : [],
+    completedAdIds: Array.isArray(candidate.ads?.completedAdIds) ? [...new Set(candidate.ads.completedAdIds.filter((id) => typeof id === 'string'))].slice(-256) : [],
+    shownOfferKeys: Array.isArray(candidate.ads?.shownOfferKeys) ? [...new Set(candidate.ads.shownOfferKeys.filter((id) => typeof id === 'string'))].slice(-128) : [],
+    events: Array.isArray(candidate.ads?.events) ? candidate.ads.events.slice(-500) : [],
+    // Startup reconciliation may grant only a provider-persisted completion receipt.
+    pending: candidate.ads?.pending && typeof candidate.ads.pending.rewardId === 'string'
+      && typeof candidate.ads.pending.placement === 'string' ? { ...candidate.ads.pending } : null,
+  };
   hydrated.customerDemandBag = Array.isArray(candidate.customerDemandBag) ? [...candidate.customerDemandBag] : [];
   hydrated.customers = (Array.isArray(candidate.customers) ? candidate.customers : []).map((customer, index) => {
     const legacyDemand = typeof customer.demand === 'string' ? customer.demand : customer.demand?.id;
@@ -136,6 +326,9 @@ export function hydrateState(candidate) {
     ensureFarmState({ ...farm }, hydrated.tick, id)]));
   hydrated.workers = hydrated.workers.map((worker) => ({
     ...worker,
+    unlocked: true,
+    upgradeLevel: Number.isSafeInteger(worker.upgradeLevel) && worker.upgradeLevel >= 0 ? worker.upgradeLevel : 0,
+    speedModifier: staffSpeedMultiplier(Number.isSafeInteger(worker.upgradeLevel) && worker.upgradeLevel >= 0 ? worker.upgradeLevel : 0),
     task: worker.task === 'idle' ? null : (worker.task ?? null),
   }));
   for (const [key, value] of Object.entries(hydrated.player)) {

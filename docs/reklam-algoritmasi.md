@@ -1,10 +1,10 @@
 # GBLB Store reklam gösterim algoritması
 
-**Durum:** Uygulamaya hazır ürün/teknik taslak. Bu doküman reklam SDK'sı eklemez ve gerçek reklam göstermeye başlamaz.
+**Durum:** Oyun içi rewarded altyapısı uygulandı. AdMob SDK'sı, reklam birimleri ve platform kurulumu daha sonra yapılacak; yapılandırılana kadar sağlayıcı hazır değildir ve ödül vermez.
 
 ## Projeye göre karar
 
-GBLB Store tarayıcıda çalışan Three.js oyunu. `package.json` içinde reklam SDK'sı yok; uygulamada reklam gösterme veya rewarded-ad ödülü işleme kodu da bulunmuyor. README'ye göre oyun arka plandayken simülasyon duruyor, dolayısıyla henüz offline kazanç sistemi yok. Bu yüzden ilk sürüm çevrimdışı kazanç reklamı veya gerçek reklam varmış gibi ödül veren sahte bir sağlayıcı kullanmamalı.
+GBLB Store tarayıcıda çalışan Three.js oyunu. `package.json` içinde reklam SDK'sı yok; bu uygulama oyun içi teklif, ödül doğrulama ve sağlayıcı köprüsünü kurar ama reklam SDK'sı yüklemez. AdMob bağlantısı `window.GBLB_ADMOB` üzerinden daha sonra native kabuk tarafından sağlanır. Köprü kurulana ve placement hazır bildirilene kadar oyun reklamı başlatmaz ve ödül vermez. README'ye göre oyun arka plandayken simülasyon duruyor, dolayısıyla henüz offline kazanç sistemi yok. Bu yüzden çevrimdışı kazanç reklamı veya reklam varmış gibi ödül veren sahte bir sağlayıcı kullanılmaz.
 
 My Mini Mart'ın mağaza kayıtları reklam ve uygulama içi satın alımı birlikte kullandığını, ayrıca reklamı ve açılır reklamları kaldıran ayrı ürünler sunduğunu doğruluyor. Kayıtlarda nakit paketleri de yer alıyor. Bu, hibrit modeli destekleyen gözlemlenebilir kanıt; oyunun özel reklam tetikleme kodu kamuya açık değil. Kullanıcı yorumlarında sık ve oyun ortasında çıkan reklamlar ile ödülün bazen verilmemesi şikâyetleri görülüyor. Bu nedenle burada **gönüllü ödüllü reklam + ileride isteğe bağlı satın alma** yaklaşımını alıyor, zorunlu reklam sıklığını kopyalamıyoruz. [App Store kaydı](https://apps.apple.com/us/app/my-mini-mart/id1592004814), [Google Play kaydı ve kullanıcı yorumları](https://play.google.com/store/apps/details?id=com.KisekiGames.smart)
 
@@ -14,10 +14,12 @@ My Mini Mart'ın mağaza kayıtları reklam ve uygulama içi satın alımı birl
 | --- | --- | --- | --- |
 | Sipariş kazancını ikiye katla | Oyuncu siparişi başarıyla teslim ettikten sonra, sonuç satırında isteğe bağlı düğme | O siparişin temel nakit ödülü kadar ek nakit; toplam sipariş kazancı en fazla `x2` olur | En fazla 3 kez/yerel gün |
 | Sponsorlu tedarik aracı | Açık bir makine gerekli girdiler yüzünden en az 20 oyun saniyesi durmuşsa ve tek tariflik girdi/çıktı kapasitesi varsa, makine panelinde | Tarifin **bir partisi** için gereken eksik girdiler; ürün normal makine süresinde üretilir | En fazla 2 kez/yerel gün; aynı yerleşimde 15 dakika bekleme |
+| İkinci tarla | Uygun tarla ilerlemesi açıldıktan sonra tarla kartında | İkinci tarla ve ona ait bağımsız bitki zamanlayıcıları kalıcı olarak açılır | Her uygun tarla için bir kez |
+| Personel alımı | İlgili personel ilerleme koşulu açıldığında personel kartında | İlk reklam rolü açar; aynı roldeki ek alımlar personel ekler. Şef/garson rolü ikisini birlikte açar | Oyuncu başlatır; genel reklam kotalarına uyar |
 
 Her iki teklif de düğmeyle başlatılır. Teklif, ödülü sayısal ve anlaşılır biçimde yazar: “Reklamı izle, bu siparişten **+$14** daha kazan” veya “Reklamı izle, fırına **2 buğday + 1 yumurta** teslim et”. Teklifin yanında “Şimdi değil” seçeneği bulunur. Reddedilmesi oyunun normal akışını değiştirmez.
 
-Bu seçim GBLB Store'un mevcut ekonomisine bağlanır: sipariş ödülü `ürün fiyatı × miktar + 5` olarak hesaplanıyor; makine tarifleri belirli girdi miktarlarıyla çalışıyor. Reklam nakdi temel sipariş ödülünü geçmez. Tedarik aracı nakit veya bitmiş ürün vermez; stok sınırlarını aşmaz ve üretim süresini atlamaz.
+Bu seçim GBLB Store'un mevcut ekonomisine bağlanır: sipariş ödülü `ürün fiyatı × miktar + 5` olarak hesaplanıyor; makine tarifleri belirli girdi miktarlarıyla çalışıyor. Reklam nakdi temel sipariş ödülünü geçmez. Tedarik aracı nakit veya bitmiş ürün vermez; stok sınırlarını aşmaz ve üretim süresini atlamaz. Kullanıcı kararıyla sipariş katlama ve sponsorlu tedarik ilk oyun içi kapsamda açık istisnalardır; yeni tarla ve personel reklamları da kapasite açar. Makine/personel hız geliştirmeleri yalnızca oyun parası kullanır.
 
 ## Teklif seçme algoritması
 
@@ -44,6 +46,10 @@ onMachineBlocked(machine):
   girişte yeterli ve çıkışta en az bir ürünlük yer varsa
   ve canOffer(..., "supplier-drop", ...) doğruysa makine panelinde teklif göster
 
+onEligibleFarmOrStaffUnlock(target):
+  ilerleme koşulu sağlandıysa ve canOffer(..., ilgili yerleşim, ...) doğruysa
+  mevcut geliştirme/personel panelinde reklamla açma teklifini göster
+
 Aynı anda yalnızca bir teklif görünür. Sipariş teslimi varsa öncelik sipariş teklifindedir.
 Teklif reddedilince aynı yerleşim 5 dakika saklanır; başka bir teklif hemen açılmaz.
 ```
@@ -69,7 +75,7 @@ Başlangıç kotaları: toplam **en fazla 2 tamamlanmış reklam/15 dakika**, **
 - Reklam tamamlanmadan ödül vaadi; rastgele veya gizli olasılıklı nakit ödülü.
 - Mevcut sistem offline simülasyonu durdurduğu için “çevrimdışı kazancını ikiye katla” teklifi.
 
-My Mini Mart'ın mağaza kayıtları web rewarded reklamın nasıl yerleştirildiğini açıklamıyor; buradaki teklifler oyunun kendi sipariş/üretim olaylarına göre tasarlanmış uyarlamadır. Google Ad Manager web envanterinde kullanıcı onayıyla başlayan rewarded biçimini destekliyor. [Rewarded ads for web](https://support.google.com/admanager/answer/9116812?hl=en)
+My Mini Mart'ın mağaza kayıtları reklamın nasıl yerleştirildiğini açıklamıyor; buradaki teklifler oyunun kendi sipariş/üretim olaylarına göre tasarlanmış uyarlamadır. AdMob SDK'sı ve reklam birimleri ayrı bir platform kurulum adımıdır. Oyun tarafındaki callback sözleşmesi ve entegrasyon örneği [`docs/admob-integration.md`](./admob-integration.md) dosyasındadır.
 
 ## Ölçüm ve ekonomi korumaları
 
@@ -86,6 +92,6 @@ Temel doğruluk ölçüleri:
 
 ## Sağlayıcı bağlantısı
 
-Kodda şu an reklam sağlayıcısı olmadığından arayüz `RewardedAdProvider` benzeri bir bağdaştırıcı üzerinden tasarlanmalı: `isReady(placement)`, `show(placement, callbacks)` ve `onCompleted/reward` callback'leri. Web dağıtımında Google Ad Manager veya seçilecek başka bir sağlayıcının rewarded-web entegrasyonu; mobil paket çıkarsa o platformun SDK'sı ayrıca bağlanır. Geliştirme sağlayıcısı gerçek sürümde ödül veremez.
+Oyun `RewardedAdService` üzerinden `isReady(placement)`, `show(placement, callbacks)` ve tamamlanma fişi uzlaştırmasını kullanır. AdMob native kabuğu `window.GBLB_ADMOB` köprüsünü sağlar. `onCompleted` yalnızca AdMob ödülün tamamlandığını bildirdiğinde çağrılmalıdır; yükleme, gösterme, kapatma veya hata callback'i ödül vermez. Aynı işlem kimliği için yalnızca ilk sonuç işlenir. AdMob SDK'sı, reklam birimleri, consent akışı ve Android/iOS kurulumu sonraki platform adımına bırakılmıştır.
 
-İlk uygulanabilir sürüm yalnızca sipariş kazancını ikiye katlama ile başlamalı. Tedarik aracı ikinci adımda eklenmeli; ölçüm bu ilk yerleşimin oyuncu devamlılığını bozmadığını gösterdikten sonra kotalar yeniden ayarlanmalı.
+İlk oyun içi kapsam sipariş kazancını ikiye katlama, sponsorlu tedarik, ikinci tarla açma ve personel alımını içerir. Sponsorlu tedarik para veya bitmiş ürün vermez; tarla/personel reklamları kalıcı kapasite açar. Makine/personel geliştirmeleri para sink'idir ve reklam kullanmaz.
