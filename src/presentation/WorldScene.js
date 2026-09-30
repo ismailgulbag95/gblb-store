@@ -933,6 +933,7 @@ export class WorldScene {
             calyx.rotation.z = leafIndex * Math.PI * 0.4;
             calyx.rotation.x = Math.PI * 0.5;
           }
+          fruit.position.set(x, 0, 0);
           group.add(fruit);
           produce.push(fruit);
         } else if (station.item === 'CORN') {

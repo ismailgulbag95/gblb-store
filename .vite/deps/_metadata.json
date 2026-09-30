@@ -1,0 +1,31 @@
+{
+  "hash": "fc9089c3",
+  "configHash": "d969f6e4",
+  "lockfileHash": "c9e05f9c",
+  "browserHash": "95eb471a",
+  "optimized": {
+    "three": {
+      "src": "../../node_modules/three/build/three.module.js",
+      "file": "three.js",
+      "fileHash": "66e24273",
+      "needsInterop": false
+    },
+    "three/addons/loaders/GLTFLoader.js": {
+      "src": "../../node_modules/three/examples/jsm/loaders/GLTFLoader.js",
+      "file": "three_addons_loaders_GLTFLoader__js.js",
+      "fileHash": "aa4555e3",
+      "needsInterop": false
+    },
+    "three/addons/geometries/RoundedBoxGeometry.js": {
+      "src": "../../node_modules/three/examples/jsm/geometries/RoundedBoxGeometry.js",
+      "file": "three_addons_geometries_RoundedBoxGeometry__js.js",
+      "fileHash": "19e42f15",
+      "needsInterop": false
+    }
+  },
+  "chunks": {
+    "chunk-UGD7UY7I": {
+      "file": "chunk-UGD7UY7I.js"
+    }
+  }
+}

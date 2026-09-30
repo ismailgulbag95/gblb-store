@@ -12,7 +12,9 @@ const BUILTIN_FARM_PHASE_SHIFTS = Object.freeze({
   orangeFarm: 2,
   orangeFarm2: 9,
   cornFarm: 4,
+  cornFarm2: 11,
   wheatFarm: 6,
+  wheatFarm2: 13,
 });
 
 function positiveModulo(value, divisor) {

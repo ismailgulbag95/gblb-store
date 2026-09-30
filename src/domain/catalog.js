@@ -37,10 +37,12 @@ export const STATIONS = Object.freeze({
   orangeFarm2: { kind: 'farm', item: 'ORANGE', x: -6.5, z: -7, title: '2. portakal bahçesi' },
   juice: { kind: 'machine', recipe: 'juice', x: -10, z: -1.8, title: 'Meyve sıkacağı' },
   cornFarm: { kind: 'farm', item: 'CORN', x: -18, z: 5, title: 'Mısır tarlası' },
+  cornFarm2: { kind: 'farm', item: 'CORN', x: -14.5, z: 5, title: '2. mısır tarlası' },
   popcorn: { kind: 'machine', recipe: 'popcorn', x: -18, z: 1.8, title: 'Popcorn makinesi' },
   feed: { kind: 'machine', recipe: 'feed', x: -18, z: -1.8, title: 'Yem değirmeni' },
   coop: { kind: 'coop', x: -23, z: 3.5, title: 'Tavuk kümesi' },
   wheatFarm: { kind: 'farm', item: 'WHEAT', x: -18, z: -7, title: 'Buğday tarlası' },
+  wheatFarm2: { kind: 'farm', item: 'WHEAT', x: -14.5, z: -7, title: '2. buğday tarlası' },
   bakery: { kind: 'machine', recipe: 'bakery', x: -23, z: 0, title: 'Taş fırın' },
   flourMill: { kind: 'machine', recipe: 'flour', x: -23, z: -4, title: 'Un değirmeni' },
   orangeTartKitchen: { kind: 'machine', recipe: 'orangeTart', x: -40, z: 0, title: 'Pastane tezgâhı' },
@@ -85,6 +87,7 @@ export const UPGRADES = Object.freeze([
   { id: 'factoryFeeder', title: 'Fabrika lojistikçisi işe al', price: 90, x: -8, z: -1, when: 'juiceSold', unlocks: ['factoryFeeder'] },
   { id: 'orangeFarm2', title: '2. portakal bahçesi', price: 45, x: -6.5, z: -7, when: 'juiceSold', unlocks: ['orangeFarm2'] },
   { id: 'corn', title: 'Mısır tarlası ve reyon', price: 110, x: -18, z: 5, when: 'juiceSold', unlocks: ['corn'] },
+  { id: 'cornFarm2', title: '2. Mısır tarlası', price: 0, x: -14.5, z: 5, when: 'cornSold', unlocks: ['cornFarm2'] },
   { id: 'popcorn', title: 'Popcorn makinesi ve reyon', price: 125, x: -18, z: 1.8, when: 'cornSold', unlocks: ['popcorn'] },
   { id: 'feed', title: 'Yem değirmeni', price: 135, x: -18, z: -1.8, when: 'popcornSold', unlocks: ['feed'] },
   { id: 'coop', title: 'Tavuk kümesi ve yumurta reyonu', price: 150, x: -23, z: 3.5, when: 'feedProduced', unlocks: ['coop'] },
@@ -92,6 +95,7 @@ export const UPGRADES = Object.freeze([
   { id: 'chicken3', title: 'Üçüncü tavuk', price: 95, x: -23, z: 6.2, when: 'chicken2', unlocks: ['chicken3'] },
   { id: 'caretaker', title: 'Çiftlik bakıcısı işe al', price: 150, x: -18, z: 0, when: 'eggSold', unlocks: ['caretaker'] },
   { id: 'bakery', title: 'Buğday tarlası ve taş fırın', price: 180, x: -23, z: 0, when: 'eggSold', unlocks: ['bakery'] },
+  { id: 'wheatFarm2', title: '2. Buğday tarlası', price: 0, x: -14.5, z: -7, when: 'eggSold', unlocks: ['wheatFarm2'] },
   { id: 'flourMill', title: 'Un değirmeni ve reyon', price: 220, x: -23, z: -4, when: 'breadSold', unlocks: ['flourMill'] },
   { id: 'orangeTartKitchen', title: 'Portakallı tart pastanesi', price: 300, x: -40, z: 0, when: 'flourProduced', unlocks: ['orangeTartKitchen'] },
   { id: 'restaurant', title: 'Gurme restoran', price: 250, x: -30, z: 0, when: 'breadSold', unlocks: ['restaurant'] },
@@ -113,5 +117,16 @@ export const STAFF_HIRES = Object.freeze([
   { upgradeId: 'caretaker', staffTypes: ['caretaker'], effect: 'Yemi kümese, yumurtaları reyona taşır.', unlock: 'İlk yumurta satışından sonra açılır.' },
   { upgradeId: 'chefWaiter', staffTypes: ['chefWaiter', 'waiter'], effect: 'Restoran mutfağını ve masa servisini otomatikleştirir.', unlock: 'Restoran müşterisinden bahşiş alınca açılır.' },
 ]);
+
+export const AD_ONLY_UPGRADE_IDS = Object.freeze([
+  'tomatoFarm2', 'orangeFarm2', 'cornFarm2', 'wheatFarm2',
+  ...STAFF_HIRES.map((hire) => hire.upgradeId),
+]);
+
+export function getStaffCount(state, role) {
+  const hire = STAFF_HIRES.find((entry) => entry.upgradeId === role);
+  if (!hire) return state.workers.filter((worker) => worker.type === role).length;
+  return state.workers.filter((worker) => hire.staffTypes.includes(worker.type)).length;
+}
 
 export const ITEM_ORDER = Object.keys(ITEMS);

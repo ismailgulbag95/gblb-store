@@ -173,7 +173,7 @@ kbd { display: inline-grid; place-items: center; min-width: 24px; min-height: 22
 
 @media (max-width: 720px) {
   #ui-layer { padding: max(9px, env(safe-area-inset-top)) max(9px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(9px, env(safe-area-inset-left)); }
-  .top-bar { top: max(9px, env(safe-area-inset-top)); left: max(9px, env(safe-area-inset-left)); right: max(9px, env(safe-area-inset-right)); display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-rows: 44px 44px; grid-template-areas: "brand quest stats" "utility utility utility"; gap: 5px 7px; min-height: 93px; }
+  .top-bar { top: max(9px, env(safe-area-inset-top)); left: max(9px, env(safe-area-inset-left)); right: max(9px, env(safe-area-inset-right)); display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-rows: 44px 48px; grid-template-areas: "brand quest stats" "utility utility utility"; gap: 5px 7px; min-height: 97px; }
   .brand-pill { grid-area: brand; }
   .stat-group { grid-area: stats; }
   .top-utility-row { grid-area: utility; display: flex; align-items: center; justify-content: space-between; gap: 6px; min-width: 0; }
@@ -211,7 +211,7 @@ kbd { display: inline-grid; place-items: center; min-width: 24px; min-height: 22
   .action-button { justify-self: end; width: min(230px, 100%); min-width: 0; max-width: 230px; min-height: 54px; gap: 7px; padding: 8px 10px; border-radius: 12px; font-size: 12px; }
   .action-button .action-icon { font-size: 18px; }
   .action-button kbd { display: none; }
-  #toast-container { top: calc(env(safe-area-inset-top) + 106px); width: min(360px, calc(100vw - 24px)); transform: translateX(-50%); }
+  #toast-container { top: calc(env(safe-area-inset-top) + 110px); width: min(360px, calc(100vw - 24px)); transform: translateX(-50%); }
   .layout-help { top: calc(env(safe-area-inset-top) + 102px); }
   .modal-overlay { padding: max(10px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left)); }
   .modal-card { width: min(540px, calc(100vw - 20px)); max-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 20px); padding: 16px; border-radius: 17px; }
@@ -262,8 +262,9 @@ kbd { display: inline-grid; place-items: center; min-width: 24px; min-height: 22
   .top-actions { flex: 0 0 auto; gap: 4px; margin-left: auto; }
   .icon-btn { min-width: 44px; height: 44px; padding-inline: 6px; }
   .business-toggle { display: none; }
-  .quest-card { top: 49px; left: 0; width: min(300px, calc(48vw - 18px)); padding: 8px 10px; }
-  .order-card { top: 123px; left: 0; width: min(280px, calc(48vw - 18px)); padding: 8px 10px; }
+  .quest-card { position: absolute; top: 49px; left: 0; width: min(300px, calc(48vw - 18px)); padding: 8px 10px; }
+  .order-card { position: absolute; top: 123px; left: 0; width: min(280px, calc(48vw - 18px)); padding: 8px 10px; }
+  .order-card:not(.collapsed) { top: 123px; width: min(280px, calc(48vw - 18px)); padding: 8px 10px; }
   #toast-container { top: calc(env(safe-area-inset-top) + 60px); }
   .business-card, .business-card.mobile-open { position: absolute; top: calc(env(safe-area-inset-top) + 58px); right: max(9px, env(safe-area-inset-right)); left: auto; display: block; width: min(194px, calc(40vw - 18px)); max-height: calc(100dvh - 170px); overflow: auto; }
   .bottom-controls { z-index: 9; right: max(10px, env(safe-area-inset-right)); bottom: max(8px, env(safe-area-inset-bottom)); left: max(10px, env(safe-area-inset-left)); display: grid; grid-template-columns: 92px minmax(0, 1fr); min-height: 96px; column-gap: 8px; }
