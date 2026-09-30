@@ -1,8 +1,9 @@
-import { AD_ONLY_UPGRADE_IDS, ITEMS, RECIPES, SHELVES, STAFF, STAFF_HIRES, STATIONS, UPGRADES, getStaffCount } from '../domain/catalog.js';
+import { AD_ONLY_UPGRADE_IDS, FARM_AD_UPGRADE_IDS, ITEMS, MONEY_ATOMS, RECIPES, SHELVES, STAFF, STAFF_HIRES, STATIONS, UPGRADES, getStaffCount, staffDailySalaryAtoms } from '../domain/catalog.js';
 import { EconomyLedger } from '../domain/ledger.js';
 import { canTransfer, makeLocation, quantityAt, transferStock } from '../domain/inventory.js';
 import { createInitialState, hydrateState } from '../domain/state.js';
 import { advanceSimulation } from '../domain/simulation.js';
+import { gameDayNumber } from '../domain/dayCycle.js';
 import { createFarmState, removeFarmReady, syncFarmHarvest } from '../domain/farm.js';
 import { canPlaceDecoration, canPlaceStation, getAllStationIds, getMarketCollisionBoxes, getShelfLocations, isStationUnlocked, stationPosition, syncCatalogLayout } from '../domain/layout.js';
 import { DECORATIONS } from '../domain/decorCatalog.js';
@@ -57,14 +58,20 @@ const AD_LIMITS = Object.freeze({
   supplierCooldownMs: 15 * 60_000,
   declinedCooldownMs: 5 * 60_000,
 });
+const BONUS_FIRST_OFFER_MS = 3 * 60_000;
+const BONUS_NEXT_OFFER_MIN_MS = 5 * 60_000;
+const BONUS_NEXT_OFFER_MAX_MS = 8 * 60_000;
+const BONUS_BAG_CAPACITY_MAX = 20;
+const WALK_SPEED_BONUS_MULTIPLIER = 2;
+const WALK_SPEED_BONUS_DURATION_MS = 5 * 60_000;
 
 function localDayKey(timestamp = Date.now()) {
   const date = new Date(timestamp);
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
 
-function addAdEvent(ads, type, placement, rewardId = null, rewardAmount = 0, timestamp = Date.now()) {
-  ads.events.push({ type, placement, rewardId, rewardAmount, at: timestamp });
+function addAdEvent(ads, type, placement, rewardId = null, rewardAmount = 0, timestamp = Date.now(), details = null) {
+  ads.events.push({ type, placement, rewardId, rewardAmount, at: timestamp, ...(details ? { details: clone(details) } : {}) });
   if (ads.events.length > 500) ads.events.splice(0, ads.events.length - 500);
 }
 
@@ -118,21 +125,86 @@ export class GameApplication {
     return this.state.economy.balanceAtoms / 10_000;
   }
 
+  getPendingBonusOffer() {
+    return this.state.bonusOffers.currentOffer ? clone(this.state.bonusOffers.currentOffer) : null;
+  }
+
+  getWalkSpeedMultiplier(now = Date.now()) {
+    return this.state.bonusOffers.walkSpeedExpiresAt > now ? WALK_SPEED_BONUS_MULTIPLIER : 1;
+  }
+
+  getWalkSpeedBonusRemainingMs(now = Date.now()) {
+    return Math.max(0, this.state.bonusOffers.walkSpeedExpiresAt - now);
+  }
+
+  advanceBonusOfferClock(deltaMs, eligible = true) {
+    if (!Number.isFinite(deltaMs) || deltaMs <= 0 || !eligible || this.state.paused
+      || globalThis.document?.hidden || this.state.ads.pending) return null;
+    const offers = this.state.bonusOffers;
+    offers.activePlayMs += deltaMs;
+    if (offers.currentOffer || offers.activePlayMs < offers.nextOfferAtActiveMs
+      || !this.canOfferRewardedAd('bonus-offer', { scheduled: true })) return null;
+
+    const availableTypes = ['walk-speed'];
+    if (this.state.player.capacity < BONUS_BAG_CAPACITY_MAX) availableTypes.push('bag-capacity');
+    const type = availableTypes[Math.floor(Math.random() * availableTypes.length)];
+    const result = this.#command(`bonus-offer:${offers.nextOfferId}`, (draft) => {
+      if (draft.bonusOffers.currentOffer || draft.ads.pending) return { ok: false, reason: 'offer-unavailable' };
+      const offer = { id: `bonus-${draft.bonusOffers.nextOfferId}`, type };
+      draft.bonusOffers.nextOfferId += 1;
+      draft.bonusOffers.currentOffer = offer;
+      const interval = BONUS_NEXT_OFFER_MIN_MS
+        + Math.floor(Math.random() * (BONUS_NEXT_OFFER_MAX_MS - BONUS_NEXT_OFFER_MIN_MS + 1));
+      draft.bonusOffers.nextOfferAtActiveMs = draft.bonusOffers.activePlayMs + interval;
+      addAdEvent(draft.ads, 'offer_shown', 'bonus-offer', null, 0, Date.now(), { bonusId: offer.id, bonusType: offer.type });
+      return { ok: true, offer };
+    });
+    if (!result.ok) return null;
+    this.onEvent({ type: 'bonus-offer-ready', offer: clone(result.offer) });
+    return result.offer;
+  }
+
+  dismissBonusOffer(offerId) {
+    return this.#command(`bonus-offer-dismissed:${offerId}`, (draft) => {
+      const offer = draft.bonusOffers.currentOffer;
+      if (!offer || offer.id !== offerId || draft.ads.pending?.placement === 'bonus-offer') {
+        return { ok: false, reason: 'offer-unavailable' };
+      }
+      draft.bonusOffers.currentOffer = null;
+      draft.ads.dismissedUntil['bonus-offer'] = Date.now() + AD_LIMITS.declinedCooldownMs;
+      addAdEvent(draft.ads, 'offer_declined', 'bonus-offer', null, 0, Date.now(), { bonusId: offer.id, bonusType: offer.type });
+      return { ok: true };
+    });
+  }
+
   isRewardedAdReady(placement) {
     return this.rewardedAdService?.isReady(placement) === true;
   }
 
+  isRewardedAdSimulated() {
+    return this.rewardedAdService?.isSimulated?.() === true;
+  }
+
   canOfferRewardedAd(placement, payload = {}) {
     const state = this.state;
-    if (!this.rewardedAdService?.isReady(placement) || state.paused || globalThis.document?.hidden
-      || state.ordersCompleted < 1 || this.adSessionTicks < 1_800) return false;
+    const simulated = this.isRewardedAdSimulated();
+    const bypassLimits = simulated && placement !== 'bonus-offer';
+    if (!this.rewardedAdService?.isReady(placement) || globalThis.document?.hidden || state.ads.pending
+      || (placement === 'bonus-offer' && state.bonusOffers.activePlayMs < BONUS_FIRST_OFFER_MS)
+      || (!bypassLimits && placement !== 'bonus-offer' && (state.ordersCompleted < 1 || this.adSessionTicks < 1_800))) return false;
     const now = Date.now();
     const ads = state.ads;
     const today = ads.dailyCounts[localDayKey(now)] ?? { completed: 0, placements: {} };
     const recent = ads.recentCompletions.filter((at) => now - at < AD_LIMITS.recentWindowMs);
-    if (today.completed >= AD_LIMITS.totalPerDay || recent.length >= AD_LIMITS.recentLimit
+    if (!bypassLimits && (today.completed >= AD_LIMITS.totalPerDay || recent.length >= AD_LIMITS.recentLimit
       || (ads.lastStartedAt && now - ads.lastStartedAt < AD_LIMITS.globalCooldownMs)
-      || (ads.dismissedUntil[placement] ?? 0) > now) return false;
+      || (ads.dismissedUntil[placement] ?? 0) > now)) return false;
+    if (placement === 'bonus-offer') {
+      const offer = state.bonusOffers.currentOffer;
+      if (payload.scheduled) return Boolean(!offer && state.bonusOffers.activePlayMs >= state.bonusOffers.nextOfferAtActiveMs);
+      if (!offer || offer.id !== payload.offerId || offer.type !== payload.bonusType) return false;
+      return offer.type !== 'bag-capacity' || state.player.capacity < BONUS_BAG_CAPACITY_MAX;
+    }
     if (placement === 'order-double') {
       const orderReward = state.lastOrderReward;
       return Boolean(orderReward && !orderReward.claimed && orderReward.id === payload.orderId
@@ -145,8 +217,8 @@ export class GameApplication {
       const lastPlacementAt = ads.lastPlacementStarts[placement] ?? 0;
       return Boolean(machine && recipe && machine.blocked === 'missing-input'
         && Number.isSafeInteger(machine.blockedTicks) && machine.blockedTicks >= 200
-        && now - lastPlacementAt >= AD_LIMITS.supplierCooldownMs
-        && (today.placements?.[placement] ?? 0) < AD_LIMITS.supplierDropPerDay
+        && (simulated || (now - lastPlacementAt >= AD_LIMITS.supplierCooldownMs
+          && (today.placements?.[placement] ?? 0) < AD_LIMITS.supplierDropPerDay))
         && this.#supplierDropItems(state, payload.machineId, recipe));
     }
     if (placement === 'farm-unlock') {
@@ -158,8 +230,9 @@ export class GameApplication {
     }
     if (placement === 'staff-hire') {
       const hire = STAFF_HIRES.find((entry) => entry.upgradeId === payload.role);
-      return Boolean(hire && (state.availableUpgrades.includes(payload.role) || state.completedUpgrades.includes(payload.role))
-        && (!state.completedUpgrades.includes(payload.role) || getStaffCount(state, payload.role) > 0));
+      const canHireFirstByAd = state.availableUpgrades.includes(payload.role);
+      const canHireExtraByAd = state.completedUpgrades.includes(payload.role) && getStaffCount(state, payload.role) > 0;
+      return Boolean(hire && (canHireFirstByAd || canHireExtraByAd));
     }
     return false;
   }
@@ -210,7 +283,7 @@ export class GameApplication {
       onClosed: () => this.#failRewardedAd(pending, new Error('Ad closed before reward completion.')),
     }, { rewardId, payload: clone(payload) });
     return result && outcome?.ok && outcome.granted
-      ? { ok: true, rewardId, rewardAmount: outcome.rewardAmount ?? 0 }
+      ? { ok: true, rewardId, rewardAmount: outcome.rewardAmount ?? 0, message: outcome.message ?? null }
       : { ok: false, reason: result ? 'reward-unavailable' : 'ad-not-completed' };
   }
 
@@ -253,6 +326,10 @@ export class GameApplication {
     this.#command(`ad-failed:${pending.rewardId}`, (draft) => {
       if (draft.ads.pending?.rewardId !== pending.rewardId) return { ok: false, reason: 'stale-ad' };
       addAdEvent(draft.ads, 'ad_failed', pending.placement, pending.rewardId);
+      if (pending.placement === 'bonus-offer'
+        && draft.bonusOffers.currentOffer?.id === pending.payload.offerId) {
+        draft.bonusOffers.currentOffer = null;
+      }
       draft.ads.pending = null;
       return { ok: true };
     });
@@ -268,6 +345,7 @@ export class GameApplication {
     const now = Date.now();
     let granted = false;
     let rewardAmount = 0;
+    let rewardMessage = null;
     const result = this.#command(`ad-complete:${pending.rewardId}`, (draft) => {
       if (draft.ads.pending?.rewardId !== pending.rewardId) return { ok: false, reason: 'stale-ad' };
       draft.ads.completedAdIds.push(pending.rewardId);
@@ -283,17 +361,18 @@ export class GameApplication {
       const reward = this.#applyRewardedPlacement(draft, pending);
       granted = reward.ok;
       rewardAmount = reward.amount ?? 0;
+      rewardMessage = reward.message ?? null;
       if (granted) {
         draft.ads.grantedRewardIds.push(pending.rewardId);
         if (draft.ads.grantedRewardIds.length > 256) draft.ads.grantedRewardIds.splice(0, draft.ads.grantedRewardIds.length - 256);
-        addAdEvent(draft.ads, 'reward_granted', pending.placement, pending.rewardId, rewardAmount, now);
+        addAdEvent(draft.ads, 'reward_granted', pending.placement, pending.rewardId, rewardAmount, now, reward.details);
       }
       draft.ads.pending = null;
       return { ok: true, granted };
     });
     if (result.ok) this.onEvent({ type: 'ad-end' });
     return result.ok && granted
-      ? { ok: true, granted: true, rewardAmount }
+      ? { ok: true, granted: true, rewardAmount, message: rewardMessage }
       : { ok: false, granted: false, reason: 'reward-no-longer-available' };
   }
 
@@ -304,7 +383,7 @@ export class GameApplication {
       if (!order || order.claimed || order.id !== payload.orderId) return { ok: false };
       new EconomyLedger(state.economy).credit(`order-ad-bonus:${pending.rewardId}`, order.reward, 'rewarded-ad:order-double');
       order.claimed = true;
-      return { ok: true, amount: order.reward, message: `Sipariş reklam ödülü: +$${order.reward}.` };
+      return { ok: true, amount: order.reward, details: { orderId: order.id }, message: `Sipariş reklam ödülü: +$${order.reward}.` };
     }
     if (placement === 'supplier-drop') {
       const station = STATIONS[payload.machineId];
@@ -316,7 +395,7 @@ export class GameApplication {
       for (const [item, quantity] of Object.entries(missing)) input.items[item] = (input.items[item] ?? 0) + quantity;
       machine.blockedTicks = 0;
       machine.blockedSinceTick = null;
-      return { ok: true, amount: 0, message: 'Bir tariflik girdi makineye teslim edildi.' };
+      return { ok: true, amount: 0, details: { machineId: payload.machineId, inputs: missing }, message: 'Bir tariflik girdi makineye teslim edildi.' };
     }
     if (placement === 'farm-unlock') {
       const id = payload.upgradeId;
@@ -325,7 +404,7 @@ export class GameApplication {
       state.unlocked[id] = true;
       this.#applyUpgrade(state, id);
       state.quest = this.#questFor(state);
-      return { ok: true, amount: 0, message: UPGRADE_MESSAGES[id] };
+      return { ok: true, amount: 0, details: { upgradeId: id }, message: UPGRADE_MESSAGES[id] };
     }
     if (placement === 'staff-hire') {
       const role = payload.role;
@@ -341,7 +420,32 @@ export class GameApplication {
       } else {
         this.#hire(state, role);
       }
-      return { ok: true, amount: 0, message: `${STAFF[role]?.title ?? role} reklamla ekibe katıldı.` };
+      return { ok: true, amount: 0, details: { role }, message: `${STAFF[role]?.title ?? role} reklamla ekibe katıldı.` };
+    }
+    if (placement === 'bonus-offer') {
+      const offer = state.bonusOffers.currentOffer;
+      if (!offer || offer.id !== payload.offerId || offer.type !== payload.bonusType) return { ok: false };
+      if (offer.type === 'walk-speed') {
+        const now = Date.now();
+        const expiresAt = Math.max(now, state.bonusOffers.walkSpeedExpiresAt) + WALK_SPEED_BONUS_DURATION_MS;
+        state.bonusOffers.walkSpeedExpiresAt = expiresAt;
+        state.bonusOffers.currentOffer = null;
+        return {
+          ok: true, amount: 0,
+          details: { bonusId: offer.id, bonusType: offer.type, multiplier: WALK_SPEED_BONUS_MULTIPLIER, durationAddedMs: WALK_SPEED_BONUS_DURATION_MS, expiresAt },
+          message: 'Yürüyüş hızın 5 dakika boyunca 2 katına çıktı.',
+        };
+      }
+      if (offer.type === 'bag-capacity' && state.player.capacity < BONUS_BAG_CAPACITY_MAX) {
+        state.player.capacity += 1;
+        state.stock.player.capacity = state.player.capacity;
+        state.bonusOffers.currentOffer = null;
+        return {
+          ok: true, amount: 0,
+          details: { bonusId: offer.id, bonusType: offer.type, capacity: state.player.capacity },
+          message: `Çanta kapasiten kalıcı olarak ${state.player.capacity} oldu.`,
+        };
+      }
     }
     return { ok: false };
   }
@@ -351,8 +455,14 @@ export class GameApplication {
     const output = state.stock[`machine:${machineId}:output`];
     if (!input || !output || output.capacity - Object.values(output.items).reduce((sum, value) => sum + value, 0)
       - (output.reservedCapacity ?? 0) < 1) return null;
+    const incoming = {};
+    for (const reservation of Object.values(state.reservations)) {
+      if (reservation.to === `machine:${machineId}:input`) {
+        incoming[reservation.item] = (incoming[reservation.item] ?? 0) + reservation.quantity;
+      }
+    }
     const missing = Object.fromEntries(Object.entries(recipe.inputs).map(([item, amount]) => [item,
-      Math.max(0, amount - (input.items[item] ?? 0))]).filter(([, amount]) => amount > 0));
+      Math.max(0, amount - (input.items[item] ?? 0) - (incoming[item] ?? 0))]).filter(([, amount]) => amount > 0));
     const needed = Object.values(missing).reduce((sum, amount) => sum + amount, 0);
     const inputUsed = Object.values(input.items).reduce((sum, value) => sum + value, 0);
     if (!needed || needed > 12 || input.capacity - inputUsed - (input.reservedCapacity ?? 0) < needed) return null;
@@ -569,9 +679,7 @@ export class GameApplication {
       shelfFor(itemId);
     };
 
-    if (upgradeId === 'tomatoFarm2') addFarm('tomatoFarm2');
-    if (upgradeId === 'cornFarm2') addFarm('cornFarm2');
-    if (upgradeId === 'wheatFarm2') addFarm('wheatFarm2');
+    if (FARM_AD_UPGRADE_IDS.includes(upgradeId)) addFarm(upgradeId);
     if (upgradeId === 'cashier') this.#hire(state, 'cashier');
     if (upgradeId === 'paste') { addMachine('paste'); unlockProduct('TOMATO_PASTE'); }
     if (upgradeId === 'harvester') this.#hire(state, 'harvester');
@@ -580,7 +688,6 @@ export class GameApplication {
       unlockProduct('ORANGE'); unlockProduct('ORANGE_JUICE');
     }
     if (upgradeId === 'factoryFeeder') this.#hire(state, 'factoryFeeder');
-    if (upgradeId === 'orangeFarm2') addFarm('orangeFarm2');
     if (upgradeId === 'corn') { addFarm('cornFarm'); unlockProduct('CORN'); }
     if (upgradeId === 'popcorn') { addMachine('popcorn'); unlockProduct('POPCORN'); }
     if (upgradeId === 'feed') addMachine('feed');
@@ -618,7 +725,11 @@ export class GameApplication {
       caretaker: [-18, 0], chefWaiter: [-30, 0], waiter: [-35, 0],
     };
     const [x, z] = positions[type] ?? [-8, 0];
-    state.workers.push({ id: `worker-${state.nextEntityId++}`, type, x, z, facing: 0, unlocked: true, upgradeLevel: 0, speedModifier: 1, task: null });
+    state.workers.push({
+      id: `worker-${state.nextEntityId++}`, type, x, z, facing: 0, unlocked: true,
+      upgradeLevel: 0, speedModifier: 1, salaryDebtAtoms: 0, salaryDueDay: null,
+      waitingForSalary: false, task: null,
+    });
   }
 
   #refreshUpgrades(state) {
@@ -671,6 +782,63 @@ export class GameApplication {
     return 'Tebrikler! GBLB STORE ve Gurme Restoran işletmen tamamlandı.';
   }
 
+  #processPayroll(state, dayStarted) {
+    let changed = false;
+    let paidAtoms = 0;
+    let paidCount = 0;
+    let newlyWaitingCount = 0;
+    let resumedCount = 0;
+    const day = gameDayNumber(state.tick);
+
+    const pay = (worker, amountAtoms, dueDay) => {
+      const transactionId = `salary:${worker.id}:${dueDay}`;
+      new EconomyLedger(state.economy).debit(transactionId, amountAtoms / MONEY_ATOMS, `salary:${worker.type}`);
+      worker.salaryDebtAtoms = 0;
+      worker.salaryDueDay = null;
+      worker.waitingForSalary = false;
+      worker.salaryWaitRoute = null;
+      worker.salaryWaitRouteIndex = 0;
+      worker.salaryWaitTarget = null;
+      worker.salaryWaitObstacles = null;
+      paidAtoms += amountAtoms;
+      paidCount += 1;
+      changed = true;
+    };
+
+    for (const worker of state.workers) {
+      const debtAtoms = worker.salaryDebtAtoms ?? 0;
+      if (debtAtoms > 0) {
+        if (state.economy.balanceAtoms < debtAtoms) continue;
+        const wasWaiting = Boolean(worker.waitingForSalary);
+        pay(worker, debtAtoms, worker.salaryDueDay ?? day);
+        if (wasWaiting) resumedCount += 1;
+        continue;
+      }
+      if (!dayStarted) continue;
+
+      const salaryAtoms = staffDailySalaryAtoms(worker.type);
+      if (!salaryAtoms) continue;
+      if (state.economy.balanceAtoms < salaryAtoms) {
+        worker.salaryDebtAtoms = salaryAtoms;
+        worker.salaryDueDay = day;
+        worker.waitingForSalary = true;
+        worker.salaryWaitRoute = null;
+        worker.salaryWaitRouteIndex = 0;
+        worker.salaryWaitTarget = null;
+        worker.salaryWaitObstacles = null;
+        newlyWaitingCount += 1;
+        changed = true;
+        continue;
+      }
+      pay(worker, salaryAtoms, day);
+    }
+
+    const waitingCount = state.workers.filter((worker) => worker.waitingForSalary).length;
+    const shouldReport = (dayStarted && (paidCount > 0 || newlyWaitingCount > 0 || resumedCount > 0))
+      || (!dayStarted && resumedCount > 0);
+    return { changed, paidAtoms, paidCount, newlyWaitingCount, resumedCount, waitingCount, day, shouldReport };
+  }
+
   interact(targetId) {
     const state = this.state;
     const player = state.player;
@@ -714,7 +882,7 @@ export class GameApplication {
         const from = `farm:${station.item}`;
         moved += this.#transferUpTo(draft, from, 'player', station.item, draft.farms[targetId].readyCount);
         removeFarmReady(draft.farms[targetId], moved, draft.tick);
-        return moved ? { ok: true, message: `${ITEMS[station.item].icon} ${moved} ürün alındı.` } : { ok: false, reason: 'empty' };
+        return moved ? { ok: true, message: `${moved} ürün alındı.` } : { ok: false, reason: 'empty' };
       }
       if (station.kind === 'machine') {
         const machine = draft.machines[targetId];
@@ -723,7 +891,7 @@ export class GameApplication {
         const output = `machine:${targetId}:output`;
         const outputItem = recipe.output;
         moved = this.#transferUpTo(draft, output, 'player', outputItem, draft.player.capacity);
-        if (moved) return { ok: true, message: `${ITEMS[outputItem].icon} ${moved} ${ITEMS[outputItem].name} alındı.` };
+        if (moved) return { ok: true, message: `${moved} ${ITEMS[outputItem].name} alındı.` };
         if (!moved) {
           const input = `machine:${targetId}:input`;
           for (const [itemId] of Object.entries(recipe.inputs)) {
@@ -744,10 +912,10 @@ export class GameApplication {
         const carried = quantityAt(draft.stock, 'player', station.item);
         if (carried > 0) {
           moved = stockId ? this.#transferUpTo(draft, 'player', stockId, station.item, carried) : 0;
-          return moved ? { ok: true, message: `${ITEMS[station.item].icon} Reyon dolduruldu.` } : { ok: false, reason: 'destination-full' };
+          return moved ? { ok: true, message: 'Reyon dolduruldu.' } : { ok: false, reason: 'destination-full' };
         }
         moved = stockId ? this.#transferUpTo(draft, stockId, 'player', station.item, draft.player.capacity) : 0;
-        return moved ? { ok: true, message: `${ITEMS[station.item].icon} ${moved} ürün alındı.` } : { ok: false, reason: 'empty' };
+        return moved ? { ok: true, message: `${moved} ürün alındı.` } : { ok: false, reason: 'empty' };
       }
       if (station.kind === 'table') return this.#serveOrCollectTip(draft, targetId);
       if (station.kind === 'register') return { ok: false, reason: 'passive-station' };
@@ -783,7 +951,7 @@ export class GameApplication {
       table.tipAtoms = 0;
       state.stats.tipsCollected += 1;
       this.#refreshUpgrades(state);
-      return { ok: true, message: '💵 Bahşiş alındı.' };
+        return { ok: true, message: 'Bahşiş alındı.' };
     }
     if (!table.customerId) return { ok: false, reason: 'table-empty' };
     const customer = state.customers.find((entry) => entry.id === table.customerId);
@@ -802,12 +970,12 @@ export class GameApplication {
     table.eatTicks = 0;
     table.customerId = customer.id;
     state.stats.tablesServed += 1;
-    return { ok: true, message: `${ITEMS[meal].icon} Yemek servis edildi.` };
+      return { ok: true, message: 'Yemek servis edildi.' };
   }
 
   setPlayerMove(vector, delta) {
     const player = { ...this.state.player };
-    const speed = 7.5 * (this.state.speedMultiplier || 1);
+    const speed = 7.5 * (this.state.speedMultiplier || 1) * this.getWalkSpeedMultiplier();
     let dx = vector.x * speed * delta;
     let dz = vector.z * speed * delta;
     const length = Math.hypot(dx, dz);
@@ -872,8 +1040,9 @@ export class GameApplication {
     const dz = this.target.z - this.state.player.z;
     const distance = Math.hypot(dx, dz);
     if (distance < 0.25) { this.target = null; return; }
-    const step = Math.min(distance, 7.5 * (this.state.speedMultiplier || 1) * delta);
-    this.setPlayerMove({ x: dx / distance, z: dz / distance }, step / (7.5 * (this.state.speedMultiplier || 1)));
+    const speed = 7.5 * (this.state.speedMultiplier || 1) * this.getWalkSpeedMultiplier();
+    const step = Math.min(distance, speed * delta);
+    this.setPlayerMove({ x: dx / distance, z: dz / distance }, step / speed);
   }
 
   getNearbyAction() {
@@ -925,7 +1094,7 @@ export class GameApplication {
       const output = quantityAt(state.stock, `machine:${nearest.id}:output`, recipe.output);
       const input = Object.keys(recipe.inputs).some((item) => quantityAt(state.stock, 'player', item) > 0);
       const missing = Object.entries(recipe.inputs).filter(([item, count]) => quantityAt(state.stock, `machine:${nearest.id}:input`, item) < count);
-      const label = output > 0 ? `${ITEMS[recipe.output].icon} ${output} ürün hazır · al`
+      const label = output > 0 ? `${ITEMS[recipe.output].name} hazır · ${output} ürün al`
         : input ? 'Malzemeleri makineye yükle'
           : missing.length ? `Gerekli: ${missing.map(([item, count]) => `${count} ${ITEMS[item].name}`).join(' + ')}`
             : `Üretiliyor · ${Math.round((state.machines[nearest.id].progressTicks / (recipe.seconds * 10)) * 100)}%`;
@@ -935,12 +1104,12 @@ export class GameApplication {
       const carried = quantityAt(state.stock, 'player', nearest.item);
       const shelf = getShelfLocations(state, nearest.item).find((entry) => entry.id === nearest.id);
       const stocked = quantityAt(state.stock, shelf?.stockId ?? SHELVES[nearest.item]?.id, nearest.item);
-      return { ...nearest, label: carried > 0 ? 'Reyonu doldur' : stocked > 0 ? `${ITEMS[nearest.item].icon} Ürünü al` : 'Reyon boş', actionable: carried > 0 || stocked > 0 };
+      return { ...nearest, label: carried > 0 ? 'Reyonu doldur' : stocked > 0 ? `${ITEMS[nearest.item].name} al` : 'Reyon boş', actionable: carried > 0 || stocked > 0 };
     }
-    if (nearest.kind === 'coop') return { ...nearest, label: quantityAt(state.stock, 'coop:eggs', 'EGG') ? '🥚 Yumurtaları al' : 'Kümese yem bırak' };
+    if (nearest.kind === 'coop') return { ...nearest, label: quantityAt(state.stock, 'coop:eggs', 'EGG') ? 'Yumurtaları al' : 'Kümese yem bırak' };
     if (nearest.kind === 'table') {
       const table = state.diningTables[nearest.id];
-      return { ...nearest, label: table.tipAtoms ? '💵 Bahşişi al' : table.customerId ? 'Yemeği servis et' : nearest.title };
+      return { ...nearest, label: table.tipAtoms ? 'Bahşişi al' : table.customerId ? 'Yemeği servis et' : nearest.title };
     }
     return { ...nearest, label: 'Müşteriler kasada ödeme yapıyor', actionable: false };
   }
@@ -948,11 +1117,14 @@ export class GameApplication {
   tick() {
     const draft = clone(this.state);
     this.adSessionTicks += 1;
-    const { events, durable } = advanceSimulation(draft);
+    const { events, durable } = advanceSimulation(draft, this.obstacles ?? []);
+    const previousDay = gameDayNumber(draft.tick);
     draft.tick += 1;
+    const dayStarted = gameDayNumber(draft.tick) > previousDay;
+    const payroll = this.#processPayroll(draft, dayStarted);
     this.#refreshUpgrades(draft);
     draft.quest = this.#questFor(draft);
-    if (durable) {
+    if (durable || payroll.changed) {
       draft.revision += 1;
       try { this.#persist(`simulation:${draft.tick}`, draft); }
       catch (error) {
@@ -963,6 +1135,7 @@ export class GameApplication {
       this.state = draft;
     }
     for (const event of events) this.onEvent(event);
+    if (payroll.shouldReport) this.onEvent({ type: 'payroll', ...payroll, dayStarted });
     if (draft.tick - this.lastDurableTick >= 300) {
       try { this.#persist(`checkpoint:${draft.tick}:${this.saveService.sequence + 1}`, this.state); }
       catch (error) { this.onEvent({ type: 'save-error', message: error.message }); }
@@ -1027,7 +1200,7 @@ export class GameApplication {
     return this.#command(`debug-capacity:${this.state.revision + 1}`, (draft) => {
       draft.player.capacity = amount;
       draft.stock.player.capacity = amount;
-      return { ok: true, message: `🎒 Taşıma kapasitesi ${amount} oldu.` };
+      return { ok: true, message: `Taşıma kapasitesi ${amount} oldu.` };
     });
   }
 

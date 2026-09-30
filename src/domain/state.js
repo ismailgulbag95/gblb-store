@@ -3,7 +3,7 @@ import { createFarmState, ensureFarmState, syncFarmHarvest } from './farm.js';
 import { canPlaceDecoration } from './layout.js';
 import { machineSpeedMultiplier, staffSpeedMultiplier } from './progression.js';
 
-export const SAVE_VERSION = 6;
+export const SAVE_VERSION = 7;
 
 function emptyStock(capacity) {
   return { capacity, items: {}, reserved: {}, reservedCapacity: 0 };
@@ -44,6 +44,13 @@ export function createInitialState(seed = 0x51f15e) {
       shownOfferKeys: [],
       events: [],
       pending: null,
+    },
+    bonusOffers: {
+      activePlayMs: 0,
+      nextOfferAtActiveMs: 180_000,
+      nextOfferId: 1,
+      currentOffer: null,
+      walkSpeedExpiresAt: 0,
     },
     player: { x: 5, z: 6, facing: 0, capacity: 6, character: 'shopkeeper' },
     farms,
@@ -101,6 +108,7 @@ function removeLegacyFurniture(candidate) {
   const removedStockIds = new Set();
   const removedCustomers = new Set();
   const removedReservations = new Set();
+  const removedFarmStock = new Map();
   const state = structuredClone(candidate);
   state.stock ??= {};
   state.farms ??= {};
@@ -115,17 +123,8 @@ function removeLegacyFurniture(candidate) {
     if (station.kind === 'farm') {
       const farm = state.farms[id];
       const item = farm?.item ?? station.item;
-      const stockId = item ? `farm:${item}` : null;
-      if (stockId && state.stock[stockId]) {
-        const location = state.stock[stockId];
-        const quantity = Math.max(0, Math.floor(farm?.readyCount ?? 0));
-        const stored = location.items?.[item] ?? 0;
-        const reserved = location.reserved?.[item] ?? 0;
-        const available = Math.max(0, stored - reserved);
-        const remaining = stored - Math.min(quantity, available);
-        if (remaining) location.items[item] = remaining;
-        else delete location.items[item];
-      }
+      if (item && farm) removedFarmStock.set(item,
+        (removedFarmStock.get(item) ?? 0) + Math.max(0, Math.floor(farm.readyCount ?? 0)));
       delete state.farms[id];
     }
     if (station.kind === 'shelf') removedStockIds.add(`shelf:${id}`);
@@ -158,6 +157,10 @@ function removeLegacyFurniture(candidate) {
   for (const id of Object.keys(state.farms)) {
     if (STATIONS[id]) continue;
     if (!removedIds.has(id)) continue;
+    const farm = state.farms[id];
+    const item = farm.item ?? legacyStations[id]?.item;
+    if (item) removedFarmStock.set(item,
+      (removedFarmStock.get(item) ?? 0) + Math.max(0, Math.floor(farm.readyCount ?? 0)));
     delete state.farms[id];
   }
   for (const id of Object.keys(state.machines)) {
@@ -178,7 +181,7 @@ function removeLegacyFurniture(candidate) {
     }
   }
   for (const customer of state.customers ?? []) {
-    if (removedCustomers.has(customer.id) || removedIds.has(customer.tableId)
+    if (removedCustomers.has(customer.id) || removedIds.has(customer.tableId) || removedIds.has(customer.targetShelfId)
       || removedIds.has(customer.registerId) || removedIds.has(customer.targetRegisterId)) {
       removedCustomers.add(customer.id);
     }
@@ -218,6 +221,15 @@ function removeLegacyFurniture(candidate) {
     source.reserved[reservation.item] = (source.reserved[reservation.item] ?? 0) + reservation.quantity;
     target.reservedCapacity += reservation.quantity;
   }
+  for (const [item, quantity] of removedFarmStock) {
+    const location = state.stock[`farm:${item}`];
+    if (!location) continue;
+    const stored = location.items?.[item] ?? 0;
+    const reserved = location.reserved?.[item] ?? 0;
+    const remaining = stored - Math.min(quantity, Math.max(0, stored - reserved));
+    if (remaining > 0) location.items[item] = remaining;
+    else delete location.items[item];
+  }
 
   state.customStations = {};
   state.layout = Object.fromEntries(Object.entries(state.layout ?? {}).filter(([id]) => Boolean(STATIONS[id])));
@@ -226,7 +238,7 @@ function removeLegacyFurniture(candidate) {
 
 export function hydrateState(candidate) {
   if (!candidate || typeof candidate !== 'object') throw new Error('Kayıt boş veya bozuk.');
-  if (![2, 3, 4, 5, SAVE_VERSION].includes(candidate.saveVersion)) throw new Error(`Bu kayıt sürümü desteklenmiyor (${candidate.saveVersion ?? 'bilinmiyor'}).`);
+  if (![2, 3, 4, 5, 6, SAVE_VERSION].includes(candidate.saveVersion)) throw new Error(`Bu kayıt sürümü desteklenmiyor (${candidate.saveVersion ?? 'bilinmiyor'}).`);
   candidate = removeLegacyFurniture(candidate);
   const initial = createInitialState(candidate.rng);
   const hydrated = { ...initial, ...candidate };
@@ -241,6 +253,22 @@ export function hydrateState(candidate) {
     && Number.isSafeInteger(candidate.lastOrderReward.reward) && candidate.lastOrderReward.reward > 0
     ? { ...candidate.lastOrderReward, claimed: Boolean(candidate.lastOrderReward.claimed) } : null;
   hydrated.player = { ...initial.player, ...(candidate.player ?? {}) };
+  const savedBonusOffers = candidate.bonusOffers && typeof candidate.bonusOffers === 'object' ? candidate.bonusOffers : {};
+  const savedBonusOffer = savedBonusOffers.currentOffer;
+  hydrated.bonusOffers = {
+    ...initial.bonusOffers,
+    activePlayMs: Number.isFinite(savedBonusOffers.activePlayMs) && savedBonusOffers.activePlayMs >= 0
+      ? savedBonusOffers.activePlayMs : 0,
+    nextOfferAtActiveMs: Number.isFinite(savedBonusOffers.nextOfferAtActiveMs) && savedBonusOffers.nextOfferAtActiveMs >= 180_000
+      ? savedBonusOffers.nextOfferAtActiveMs : 180_000,
+    nextOfferId: Number.isSafeInteger(savedBonusOffers.nextOfferId) && savedBonusOffers.nextOfferId > 0
+      ? savedBonusOffers.nextOfferId : 1,
+    currentOffer: savedBonusOffer && typeof savedBonusOffer.id === 'string'
+      && ['walk-speed', 'bag-capacity'].includes(savedBonusOffer.type)
+      ? { id: savedBonusOffer.id, type: savedBonusOffer.type } : null,
+    walkSpeedExpiresAt: Number.isFinite(savedBonusOffers.walkSpeedExpiresAt) && savedBonusOffers.walkSpeedExpiresAt > 0
+      ? savedBonusOffers.walkSpeedExpiresAt : 0,
+  };
   hydrated.economy = { ...initial.economy, ...(candidate.economy ?? {}) };
   hydrated.settings = { ...initial.settings, ...(candidate.settings ?? {}) };
   hydrated.unlocked = { ...initial.unlocked, ...(candidate.unlocked ?? {}) };
@@ -329,6 +357,12 @@ export function hydrateState(candidate) {
     unlocked: true,
     upgradeLevel: Number.isSafeInteger(worker.upgradeLevel) && worker.upgradeLevel >= 0 ? worker.upgradeLevel : 0,
     speedModifier: staffSpeedMultiplier(Number.isSafeInteger(worker.upgradeLevel) && worker.upgradeLevel >= 0 ? worker.upgradeLevel : 0),
+    salaryDebtAtoms: Number.isSafeInteger(worker.salaryDebtAtoms) && worker.salaryDebtAtoms > 0 ? worker.salaryDebtAtoms : 0,
+    salaryDueDay: Number.isSafeInteger(worker.salaryDueDay) && worker.salaryDueDay > 0 ? worker.salaryDueDay : null,
+    waitingForSalary: Number.isSafeInteger(worker.salaryDebtAtoms) && worker.salaryDebtAtoms > 0,
+    salaryWaitRoute: null,
+    salaryWaitRouteIndex: 0,
+    salaryWaitTarget: null,
     task: worker.task === 'idle' ? null : (worker.task ?? null),
   }));
   for (const [key, value] of Object.entries(hydrated.player)) {

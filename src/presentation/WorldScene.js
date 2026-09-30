@@ -4,9 +4,11 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
 import { Engine } from '../core/Engine.js';
 import { MarketGrid } from '../environment/MarketGrid.js';
 import { ITEMS, RECIPES, SHELVES, STATIONS } from '../domain/catalog.js';
+import { gameDaylight } from '../domain/dayCycle.js';
 import { CharacterFactory } from './CharacterFactory.js';
 import { ZONES, canPlaceDecoration, canPlaceStation, getAllStationIds, getDecorationDimensions, getStationDimensions, isStationUnlocked, stationPosition } from '../domain/layout.js';
 import { DECORATIONS } from '../domain/decorCatalog.js';
+import { drawAssetIcon } from '../ui/AssetIcons.js';
 
 const CUSTOMER_SHIRTS = [0xff4757, 0xffa502, 0x2ed573, 0x1e90ff, 0xa55eea, 0xff6b81, 0x00d2d3, 0xffc048];
 const CUSTOMER_HAIR = [0x2c3e50, 0x6d4c41, 0xdfe6e9, 0xf1c40f, 0xb33939];
@@ -121,9 +123,10 @@ export class WorldScene {
   #createAtmosphere() {
     const sun = new THREE.Mesh(
       new THREE.SphereGeometry(2.5, 16, 12),
-      new THREE.MeshBasicMaterial({ color: 0xfff4c7 }),
+      new THREE.MeshBasicMaterial({ color: 0xfff4c7, transparent: true, depthWrite: false }),
     );
     sun.position.set(-54, 24, -36);
+    this.sun = sun;
     this.scene.add(sun);
   }
 
@@ -630,7 +633,7 @@ export class WorldScene {
         ctx.fillStyle = '#f1c40f'; ctx.fillRect(0, 34, 256, 5); ctx.fillRect(0, 217, 256, 5);
         ctx.fillStyle = '#ffffff'; ctx.font = 'bold 36px Fredoka, sans-serif'; ctx.textAlign = 'center';
         ctx.fillText('SALÇA', 128, 115);
-        ctx.font = '32px sans-serif'; ctx.fillText('🥫', 128, 165);
+        ctx.font = 'bold 28px Fredoka, sans-serif'; ctx.fillText('EV YAPIMI', 128, 165);
         const texture = new THREE.CanvasTexture(canvas);
         material = new THREE.MeshStandardMaterial({ map: texture, roughness: 0.35, metalness: 0.3 });
       } else if (itemId === 'POPCORN') {
@@ -707,7 +710,7 @@ export class WorldScene {
         }
         ctx.fillStyle = '#5c3a21'; ctx.fillRect(0, 185, 256, 16);
         ctx.fillStyle = '#3e2723'; ctx.font = 'bold 36px sans-serif'; ctx.textAlign = 'center';
-        ctx.fillText('🌾 YEM', 128, 120);
+        ctx.fillText('TAVUK YEMİ', 128, 120);
         const texture = new THREE.CanvasTexture(canvas);
         material = new THREE.MeshStandardMaterial({ map: texture, roughness: 0.85 });
       } else if (itemId === 'BREAD') {
@@ -1813,7 +1816,27 @@ export class WorldScene {
       badgeContext.font = 'bold 78px sans-serif';
       badgeContext.textAlign = 'center';
       badgeContext.textBaseline = 'middle';
-      badgeContext.fillText('♻', 64, 67);
+      badgeContext.lineWidth = 8;
+      badgeContext.lineCap = 'round';
+      badgeContext.lineJoin = 'round';
+      badgeContext.strokeStyle = '#15803d';
+      for (let index = 0; index < 3; index += 1) {
+        badgeContext.save();
+        badgeContext.translate(64, 64);
+        badgeContext.rotate(index * Math.PI * 2 / 3);
+        badgeContext.beginPath();
+        badgeContext.moveTo(-16, -22);
+        badgeContext.lineTo(10, -22);
+        badgeContext.lineTo(10, -8);
+        badgeContext.stroke();
+        badgeContext.beginPath();
+        badgeContext.moveTo(10, -8);
+        badgeContext.lineTo(0, -14);
+        badgeContext.moveTo(10, -8);
+        badgeContext.lineTo(15, -20);
+        badgeContext.stroke();
+        badgeContext.restore();
+      }
       const badgeTexture = new THREE.CanvasTexture(badgeCanvas);
       badgeTexture.colorSpace = THREE.SRGBColorSpace;
       const badge = new THREE.Mesh(new THREE.PlaneGeometry(0.22, 0.22), new THREE.MeshBasicMaterial({ map: badgeTexture }));
@@ -1851,7 +1874,7 @@ export class WorldScene {
       ctx.font = 'bold 36px Fredoka, sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText('🛒 GBLB SUPERMARKET', 256, 95);
+      ctx.fillText('GBLB SUPERMARKET', 256, 95);
       ctx.fillStyle = '#f1c40f';
       ctx.font = 'bold 28px Fredoka, sans-serif';
       ctx.fillText('HOŞ GELDİNİZ • WELCOME', 256, 160);
@@ -1901,7 +1924,7 @@ export class WorldScene {
         pCtx.fillRect(20, 260, 216, 90);
         pCtx.fillStyle = '#2ed573';
         pCtx.font = 'bold 24px sans-serif';
-        pCtx.fillText('🛒 SÜPER FİYAT', 128, 315);
+        pCtx.fillText('SÜPER FİYAT', 128, 315);
 
         const posterTexture = new THREE.CanvasTexture(posterCanvas);
         posterTexture.colorSpace = THREE.SRGBColorSpace;
@@ -2556,7 +2579,7 @@ export class WorldScene {
       actor.group.position.y += Math.sin(time * 3 + customer.id.length) * 0.012;
     }
 
-    const wish = customer.reaction ? (customer.reaction === 'happy' ? '😊' : '😕') : customer.kind === 'diner'
+    const wish = customer.reaction ? (customer.reaction === 'happy' ? 'satisfied' : 'unhappy') : customer.kind === 'diner'
       ? (customer.phase === 'waiting-meal' ? customer.demand : null)
       : (['entering', 'to-shelf', 'waiting-stock', 'to-next-shelf'].includes(customer.phase)
         ? customer.shoppingList?.[customer.shoppingIndex ?? 0] ?? customer.demand : null);
@@ -2571,10 +2594,7 @@ export class WorldScene {
         context.lineWidth = 6;
         context.strokeStyle = '#2c3e50';
         context.stroke();
-        context.font = '52px sans-serif';
-        context.textAlign = 'center';
-        context.textBaseline = 'middle';
-        context.fillText(ITEMS[wish]?.icon ?? wish, 64, 62);
+        drawAssetIcon(context, ITEMS[wish]?.icon ?? wish, 32, 28, 64, 64);
         actor.bubbleTexture.needsUpdate = true;
       }
       actor.bubble.visible = Boolean(wish);
@@ -2633,6 +2653,10 @@ export class WorldScene {
   render(state, availableUpgrades = []) {
     const frameDelta = Math.min(this.clock.getDelta(), 0.05);
     const time = this.clock.elapsedTime;
+    const daylight = gameDaylight(state.tick);
+    this.engine.setDaylight(daylight);
+    this.sun.material.opacity = daylight;
+    this.sun.visible = daylight > 0.01;
     this.environment.update(frameDelta, time);
     const wasMoving = Math.hypot(state.player.x - this.playerMesh.position.x, state.player.z - this.playerMesh.position.z) > 0.001;
     if (this.playerCharacter.type !== state.player.character) {
@@ -2823,7 +2847,7 @@ export class WorldScene {
 
       const distance = Math.hypot(state.player.x - table.position.x, state.player.z - table.position.z);
       this.#statusBadge(table, ready ? (state.settings.language === 'en' ? 'TIP READY' : 'BAHŞİŞ HAZIR')
-        : waiting ? `${ITEMS[customer.demand]?.icon ?? '🍽️'} ${state.settings.language === 'en' ? 'ORDER' : 'SİPARİŞ'}` : '',
+        : waiting ? (state.settings.language === 'en' ? 'ORDER' : 'SİPARİŞ') : '',
       ready ? '#58cc02' : '#ff9600', (ready || waiting) && distance < 12, 2.1);
     }
 

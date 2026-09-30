@@ -1,17 +1,21 @@
 import './style.css';
 import { GameApplication } from './application/GameApplication.js';
 import { SaveService } from './infrastructure/SaveService.js';
-import { AdMobRewardedProvider, RewardedAdService } from './infrastructure/RewardedAdProvider.js';
+import { AdMobRewardedProvider, DevelopmentRewardedProvider, RewardedAdService } from './infrastructure/RewardedAdProvider.js';
 import { HUD } from './presentation/HUD.js';
 import { InputManager } from './presentation/InputManager.js';
 import { WorldScene } from './presentation/WorldScene.js';
+import { hydrateAssetIcons, preloadAssetAtlas } from './ui/AssetIcons.js';
+
+hydrateAssetIcons();
 
 const SIMULATION_STEP = 0.1;
 const MAX_TICKS_PER_FRAME = 5;
 
 function showFatal(message) {
   const container = document.getElementById('game-container');
-  container.innerHTML = `<section class="fatal-card"><span>⚠️</span><h1>Oyun başlatılamadı</h1><p></p><small>Sayfayı yenileyip tekrar deneyebilirsin.</small></section>`;
+  container.innerHTML = `<section class="fatal-card"><span data-asset-icon="warning" data-asset-size="54"></span><h1>Oyun başlatılamadı</h1><p></p><small>Sayfayı yenileyip tekrar deneyebilirsin.</small></section>`;
+  hydrateAssetIcons(container);
   container.querySelector('p').textContent = message;
 }
 
@@ -30,12 +34,17 @@ function showRecovery(saveService, error) {
   }, { once: true });
 }
 
-function boot() {
+async function boot() {
   let saveService;
   let app;
   try {
+    await preloadAssetAtlas();
     saveService = new SaveService();
-    app = new GameApplication(saveService, undefined, new RewardedAdService(new AdMobRewardedProvider()));
+    const admobProvider = new AdMobRewardedProvider();
+    const rewardedProvider = import.meta.env.DEV
+      ? new DevelopmentRewardedProvider(admobProvider, true, 3_000)
+      : admobProvider;
+    app = new GameApplication(saveService, undefined, new RewardedAdService(rewardedProvider));
   } catch (error) {
     if (saveService && error.name === 'SaveRecoveryError') showRecovery(saveService, error);
     else showFatal(error.message);
@@ -53,18 +62,25 @@ function boot() {
 
   const pauseReasons = new Set();
   let input;
+  let hud;
+  const showPendingBonusOffer = () => queueMicrotask(() => {
+    if (!hud || pauseReasons.size || document.hidden || app.getState().ads.pending) return;
+    const offer = app.getPendingBonusOffer();
+    if (offer && app.canOfferRewardedAd('bonus-offer', { offerId: offer.id, bonusType: offer.type })) hud.openBonusOffer(offer);
+  });
   const setPaused = () => {
     const paused = pauseReasons.size > 0;
     app.setPaused(paused);
     input?.setEnabled(!paused);
   };
-  const hud = new HUD(app, null, (open) => {
+  hud = new HUD(app, null, (open) => {
     if (open) pauseReasons.add('modal');
     else {
       pauseReasons.delete('modal');
       pauseReasons.delete('resume-required');
     }
     setPaused();
+    if (!open) showPendingBonusOffer();
   });
   input = new InputManager(world.getCanvas(), world, app, () => document.getElementById('btn-interact').click());
   const layoutButton = document.getElementById('btn-layout');
@@ -100,6 +116,10 @@ function boot() {
   }
 
   app.setEventHandler((event) => {
+    if (event.type === 'bonus-offer-ready') {
+      if (!pauseReasons.size && !document.hidden && !app.getState().ads.pending) hud.openBonusOffer(event.offer);
+      return;
+    }
     if (event.type === 'ad-start') {
       pauseReasons.add('rewarded-ad');
       setPaused();
@@ -108,9 +128,10 @@ function boot() {
       pauseReasons.delete('rewarded-ad');
       setPaused();
     }
-    if (event.type === 'toast' || event.type === 'sale' || event.type === 'production' || event.type === 'tip-ready') {
+    if (event.type === 'toast' || event.type === 'sale' || event.type === 'production'
+      || event.type === 'tip-ready' || event.type === 'payroll') {
       hud.showEvent(event);
-      if (event.tone !== 'error') world.playEvent(event, app.getState());
+      if (event.type !== 'payroll' && event.tone !== 'error') world.playEvent(event, app.getState());
     }
     if (event.type === 'save-error') {
       pauseReasons.add('save-error');
@@ -123,6 +144,7 @@ function boot() {
       hud.toast('Yeni oyun hazır.');
     }
   });
+  if (!app.getState().paused && !app.getState().ads.pending) showPendingBonusOffer();
 
   let hiddenAt = 0;
   document.addEventListener('visibilitychange', () => {
@@ -184,6 +206,13 @@ function boot() {
         if (pauseReasons.size > 0) break;
       }
       if (ticks === MAX_TICKS_PER_FRAME && simulationAccumulator >= SIMULATION_STEP) simulationAccumulator = 0;
+      const pendingBonusOffer = app.getPendingBonusOffer();
+      if (pendingBonusOffer && !input.layoutMode
+        && app.canOfferRewardedAd('bonus-offer', { offerId: pendingBonusOffer.id, bonusType: pendingBonusOffer.type })) {
+        hud.openBonusOffer(pendingBonusOffer);
+      } else {
+        app.advanceBonusOfferClock(elapsed * 1000, !input.layoutMode && pauseReasons.size === 0);
+      }
     }
 
     const state = app.getState();

@@ -1,21 +1,23 @@
-import { ITEMS, RECIPES, SHELVES, STAFF, STAFF_HIRES, STATIONS, UPGRADES } from '../domain/catalog.js';
+import { FARM_AD_UPGRADE_IDS, ITEMS, MONEY_ATOMS, RECIPES, SHELVES, STAFF, STAFF_HIRES, STATIONS, UPGRADES, staffDailySalaryAtoms } from '../domain/catalog.js';
 import { DECORATIONS, decorBonus, decorScore } from '../domain/decorCatalog.js';
 import { decorationPrice, orderProgress } from '../domain/orders.js';
 import { machineProductionSeconds, machineSpeedMultiplier, machineUpgradeCost, percentGain, staffSpeedMultiplier, staffUpgradeCost } from '../domain/progression.js';
+import { gameDayNumber } from '../domain/dayCycle.js';
+import { assetIconMarkup, hydrateAssetIcons } from '../ui/AssetIcons.js';
 
 const UPGRADE_ICONS = {
-  tomatoFarm2: '🍅', cornFarm2: '🌽', wheatFarm2: '🌾', cashier: '🧑‍💼', paste: '🥫', harvester: '🧑‍🌾', orange: '🍊',
-  factoryFeeder: '🧑‍🔧', orangeFarm2: '🍊', corn: '🌽', popcorn: '🍿', feed: '🌾',
-  coop: '🐔', chicken2: '🐔', chicken3: '🐔', caretaker: '🧑‍🌾', bakery: '🍞',
-  flourMill: '🌾', orangeTartKitchen: '🥧',
-  restaurant: '🍽️', chefWaiter: '🧑‍🍳',
+  tomatoFarm2: 'tomato', cornFarm2: 'corn', wheatFarm2: 'wheat', cashier: 'cashier', paste: 'tomatoPaste', harvester: 'workerAvatar', orange: 'orange',
+  factoryFeeder: 'courierAvatar', orangeFarm2: 'orange', corn: 'corn', popcorn: 'popcorn', feed: 'chickenFeed',
+  coop: 'coop', chicken2: 'coop', chicken3: 'coop', caretaker: 'workerAvatar', bakery: 'bread',
+  flourMill: 'flour', orangeTartKitchen: 'orangeTart',
+  restaurant: 'table', chefWaiter: 'chef',
 };
 
 const EN = {
   business: 'BUSINESS', customers: 'Customers', workers: 'Staff', shelfStock: 'Shelf stock',
   viewProducts: 'View products', upgrades: 'Business upgrades', settings: 'Settings',
   nextGoal: 'NEXT GOAL', inventory: 'Inventory', language: 'Interface language',
-  normal: 'Normal speed', resume: '▶ Resume game', noUpgrade: 'No upgrades available right now. Make a sale to unlock the next step.',
+  normal: 'Normal speed', resume: 'Resume game', noUpgrade: 'No upgrades available right now. Make a sale to unlock the next step.',
   live: 'LIVE', grow: 'GROW YOUR BUSINESS', newUpgrades: 'New upgrades', stock: 'STOCK STATUS',
   general: 'General', character: 'Character', developer: 'Developer', sound: 'Sound effects',
   haptics: 'Haptic feedback', backgroundNote: 'The simulation pauses while the app is in the background. Tap resume when you return.',
@@ -37,10 +39,11 @@ export class HUD {
     this.app = app;
     this.input = input;
     this.onModalChange = onModalChange;
-    this.modals = ['expansion-modal', 'settings-modal', 'inventory-modal', 'decor-modal', 'recovery-modal'];
+    this.modals = ['expansion-modal', 'settings-modal', 'inventory-modal', 'decor-modal', 'recovery-modal', 'bonus-offer-modal'];
     this.lastUpgradeSignature = '';
     this.lastInventorySignature = '';
     this.lastLanguage = null;
+    hydrateAssetIcons();
     this.#bind();
   }
 
@@ -60,6 +63,18 @@ export class HUD {
     };
     syncOrderLayout();
     compactOrderMedia.addEventListener('change', syncOrderLayout);
+    const toggleOrderCard = () => {
+      const collapsed = orderCard.classList.toggle('collapsed');
+      const english = this.app.getState().settings.language === 'en';
+      orderToggle.setAttribute('aria-expanded', String(!collapsed));
+      orderToggle.setAttribute('aria-label', english
+        ? (collapsed ? 'Expand customer order' : 'Collapse customer order')
+        : (collapsed ? 'Sipariş ayrıntılarını aç' : 'Sipariş ayrıntılarını kapat'));
+      orderToggle.textContent = collapsed ? '⌄' : '⌃';
+    };
+    orderCard.querySelector('.order-heading').addEventListener('click', (event) => {
+      if (!event.target.closest('button')) toggleOrderCard();
+    });
 
     document.getElementById('btn-expansions').addEventListener('click', () => this.open('expansion-modal'));
     document.getElementById('btn-settings').addEventListener('click', () => this.open('settings-modal'));
@@ -71,26 +86,24 @@ export class HUD {
       button.setAttribute('aria-expanded', String(open));
       button.setAttribute('aria-label', open ? 'İşletme özetini kapat' : 'İşletme özetini aç');
     });
-    document.getElementById('btn-order-toggle').addEventListener('click', () => {
-      const card = document.getElementById('order-card');
-      const collapsed = card.classList.toggle('collapsed');
-      const button = document.getElementById('btn-order-toggle');
-      const english = this.app.getState().settings.language === 'en';
-      button.setAttribute('aria-expanded', String(!collapsed));
-      button.setAttribute('aria-label', english
-        ? (collapsed ? 'Expand customer order' : 'Collapse customer order')
-        : (collapsed ? 'Sipariş ayrıntılarını aç' : 'Sipariş ayrıntılarını kapat'));
-      button.textContent = collapsed ? '⌄' : '⌃';
-    });
+    orderToggle.addEventListener('click', toggleOrderCard);
     document.getElementById('btn-deliver-order').addEventListener('click', () => {
       const result = this.app.fulfillOrder();
       if (!result.ok) this.toast('Sipariş için çantanda yeterli ürün yok.', 'error');
       this.render(this.app.getState(), this.app.getNearbyAction(), true);
     });
-    document.getElementById('btn-order-ad').addEventListener('click', () => this.#watchAd('order-double', { orderId: this.app.getState().lastOrderReward?.id }));
+    document.getElementById('btn-order-ad').addEventListener('click', (event) => this.#watchAd('order-double', { orderId: this.app.getState().lastOrderReward?.id }, event.currentTarget));
     document.getElementById('btn-order-ad-decline').addEventListener('click', () => this.#declineAd('order-double', { orderId: this.app.getState().lastOrderReward?.id }));
-    document.getElementById('btn-machine-ad').addEventListener('click', () => this.#watchAd('supplier-drop', { machineId: this.currentSupplierMachineId }));
+    document.getElementById('btn-machine-ad').addEventListener('click', (event) => this.#watchAd('supplier-drop', { machineId: this.currentSupplierMachineId }, event.currentTarget));
     document.getElementById('btn-machine-ad-decline').addEventListener('click', () => this.#declineAd('supplier-drop', { machineId: this.currentSupplierMachineId }));
+    document.getElementById('btn-bonus-ad').addEventListener('click', (event) => {
+      if (!this.currentBonusOffer) return;
+      this.#watchAd('bonus-offer', {
+        offerId: this.currentBonusOffer.id,
+        bonusType: this.currentBonusOffer.type,
+      }, event.currentTarget);
+    });
+    document.getElementById('btn-bonus-decline').addEventListener('click', () => this.close('bonus-offer-modal'));
     document.getElementById('btn-decor-top').addEventListener('click', () => this.open('decor-modal'));
     document.getElementById('decor-list').addEventListener('click', (event) => {
       const button = event.target.closest('[data-buy-decoration]');
@@ -132,7 +145,7 @@ export class HUD {
     document.getElementById('expansion-modal').addEventListener('click', (event) => {
       const adButton = event.target.closest('[data-ad-accept]');
       if (adButton) {
-        this.#watchAd(adButton.dataset.adAccept, this.#adPayload(adButton));
+        this.#watchAd(adButton.dataset.adAccept, this.#adPayload(adButton), adButton);
         return;
       }
       const declineButton = event.target.closest('[data-ad-decline]');
@@ -206,14 +219,30 @@ export class HUD {
     };
   }
 
-  async #watchAd(placement, payload = {}) {
-    if (!placement) return;
-    const result = await this.app.watchRewardedAd(placement, payload);
-    this.render(this.app.getState(), this.app.getNearbyAction(), true);
+  async #watchAd(placement, payload = {}, button = null) {
+    if (!placement || this.rewardedAdRequestActive) return;
+    this.rewardedAdRequestActive = true;
+    if (button) {
+      button.disabled = true;
+      const english = this.app.getState().settings.language === 'en';
+      button.textContent = this.app.isRewardedAdSimulated()
+        ? (english ? 'Simulation · 3 sec…' : 'Simülasyon · 3 sn…')
+        : (english ? 'Opening ad…' : 'Reklam açılıyor…');
+    }
+    let result;
+    try {
+      result = await this.app.watchRewardedAd(placement, payload);
+    } catch {
+      result = { ok: false, reason: 'ad-not-completed' };
+    } finally {
+      this.rewardedAdRequestActive = false;
+      if (placement === 'bonus-offer') this.close('bonus-offer-modal');
+      this.render(this.app.getState(), this.app.getNearbyAction(), true);
+    }
     if (result.ok) {
-      const message = result.rewardAmount
+      const message = result.message ?? (result.rewardAmount
         ? `Reklam ödülü alındı: +$${result.rewardAmount}.`
-        : 'Ödül başarıyla alındı.';
+        : 'Ödül başarıyla alındı.');
       this.toast(message);
     } else if (result.reason === 'ad-not-completed') {
       this.toast('Reklam tamamlanmadı; ödül verilmedi.', 'error');
@@ -282,12 +311,43 @@ export class HUD {
     if (id === 'settings-modal') this.#syncSettings(this.app.getState());
   }
 
+  openBonusOffer(offer) {
+    if (!offer || !['walk-speed', 'bag-capacity'].includes(offer.type)) return;
+    this.currentBonusOffer = offer;
+    const english = this.app.getState().settings.language === 'en';
+    const speed = offer.type === 'walk-speed';
+    document.querySelector('#bonus-offer-modal .eyebrow').textContent = english ? 'DAILY BONUS' : 'GÜNLÜK BONUS';
+    document.getElementById('bonus-offer-icon').textContent = speed ? '⚡' : '🎒';
+    document.getElementById('bonus-offer-title').textContent = english ? 'Surprise bonus!' : 'Sürpriz bonus!';
+    document.getElementById('bonus-offer-name').textContent = speed
+      ? (english ? 'Double walking speed' : 'Yürüyüş hızın 2 katına çıksın')
+      : (english ? 'Permanently expand your bag' : 'Çanta kapasiteni kalıcı artır');
+    document.getElementById('bonus-offer-description').textContent = speed
+      ? (english ? 'Watch a rewarded ad to walk 2× faster for 5 minutes. Watch again to add 5 minutes to the remaining time.' : 'Ödüllü reklamı izle, 5 dakika boyunca 2 kat hızlı yürü. Tekrar izleyerek kalan süreye 5 dakika ekleyebilirsin.')
+      : (english ? `Watch a rewarded ad to permanently add 1 bag slot. Repeat up to ${20} slots total.` : 'Ödüllü reklamı izle, çanta kapasiten kalıcı olarak +1 artsın. Toplam 20 slota kadar tekrarlayabilirsin.');
+    document.getElementById('btn-bonus-ad').textContent = speed
+      ? (english ? 'Watch ad · +5 min' : 'Reklamı izle · +5 dk')
+      : (english ? 'Watch ad · +1 slot' : 'Reklamı izle · +1 yer');
+    document.getElementById('btn-bonus-decline').textContent = english ? 'Maybe later' : 'Şimdi değil';
+    this.open('bonus-offer-modal');
+  }
+
   close(id) {
+    if (id === 'bonus-offer-modal' && this.currentBonusOffer
+      && this.app.getState().ads.pending?.placement !== 'bonus-offer') {
+      this.app.dismissBonusOffer(this.currentBonusOffer.id);
+      this.currentBonusOffer = null;
+    }
     document.getElementById(id)?.classList.add('hidden');
     this.#notifyModalState();
   }
 
   closeAll() {
+    if (!document.getElementById('bonus-offer-modal').classList.contains('hidden') && this.currentBonusOffer
+      && this.app.getState().ads.pending?.placement !== 'bonus-offer') {
+      this.app.dismissBonusOffer(this.currentBonusOffer.id);
+      this.currentBonusOffer = null;
+    }
     this.modals.forEach((id) => document.getElementById(id).classList.add('hidden'));
     this.#notifyModalState();
   }
@@ -322,9 +382,21 @@ export class HUD {
     const language = state.settings.language;
     this.#applyLanguage(language);
     const balance = state.economy.balanceAtoms / 10_000;
-    document.getElementById('money-display').textContent = `$${balance.toLocaleString(language === 'tr' ? 'tr-TR' : 'en-US', { maximumFractionDigits: 2 })}`;
+    const moneyLabel = `$${balance.toLocaleString(language === 'tr' ? 'tr-TR' : 'en-US', { maximumFractionDigits: 2 })}`;
+    document.getElementById('money-display').textContent = moneyLabel;
+    document.querySelector('.money-pill').classList.toggle('compact', moneyLabel.length >= 8);
+    document.getElementById('day-display').textContent = language === 'en'
+      ? `Day ${gameDayNumber(state.tick)}` : `Gün ${gameDayNumber(state.tick)}`;
     const playerCount = Object.values(state.stock.player.items).reduce((sum, count) => sum + count, 0);
     document.getElementById('stack-display').textContent = `${playerCount} / ${state.player.capacity}`;
+    const walkSpeedRemaining = this.app.getWalkSpeedBonusRemainingMs();
+    const walkSpeedBadge = document.getElementById('walk-speed-buff');
+    walkSpeedBadge.classList.toggle('hidden', walkSpeedRemaining <= 0);
+    if (walkSpeedRemaining > 0) {
+      const seconds = Math.ceil(walkSpeedRemaining / 1000);
+      const timer = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+      walkSpeedBadge.textContent = `${language === 'en' ? 'Walk x2' : 'Yürüyüş x2'} · ${timer}`;
+    }
     document.getElementById('customer-count').textContent = String(state.customers.length);
     document.getElementById('worker-count').textContent = String(state.workers.length);
     let shelfTotal = 0;
@@ -340,7 +412,7 @@ export class HUD {
     if (order) {
       const held = orderProgress(state);
       const itemName = language === 'en' ? this.#itemNameEnglish(order.item, ITEMS[order.item].name) : ITEMS[order.item].name;
-      document.getElementById('order-item').textContent = `${ITEMS[order.item].icon} ${itemName} × ${order.quantity}`;
+      document.getElementById('order-item').innerHTML = `${assetIconMarkup(ITEMS[order.item].icon, 28)} ${itemName} × ${order.quantity}`;
       document.getElementById('order-reward').textContent = `+$${order.reward}`;
       document.getElementById('order-progress').textContent = `${held} / ${order.quantity}`;
       document.getElementById('order-progress-fill').style.width = `${held / order.quantity * 100}%`;
@@ -359,8 +431,7 @@ export class HUD {
     const actionButton = document.getElementById('btn-interact');
     const actionLabel = document.getElementById('action-label');
     actionButton.disabled = !action || action.actionable === false;
-    document.querySelector('#btn-interact .action-icon').textContent = action
-      ? ({ farm: '🌱', machine: '⚙️', shelf: '📦', coop: '🐔', table: '🍽️', register: '💵', upgrade: '🏗️', trashBin: '🗑️' })[action.kind] ?? '✋' : '✋';
+    document.querySelector('#btn-interact .action-icon').innerHTML = assetIconMarkup(this.#actionIcon(action), 38);
     actionLabel.textContent = action ? this.#actionText(action, state) : (language === 'en' ? 'Move closer to a station' : 'Bir istasyona yaklaş');
     document.getElementById('upgrade-count').textContent = String(this.app.getAvailableUpgrades().length);
     this.renderAdOffers(state, action);
@@ -387,20 +458,30 @@ export class HUD {
         ? `Watch a rewarded ad to double this order bonus (+$${orderReward.reward}).`
         : `Ödüllü reklamı izle, bu sipariş kazancını ikiye katla (+$${orderReward.reward}).`;
       document.getElementById('btn-order-ad').dataset.adOrder = orderReward.id;
-      document.getElementById('btn-order-ad').textContent = english ? `Watch · +$${orderReward.reward}` : `İzle · +$${orderReward.reward}`;
+      const adLabel = this.app.isRewardedAdSimulated()
+        ? (english ? 'Wait 3 sec · ' : '3 sn bekle · ')
+        : (english ? 'Watch · ' : 'İzle · ');
+      document.getElementById('btn-order-ad').textContent = `${adLabel}+$${orderReward.reward}`;
     }
 
     const machineOffer = document.getElementById('machine-ad-offer');
     const machine = action?.kind === 'machine' ? state.machines[action.id] : null;
     const supplierPayload = machine ? { machineId: action.id } : null;
-    const supplierReady = Boolean(supplierPayload && this.app.canOfferRewardedAd('supplier-drop', supplierPayload));
+    const supplierReady = Boolean(!orderReady && supplierPayload
+      && this.app.canOfferRewardedAd('supplier-drop', supplierPayload));
     machineOffer.classList.toggle('hidden', !supplierReady);
     this.currentSupplierMachineId = supplierReady ? action.id : null;
     if (supplierReady) {
       const recipe = RECIPES[machine.recipe ?? STATIONS[action.id]?.recipe];
       const input = state.stock[`machine:${action.id}:input`];
+      const incoming = {};
+      for (const reservation of Object.values(state.reservations)) {
+        if (reservation.to === `machine:${action.id}:input`) {
+          incoming[reservation.item] = (incoming[reservation.item] ?? 0) + reservation.quantity;
+        }
+      }
       const missing = Object.entries(recipe.inputs)
-        .map(([item, amount]) => [item, Math.max(0, amount - (input.items[item] ?? 0))])
+        .map(([item, amount]) => [item, Math.max(0, amount - (input.items[item] ?? 0) - (incoming[item] ?? 0))])
         .filter(([, amount]) => amount > 0);
       const supplies = missing.map(([item, amount]) => `${amount} ${ITEMS[item].name}`).join(' + ');
       this.app.markRewardedOfferShown('supplier-drop', supplierPayload);
@@ -408,7 +489,9 @@ export class HUD {
         ? `Machine stopped for missing inputs. Watch to deliver ${supplies} for one recipe batch.`
         : `Makine girdisiz durdu. Bir tariflik ${supplies} girdiyi reklamla al.`;
       document.getElementById('btn-machine-ad').dataset.adMachine = action.id;
-      document.getElementById('btn-machine-ad').textContent = english ? 'Watch and get inputs' : 'İzle ve girdiyi al';
+      document.getElementById('btn-machine-ad').textContent = this.app.isRewardedAdSimulated()
+        ? (english ? 'Wait 3 sec · Get inputs' : '3 sn bekle · Girdiyi al')
+        : (english ? 'Watch and get inputs' : 'İzle ve girdiyi al');
     }
   }
 
@@ -418,10 +501,10 @@ export class HUD {
     const english = language === 'en';
     document.querySelector('.business-heading strong').textContent = english ? EN.business : 'İŞLETME';
     document.querySelector('.business-heading small').textContent = english ? EN.live : 'CANLI';
-    document.querySelectorAll('.business-row')[0].children[0].textContent = `🧑‍🤝‍🧑 ${english ? EN.customers : 'Müşteriler'}`;
-    document.querySelectorAll('.business-row')[1].children[0].textContent = `🧑‍🔧 ${english ? EN.workers : 'Çalışanlar'}`;
-    document.querySelectorAll('.business-row')[2].children[0].textContent = `📦 ${english ? EN.shelfStock : 'Reyon stoğu'}`;
-    document.getElementById('mood-label').textContent = english ? '😊 Satisfaction' : '😊 Memnuniyet';
+    document.querySelectorAll('.business-row')[0].children[0].innerHTML = `${assetIconMarkup('customers', 28)} ${english ? EN.customers : 'Müşteriler'}`;
+    document.querySelectorAll('.business-row')[1].children[0].innerHTML = `${assetIconMarkup('staff', 28)} ${english ? EN.workers : 'Çalışanlar'}`;
+    document.querySelectorAll('.business-row')[2].children[0].innerHTML = `${assetIconMarkup('stock', 28)} ${english ? EN.shelfStock : 'Reyon stoğu'}`;
+    document.getElementById('mood-label').innerHTML = `${assetIconMarkup('satisfied', 28)} ${english ? 'Satisfaction' : 'Memnuniyet'}`;
     const orderTitle = document.getElementById('order-title');
     const orderCard = document.getElementById('order-card');
     const orderToggle = document.getElementById('btn-order-toggle');
@@ -438,7 +521,7 @@ export class HUD {
     document.getElementById('btn-expansions').setAttribute('aria-label', english ? EN.upgrades : 'İşletme geliştirmeleri');
     document.getElementById('btn-decor-top').setAttribute('aria-label', english ? 'Decoration shop' : 'Dekorasyon mağazası');
     document.getElementById('btn-decor-top').title = english ? 'Decoration shop' : 'Dekorasyon mağazası';
-    document.getElementById('btn-decor').innerHTML = `${english ? '🎨 Decoration shop' : '🎨 Dekorasyon mağazası'} <span>›</span>`;
+    document.getElementById('btn-decor').innerHTML = `${assetIconMarkup('decoration', 26)} ${english ? 'Decoration shop' : 'Dekorasyon mağazası'} <span>›</span>`;
     document.getElementById('decor-title').textContent = english ? 'Decoration shop' : 'Dekorasyon mağazası';
     document.getElementById('decor-intro').textContent = english
       ? 'Buy decorations for your market. Each placed piece adds style and a small sales bonus.'
@@ -446,7 +529,7 @@ export class HUD {
     document.getElementById('decor-score-caption').textContent = english
       ? 'More decorations create a more welcoming shopping experience.'
       : 'Dekorasyon arttıkça mağaza daha davetkâr olur.';
-    document.querySelector('.decor-score-row span').textContent = english ? '✨ Decor score' : '✨ Dekor puanı';
+    document.querySelector('.decor-score-row > span').innerHTML = `${assetIconMarkup('decorScore', 24)} ${english ? 'Decor score' : 'Dekor puanı'}`;
     document.querySelector('.quest-copy .eyebrow').textContent = english ? EN.nextGoal : 'SIRADAKİ HEDEF';
     document.querySelector('#inventory-title').textContent = english ? EN.inventory : 'Ürünler';
     document.querySelector('#settings-title').textContent = english ? EN.settings : 'Ayarlar';
@@ -461,7 +544,7 @@ export class HUD {
     document.querySelector('.settings-content[data-panel="general"] .setting-note').textContent = english ? EN.backgroundNote : 'Oyun arka plana geçtiğinde simülasyon durur. Döndüğünde kaldığın yerden devam eder.';
     document.getElementById('btn-reset').textContent = english ? EN.resetGame : 'Yeni oyuna başla';
     document.querySelector('.settings-content[data-panel="character"] .modal-intro').textContent = english ? 'Choose your character' : 'Oyuncu karakterini seç';
-    document.querySelectorAll('[data-character] span').forEach((node, index) => {
+    document.querySelectorAll('.character-options button > span:last-child').forEach((node, index) => {
       node.textContent = english ? ['Shopkeeper', 'Cat', 'Robot', 'Panda', 'Penguin'][index] : ['Marketçi', 'Kedi', 'Robot', 'Panda', 'Penguen'][index];
     });
     document.getElementById('btn-recovery-reset').textContent = english ? 'Erase saves and start a new game' : 'Yedekleri sil ve yeni oyun başlat';
@@ -474,7 +557,7 @@ export class HUD {
     document.querySelector('[data-upgrade-tab="business"]').textContent = english ? EN.businessTab : 'İşletme';
     document.querySelector('[data-upgrade-tab="staff"]').textContent = english ? EN.staffTab : 'Personel';
     document.querySelector('.control-hint span').textContent = english ? EN.orTap : 'veya dokunup yürü';
-    document.getElementById('btn-resume').textContent = english ? EN.resume : '▶ Oyuna dön';
+    document.getElementById('btn-resume').textContent = english ? EN.resume : 'Oyuna dön';
     document.getElementById('expansion-title').textContent = english ? EN.newUpgrades : 'Yeni geliştirmeler';
   }
 
@@ -507,7 +590,7 @@ export class HUD {
     const expansionCards = upgrades.map((upgrade) => {
       const affordable = state.economy.balanceAtoms >= upgrade.price * 10_000;
       const title = english ? this.#upgradeNameEnglish(upgrade.id, upgrade.title) : upgrade.title;
-      return `<article class="upgrade-card"><div class="upgrade-icon">${UPGRADE_ICONS[upgrade.id] ?? '✨'}</div><div class="upgrade-copy"><strong>${title}</strong><small>${english ? 'Unlock a new production step' : 'Yeni bir üretim aşaması aç'}</small></div><button class="buy-button" data-buy-upgrade="${upgrade.id}" ${affordable ? '' : 'disabled'}>$${upgrade.price}</button></article>`;
+      return `<article class="upgrade-card"><div class="upgrade-icon">${assetIconMarkup(UPGRADE_ICONS[upgrade.id] ?? 'decorScore', 38)}</div><div class="upgrade-copy"><strong>${title}</strong><small>${english ? 'Unlock a new production step' : 'Yeni bir üretim aşaması aç'}</small></div><button class="buy-button" data-buy-upgrade="${upgrade.id}" ${affordable ? '' : 'disabled'}>$${upgrade.price}</button></article>`;
     }).join('');
     const farmCards = this.#farmUnlockCards(state);
     const machineCards = Object.entries(state.machines).filter(([id]) => STATIONS[id]?.kind === 'machine').map(([id, machine]) => {
@@ -520,7 +603,7 @@ export class HUD {
       const title = english ? this.#upgradeNameEnglish(id, STATIONS[id].title) : STATIONS[id].title;
       const number = (value) => value.toLocaleString(english ? 'en-US' : 'tr-TR', { minimumFractionDigits: 1, maximumFractionDigits: 2 });
       return `<article class="upgrade-card machine-upgrade-card">
-        <div class="upgrade-icon">⚙️</div><div class="upgrade-copy">
+        <div class="upgrade-icon">${assetIconMarkup('machine', 38)}</div><div class="upgrade-copy">
           <strong>${title}</strong><small>${english ? `Level ${level + 1} · ${number(currentSeconds)}s → ${number(nextSeconds)}s · +${speedGain.toFixed(2)}% speed` : `Seviye ${level + 1} · ${number(currentSeconds)} sn → ${number(nextSeconds)} sn · +%${speedGain.toFixed(2)} hız`}</small>
           <small>${english ? 'Small permanent production-time reduction' : 'Kalıcı ve küçük üretim süresi azalması'}</small>
         </div><button class="buy-button" data-upgrade-machine="${id}" ${affordable ? '' : 'disabled'}>${english ? 'Upgrade' : 'Geliştir'} · $${cost}</button>
@@ -536,16 +619,15 @@ export class HUD {
 
   #farmUnlockCards(state) {
     const english = state.settings.language === 'en';
-    const farms = [
-      ['tomatoFarm2', '🍅', english ? 'Second tomato field' : '2. Domates tarlası'],
-      ['orangeFarm2', '🍊', english ? 'Second orange grove' : '2. Portakal bahçesi'],
-      ['cornFarm2', '🌽', english ? 'Second corn field' : '2. Mısır tarlası'],
-      ['wheatFarm2', '🌾', english ? 'Second wheat field' : '2. Buğday tarlası'],
-    ];
-    return farms.map(([id, icon, title]) => {
+    return FARM_AD_UPGRADE_IDS.map((id) => {
+      const upgrade = UPGRADES.find((entry) => entry.id === id);
+      const station = STATIONS[id];
+      const icon = ITEMS[station?.item]?.icon ?? 'farm';
+      const title = english ? this.#upgradeNameEnglish(id, `Second ${station?.item?.toLowerCase() ?? 'farm'} field`)
+        : upgrade?.title ?? station?.title ?? id;
       const baseId = id.replace(/2$/, '');
       if (!state.farms[baseId]) return '';
-      if (state.farms[id]) return `<article class="upgrade-card farm-ad-card hired"><div class="upgrade-icon">${icon}</div><div class="upgrade-copy"><strong>${title}</strong><small>${english ? 'Permanently unlocked' : 'Kalıcı olarak açık'}</small></div><span class="ad-open-badge">${english ? 'Opened' : 'Açıldı'}</span></article>`;
+      if (state.farms[id]) return `<article class="upgrade-card farm-ad-card hired"><div class="upgrade-icon">${assetIconMarkup(icon, 38)}</div><div class="upgrade-copy"><strong>${title}</strong><small>${english ? 'Permanently unlocked' : 'Kalıcı olarak açık'}</small></div><span class="ad-open-badge">${english ? 'Opened' : 'Açıldı'}</span></article>`;
       const available = state.availableUpgrades.includes(id);
       const payload = { upgradeId: id };
       const ready = available && this.app.canOfferRewardedAd('farm-unlock', payload);
@@ -553,8 +635,9 @@ export class HUD {
       const buttonText = !available ? (english ? 'Locked by progress' : 'İlerleme bekleniyor')
         : !this.app.isRewardedAdReady('farm-unlock') ? (english ? 'AdMob setup pending' : 'AdMob bağlantısı bekleniyor')
           : (english ? 'Rewarded ad not ready' : 'Reklam şu anda hazır değil');
-      return `<article class="upgrade-card farm-ad-card"><div class="upgrade-icon">${icon}</div><div class="upgrade-copy"><strong>${title}</strong><small>${english ? 'Unlock permanently by completing a rewarded ad.' : 'Ödüllü reklamı tamamlayarak kalıcı aç.'}</small></div>
-        ${ready ? `<div class="ad-action-group"><button class="buy-button ad-reward-button" data-ad-accept="farm-unlock" data-ad-upgrade="${id}">${english ? 'Watch ad · Unlock' : 'Reklam izle · Aç'}</button><button class="ad-decline-button" data-ad-decline="farm-unlock" data-ad-upgrade="${id}">${english ? 'Not now' : 'Şimdi değil'}</button></div>` : `<button class="buy-button" disabled>${buttonText}</button>`}
+      const simulated = this.app.isRewardedAdSimulated();
+      return `<article class="upgrade-card farm-ad-card"><div class="upgrade-icon">${assetIconMarkup(icon, 38)}</div><div class="upgrade-copy"><strong>${title}</strong><small>${simulated ? (english ? 'Development simulation · grants after 3 seconds.' : 'Geliştirme simülasyonu · 3 saniye sonra açılır.') : (english ? 'Unlock permanently by completing a rewarded ad.' : 'Ödüllü reklamı tamamlayarak kalıcı aç.')}</small></div>
+        ${ready ? `<div class="ad-action-group"><button class="buy-button ad-reward-button" data-ad-accept="farm-unlock" data-ad-upgrade="${id}">${simulated ? (english ? 'Wait 3 sec · Unlock' : '3 sn bekle · Aç') : (english ? 'Watch ad · Unlock' : 'Reklam izle · Aç')}</button><button class="ad-decline-button" data-ad-decline="farm-unlock" data-ad-upgrade="${id}">${english ? 'Not now' : 'Şimdi değil'}</button></div>` : `<button class="buy-button" disabled>${buttonText}</button>`}
       </article>`;
     }).join('');
   }
@@ -576,22 +659,22 @@ export class HUD {
       const owned = state.decorations.filter((entry) => entry.type === id).length;
       const name = item.name[state.settings.language];
       const price = decorationPrice(state, item.price);
-      return `<article class="decor-item"><div class="decor-item-icon">${this.#decorationIcon(id)}</div><div class="upgrade-copy"><strong>${name}</strong><small>✨ +${item.score} ${english ? 'style points' : 'dekor puanı'} · ${owned} ${english ? 'placed' : 'mağazada'}</small></div><button class="buy-button" data-buy-decoration="${id}" ${state.economy.balanceAtoms < price * 10_000 ? 'disabled' : ''}>$ ${price}</button></article>`;
+      return `<article class="decor-item"><div class="decor-item-icon">${assetIconMarkup(this.#decorationIcon(id), 38)}</div><div class="upgrade-copy"><strong>${name}</strong><small>${assetIconMarkup('decorScore', 18)} +${item.score} ${english ? 'style points' : 'dekor puanı'} · ${owned} ${english ? 'placed' : 'mağazada'}</small></div><button class="buy-button" data-buy-decoration="${id}" ${state.economy.balanceAtoms < price * 10_000 ? 'disabled' : ''}>$ ${price}</button></article>`;
     }).join('');
   }
 
   #decorationIcon(id) {
     return ({
-      petalPlanter: '🪴',
-      farmhouseSign: '🪧',
-      orchardLantern: '💡',
-      welcomeMat: '🚪',
-      pennantBanner: '🚩',
-      harvestBasket: '🛒',
-      citrusTopiary: '🍊',
-      windowDisplay: '💐',
-      cardboardBoxes: '📦',
-    })[id] ?? '✨';
+      petalPlanter: 'planter',
+      farmhouseSign: 'farmSign',
+      orchardLantern: 'lamp',
+      welcomeMat: 'welcomeMat',
+      pennantBanner: 'pennant',
+      harvestBasket: 'shoppingCart',
+      citrusTopiary: 'orange',
+      windowDisplay: 'flowers',
+      cardboardBoxes: 'pallet',
+    })[id] ?? 'decorScore';
   }
 
   renderStaff(state) {
@@ -599,7 +682,6 @@ export class HUD {
     if (!list) return;
     const english = state.settings.language === 'en';
     const hireCards = STAFF_HIRES.map((hire) => {
-      const upgrade = UPGRADES.find((entry) => entry.id === hire.upgradeId);
       const hiredCount = state.workers.filter((worker) => hire.staffTypes.includes(worker.type)).length;
       const hired = hiredCount > 0 || state.completedUpgrades.includes(hire.upgradeId);
       const unlocked = state.availableUpgrades.includes(hire.upgradeId) && !state.completedUpgrades.includes(hire.upgradeId);
@@ -616,7 +698,17 @@ export class HUD {
       const disabledText = !canHire ? (english ? 'Locked' : 'Kilitli')
         : !this.app.isRewardedAdReady('staff-hire') ? (english ? 'AdMob setup pending' : 'AdMob bağlantısı bekleniyor')
           : (english ? 'Rewarded ad not ready' : 'Reklam şu anda hazır değil');
-      const hireAction = hire.staffTypes.length > 1
+      const simulated = this.app.isRewardedAdSimulated();
+      const salaryAtoms = staffDailySalaryAtoms(hire.staffTypes[0]);
+      const salary = (salaryAtoms / MONEY_ATOMS).toLocaleString(english ? 'en-US' : 'tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      const salaryText = english
+        ? `Salary $${salary}/day${hire.staffTypes.length > 1 ? ' per person' : ''}`
+        : `Maaş $${salary}/gün${hire.staffTypes.length > 1 ? ' kişi başı' : ''}`;
+      const hireAction = simulated
+        ? (english ? 'Wait 3 sec · ' : '3 sn bekle · ') + (hire.staffTypes.length > 1
+          ? (english ? 'Hire chef + waiter' : 'Şef + garson al')
+          : (english ? 'Hire' : 'İşe al'))
+        : hire.staffTypes.length > 1
         ? (english ? (hired ? 'Watch ad · Add chef + waiter' : 'Watch ad · Hire chef + waiter')
           : (hired ? 'Reklam izle · Şef + garson ekle' : 'Reklam izle · Şef + garson al'))
         : (english ? (hired ? 'Watch ad · +1 hire' : 'Watch ad · Hire')
@@ -624,7 +716,7 @@ export class HUD {
       const button = ready
         ? `<div class="ad-action-group"><button class="buy-button ad-reward-button" data-ad-accept="staff-hire" data-ad-role="${hire.upgradeId}">${hireAction}</button><button class="ad-decline-button" data-ad-decline="staff-hire" data-ad-role="${hire.upgradeId}">${english ? 'Not now' : 'Şimdi değil'}</button></div>`
         : `<button class="buy-button" disabled>${disabledText}</button>`;
-      return `<article class="upgrade-card staff-card${hired ? ' hired' : ''}"><div class="upgrade-icon">${STAFF[hire.staffTypes[0]]?.icon ?? '🧑‍🔧'}</div><div class="upgrade-copy"><strong>${english ? englishTitle : title}</strong><small>${subtitle}</small></div>${button}</article>`;
+      return `<article class="upgrade-card staff-card${hired ? ' hired' : ''}"><div class="upgrade-icon">${assetIconMarkup(STAFF[hire.staffTypes[0]]?.icon ?? 'workerAvatar', 38)}</div><div class="upgrade-copy"><strong>${english ? englishTitle : title}</strong><small>${subtitle}</small><small>${salaryText}</small></div>${button}</article>`;
     }).join('');
     const staffUpgrades = state.workers.map((worker) => {
       const level = worker.upgradeLevel ?? 0;
@@ -635,14 +727,19 @@ export class HUD {
       const gain = percentGain(currentSpeed, nextSpeed);
       const title = english ? ({ cashier: 'Cashier', harvester: 'Harvester', factoryFeeder: 'Factory feeder', caretaker: 'Farm caretaker', chefWaiter: 'Chef', waiter: 'Waiter' })[worker.type] : (STAFF[worker.type]?.title ?? (worker.type === 'waiter' ? 'Garson' : worker.type));
       const number = (value) => value.toLocaleString(english ? 'en-US' : 'tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-      return `<article class="upgrade-card staff-upgrade-card"><div class="upgrade-icon">${STAFF[worker.type]?.icon ?? '🧑‍🔧'}</div><div class="upgrade-copy"><strong>${title} · ${worker.id}</strong><small>${english ? `Level ${level + 1} · speed ${number(currentSpeed)} → ${number(nextSpeed)} units/s · +${gain.toFixed(2)}%` : `Seviye ${level + 1} · hız ${number(currentSpeed)} → ${number(nextSpeed)} birim/sn · +%${gain.toFixed(2)}`}</small><small>${english ? 'Safe cap: 4.08 units/s' : 'Güvenli hız tavanı: 4,08 birim/sn'}</small></div><button class="buy-button" data-upgrade-staff="${worker.id}" ${affordable ? '' : 'disabled'}>${english ? 'Upgrade' : 'Geliştir'} · $${cost}</button></article>`;
+      const salaryAtoms = staffDailySalaryAtoms(worker.type);
+      const salaryStatus = worker.waitingForSalary
+        ? (english ? `Waiting for salary · $${number((worker.salaryDebtAtoms ?? 0) / MONEY_ATOMS)} due` : `Maaş bekliyor · $${number((worker.salaryDebtAtoms ?? 0) / MONEY_ATOMS)} ödenmemiş`)
+        : (english ? `Salary $${number(salaryAtoms / MONEY_ATOMS)}/day` : `Maaş $${number(salaryAtoms / MONEY_ATOMS)}/gün`);
+      return `<article class="upgrade-card staff-upgrade-card${worker.waitingForSalary ? ' salary-waiting' : ''}"><div class="upgrade-icon">${assetIconMarkup(STAFF[worker.type]?.icon ?? 'workerAvatar', 38)}</div><div class="upgrade-copy"><strong>${title} · ${worker.id}</strong><small>${english ? `Level ${level + 1} · speed ${number(currentSpeed)} → ${number(nextSpeed)} units/s · +${gain.toFixed(2)}%` : `Seviye ${level + 1} · hız ${number(currentSpeed)} → ${number(nextSpeed)} birim/sn · +%${gain.toFixed(2)}`}</small><small>${salaryStatus}</small></div><button class="buy-button" data-upgrade-staff="${worker.id}" ${affordable ? '' : 'disabled'}>${english ? 'Upgrade' : 'Geliştir'} · $${cost}</button></article>`;
     }).join('');
     list.innerHTML = `<h2 class="upgrade-section-title">${english ? 'Hire new staff' : 'Yeni personel al'}</h2>${hireCards}${staffUpgrades ? `<h2 class="upgrade-section-title">${english ? 'Individual staff upgrades' : 'Personel bazlı geliştirme'}</h2>${staffUpgrades}` : ''}`;
   }
 
   #upgradeNameEnglish(id, fallback) {
     const names = {
-      tomatoFarm2: 'Second tomato field', cashier: 'Hire a cashier', paste: 'Tomato paste kitchen', harvester: 'Hire a harvester',
+      tomatoFarm2: 'Second tomato field', cornFarm2: 'Second corn field', wheatFarm2: 'Second wheat field',
+      cashier: 'Hire a cashier', paste: 'Tomato paste kitchen', harvester: 'Hire a harvester',
       orange: 'Orange grove and juicer', factoryFeeder: 'Hire a factory feeder', orangeFarm2: 'Second orange grove',
       corn: 'Corn field and shelf', popcorn: 'Popcorn machine and shelf', feed: 'Chicken feed grinder',
       coop: 'Chicken coop and egg shelf', chicken2: 'Second chicken', chicken3: 'Third chicken',
@@ -651,6 +748,14 @@ export class HUD {
       restaurant: 'Gourmet restaurant', chefWaiter: 'Hire chef and waiter',
     };
     return names[id] ?? fallback;
+  }
+
+  #actionIcon(action) {
+    if (!action) return 'interact';
+    return ({
+      farm: 'farm', machine: 'machine', shelf: 'shelf', coop: 'coop',
+      table: 'table', register: 'register', upgrade: 'upgrade', trashBin: 'trashBin',
+    })[action.kind] ?? 'interact';
   }
 
   #actionText(action, state) {
@@ -711,7 +816,7 @@ export class HUD {
       const item = ITEMS[itemId];
       const total = amounts.carried + amounts.shelf + amounts.machine;
       const stockLabel = state.settings.language === 'en' ? `bag ${amounts.carried} · shelves ${amounts.shelf} · machines ${amounts.machine}` : `çanta ${amounts.carried} · raf ${amounts.shelf} · makine ${amounts.machine}`;
-      return `<div class="inventory-row"><span>${item.icon} ${state.settings.language === 'en' ? this.#itemNameEnglish(itemId, item.name) : item.name}<small>${stockLabel}</small></span><strong>${total}</strong></div>`;
+      return `<div class="inventory-row"><span>${assetIconMarkup(item.icon, 34)} ${state.settings.language === 'en' ? this.#itemNameEnglish(itemId, item.name) : item.name}<small>${stockLabel}</small></span><strong>${total}</strong></div>`;
     }).join('');
   }
 
@@ -723,12 +828,13 @@ export class HUD {
     })[itemId] ?? fallback;
   }
 
-  toast(message, tone = 'success') {
+  toast(message, tone = 'success', iconId = null) {
     const container = document.getElementById('toast-container');
     if (!container) return;
     const toast = document.createElement('div');
     toast.className = `toast-msg${tone === 'error' ? ' error' : ''}`;
-    toast.textContent = message;
+    if (iconId) toast.innerHTML = assetIconMarkup(iconId, 30);
+    toast.append(document.createTextNode(message));
     container.appendChild(toast);
     while (container.children.length > 3) {
       container.firstElementChild.remove();
@@ -738,16 +844,39 @@ export class HUD {
 
   showEvent(event) {
     let message = event.message;
+    let iconId = null;
     if (event.type === 'sale' || event.type === 'production' || event.type === 'tip-ready') {
       this.#eventSound(event.type);
     }
+    if (event.type === 'payroll') {
+      const english = this.app.getState().settings.language === 'en';
+      const locale = english ? 'en-US' : 'tr-TR';
+      const paid = `$${(event.paidAtoms / MONEY_ATOMS).toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      if (english) {
+        message = event.resumedCount && !event.dayStarted
+          ? `${event.resumedCount} staff member(s) received overdue pay and returned to work.`
+          : `Day ${event.day} payroll: ${paid} paid${event.waitingCount ? ` · ${event.waitingCount} waiting for salary` : ''}.`;
+      } else {
+        message = event.resumedCount && !event.dayStarted
+          ? `${event.resumedCount} personelin gecikmiş maaşı ödendi; işe döndü.`
+          : `Gün ${event.day} maaş ödemesi: ${paid}${event.waitingCount ? ` · ${event.waitingCount} personel bekliyor` : ''}.`;
+      }
+    }
     if (this.app.getState().settings.language === 'en') {
       if (event.type === 'sale') {
-        const sold = (event.items ?? [event.item]).map((itemId) => `${ITEMS[itemId]?.icon ?? '📦'} ${this.#itemNameEnglish(itemId, ITEMS[itemId]?.name ?? itemId)}`);
+        const itemIds = event.items ?? [event.item];
+        iconId = ITEMS[itemIds[0]]?.icon ?? 'stock';
+        const sold = itemIds.map((itemId) => this.#itemNameEnglish(itemId, ITEMS[itemId]?.name ?? itemId));
         message = `+$${event.amount.toFixed(2)} · ${sold.join(', ')} sold${event.decorationBonus ? ` · +${(event.decorationBonus * 100).toFixed(1)}% decor bonus` : ''}.`;
       }
-      if (event.type === 'production') message = `${ITEMS[event.item]?.icon ?? '📦'} ${this.#itemNameEnglish(event.item, ITEMS[event.item]?.name ?? event.item)} ready.`;
-      if (event.type === 'tip-ready') message = '💵 A customer left a tip.';
+      if (event.type === 'production') {
+        iconId = ITEMS[event.item]?.icon ?? 'stock';
+        message = `${this.#itemNameEnglish(event.item, ITEMS[event.item]?.name ?? event.item)} ready.`;
+      }
+      if (event.type === 'tip-ready') {
+        iconId = 'tip';
+        message = 'A customer left a tip.';
+      }
       if (message === 'Yedek kayıttan devam edildi.') message = 'Recovered from the backup save.';
       if (message === 'Yeni oyun hazır.') message = 'A new game is ready.';
       if (message === 'Müşteriler kasada ödeme yapıyor.') message = 'Customers are paying at the register.';
@@ -758,7 +887,10 @@ export class HUD {
       if (message.includes('Yemek servis edildi.')) message = 'Meal served.';
       if (message.includes('eklendi.')) message = 'Credits added.';
     }
-    this.toast(message, event.tone);
+    if (event.type === 'sale') iconId ??= ITEMS[(event.items ?? [event.item])[0]]?.icon ?? 'stock';
+    if (event.type === 'production') iconId ??= ITEMS[event.item]?.icon ?? 'stock';
+    if (event.type === 'tip-ready') iconId ??= 'tip';
+    this.toast(message, event.tone, iconId);
   }
 
   #eventSound(type) {

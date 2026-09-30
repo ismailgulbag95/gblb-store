@@ -1,5 +1,5 @@
 import { ITEMS, RECIPES, SHELVES, STATIONS } from './catalog.js';
-import { getMarketCollisionBoxes, getShelfLocations, stationPosition } from './layout.js';
+import { getDecorationDimensions, getMarketCollisionBoxes, getShelfLocations, getStationDimensions, stationPosition } from './layout.js';
 import { EconomyLedger } from './ledger.js';
 import { decorBonus, decorScore } from './decorCatalog.js';
 import { FARM_CAPACITY, ensureFarmState, removeFarmReady, syncFarmHarvest } from './farm.js';
@@ -7,12 +7,14 @@ import { customerMood, saleMoodMultiplier, tipForMood } from './customerExperien
 import { nextOrder } from './orders.js';
 import { cancelReservation, capacityAt, makeLocation, pickUpReservedStock, quantityAt, reserveStock, totalAt, transferStock } from './inventory.js';
 import { staffSpeedMultiplier } from './progression.js';
+import { STAFF_WAITING_AREA } from './dayCycle.js';
 
 const TICKS_PER_SECOND = 10;
 const CUSTOMER_SPAWN_TICKS = 40;
 const MAX_CUSTOMERS = 8;
 const CUSTOMER_SPEED = 0.36;
 const CUSTOMER_RADIUS = 0.32;
+const WORKER_RADIUS = 0.3;
 const CUSTOMER_WALLS = [
   { min: { x: -4.2, z: 8.8 }, max: { x: 0.9, z: 9.2 } },
   { min: { x: 9.1, z: 8.8 }, max: { x: 14.2, z: 9.2 } },
@@ -22,6 +24,13 @@ const CUSTOMER_WALLS = [
   { min: { x: -31.8, z: 8.8 }, max: { x: -25.8, z: 9.2 } },
   { min: { x: -48.2, z: -9.2 }, max: { x: -25.8, z: -8.8 } },
   { min: { x: -48.2, z: -9.2 }, max: { x: -47.8, z: 9.2 } },
+];
+const WORKER_WALLS = [
+  ...CUSTOMER_WALLS,
+  { min: { x: -4.2, z: -9.0 }, max: { x: -3.8, z: -1.8 } },
+  { min: { x: -4.2, z: 1.8 }, max: { x: -3.8, z: 9.0 } },
+  { min: { x: -26.2, z: -9.0 }, max: { x: -25.8, z: -1.8 } },
+  { min: { x: -26.2, z: 1.8 }, max: { x: -25.8, z: 9.0 } },
 ];
 
 function random(state) {
@@ -70,7 +79,7 @@ function produceFarm(state, events) {
       plant.nextReadyTick += plant.cycleTicks;
       farm.readyCount += 1;
       farm.harvestCount += 1;
-      events.push({ type: 'production', item, farmId, message: `${ITEMS[item].icon} ${ITEMS[item].name} hazır.` });
+      events.push({ type: 'production', item, farmId, message: `${ITEMS[item].name} hazır.` });
       durable = true;
     }
   }
@@ -121,7 +130,7 @@ function produceMachines(state, events) {
       ORANGE_TART: 'orangeTartProduced', BURGER: 'burgerCooked', PIZZA: 'pizzaCooked',
     }[recipe.output];
     if (producedStat) state.stats[producedStat] = (state.stats[producedStat] ?? 0) + 1;
-    events.push({ type: 'production', item: recipe.output, message: `${ITEMS[recipe.output].icon} ${ITEMS[recipe.output].name} hazır.` });
+    events.push({ type: 'production', item: recipe.output, message: `${ITEMS[recipe.output].name} hazır.` });
     durable = true;
   }
   return durable;
@@ -443,14 +452,21 @@ function clearWorkerRoute(task) {
   delete task.routeObstacles;
 }
 
-function getWorkerObstacles(state) {
-  const boxes = [...getMarketCollisionBoxes(state), ...CUSTOMER_WALLS.map((wall, index) => ({
+function getWorkerObstacles(state, environmentObstacles) {
+  const walls = environmentObstacles.length ? environmentObstacles.map((obstacle, index) => ({
+    id: `environment-wall:${index}`,
+    minX: obstacle.min.x,
+    maxX: obstacle.max.x,
+    minZ: obstacle.min.z,
+    maxZ: obstacle.max.z,
+  })) : WORKER_WALLS.map((wall, index) => ({
     id: `wall:${index}`,
     minX: wall.min.x,
     maxX: wall.max.x,
     minZ: wall.min.z,
     maxZ: wall.max.z,
-  }))];
+  }));
+  const boxes = [...getMarketCollisionBoxes(state), ...walls];
   const stations = { ...STATIONS, ...(state.customStations ?? {}) };
   for (const [id, station] of Object.entries(stations)) {
     const active = station.kind === 'machine' ? Boolean(state.machines?.[id])
@@ -534,7 +550,7 @@ function findWorkerRoute(start, target, obstacles) {
   if (!obstacles.some((box) => segmentIntersectsBox(start, target, box))) return [{ x: target.x, z: target.z }];
 
   const cellSize = 0.5;
-  const margin = 2;
+  const margin = 8;
   const minX = Math.floor((Math.min(start.x, target.x) - margin) / cellSize) * cellSize;
   const maxX = Math.ceil((Math.max(start.x, target.x) + margin) / cellSize) * cellSize;
   const minZ = Math.floor((Math.min(start.z, target.z) - margin) / cellSize) * cellSize;
@@ -642,9 +658,57 @@ function moveWorkerAlongRoute(worker, task, distance) {
   return task.routeIndex >= task.route.length;
 }
 
-function workerTick(state) {
+function workerWaitingPosition(index) {
+  const column = index % STAFF_WAITING_AREA.columns;
+  const row = Math.floor(index / STAFF_WAITING_AREA.columns);
+  return {
+    x: STAFF_WAITING_AREA.minX + column * STAFF_WAITING_AREA.spacing,
+    z: STAFF_WAITING_AREA.minZ + row * STAFF_WAITING_AREA.spacing,
+  };
+}
+
+function moveWorkerToWaitingArea(worker, target, obstacles, obstacleSignature) {
+  if (Math.hypot(worker.x - target.x, worker.z - target.z) < 0.08) {
+    worker.salaryWaitRoute = null;
+    worker.salaryWaitRouteIndex = 0;
+    worker.salaryWaitTarget = target;
+    worker.salaryWaitObstacles = obstacleSignature;
+    return;
+  }
+
+  const routeIsCurrent = Array.isArray(worker.salaryWaitRoute) && worker.salaryWaitRoute.length > 0
+    && worker.salaryWaitTarget?.x === target.x && worker.salaryWaitTarget?.z === target.z
+    && worker.salaryWaitObstacles === obstacleSignature;
+  if (!routeIsCurrent) {
+    worker.salaryWaitRoute = findWorkerRoute(worker, target, obstacles);
+    worker.salaryWaitRouteIndex = 0;
+    worker.salaryWaitTarget = target;
+    worker.salaryWaitObstacles = obstacleSignature;
+  }
+  if (!worker.salaryWaitRoute.length) return;
+
+  const speedModifier = Math.min(1.2, Math.max(1, Number.isFinite(worker.speedModifier)
+    ? worker.speedModifier : staffSpeedMultiplier(worker.upgradeLevel ?? 0)));
+  const route = { route: worker.salaryWaitRoute, routeIndex: worker.salaryWaitRouteIndex ?? 0 };
+  moveWorkerAlongRoute(worker, route, 0.34 * speedModifier);
+  worker.salaryWaitRouteIndex = route.routeIndex;
+}
+
+function workerTick(state, environmentObstacles) {
   let durable = false;
-  for (const worker of state.workers) {
+  const obstacles = getWorkerObstacles(state, environmentObstacles);
+  const obstacleSignature = workerObstacleSignature(obstacles);
+  for (const [workerIndex, worker] of state.workers.entries()) {
+    if (worker.waitingForSalary) {
+      if (worker.task?.phase === 'to-source') {
+        cancelReservation(state, worker.task.reservationId);
+        worker.task = null;
+        durable = true;
+      }
+      if (worker.task) clearWorkerRoute(worker.task);
+      moveWorkerToWaitingArea(worker, workerWaitingPosition(workerIndex), obstacles, obstacleSignature);
+      continue;
+    }
     if (prioritizeShelfRestock(state, worker)) {
       durable = true;
       if (!worker.task && assignWorkerTask(state, worker)) durable = true;
@@ -654,10 +718,8 @@ function workerTick(state) {
       if (!worker.task) continue;
     }
     const task = worker.task;
-    const obstacles = getWorkerObstacles(state);
     const target = workerTaskTarget(state, worker, task, obstacles);
     if (!target) continue;
-    const obstacleSignature = workerObstacleSignature(obstacles);
     if (!Array.isArray(task.route) || task.routeTarget?.x !== target.x || task.routeTarget?.z !== target.z
       || task.routeObstacles !== obstacleSignature) {
       task.route = findWorkerRoute(worker, target, obstacles);
@@ -665,7 +727,9 @@ function workerTick(state) {
       task.routeTarget = { x: target.x, z: target.z };
       task.routeObstacles = obstacleSignature;
     }
-    if (!task.route.length || !moveWorkerAlongRoute(worker, task, 0.34)) continue;
+    const speedModifier = Math.min(1.2, Math.max(1, Number.isFinite(worker.speedModifier)
+      ? worker.speedModifier : staffSpeedMultiplier(worker.upgradeLevel ?? 0)));
+    if (!task.route.length || !moveWorkerAlongRoute(worker, task, 0.34 * speedModifier)) continue;
     if (task.phase === 'to-source') {
       const picked = pickUpReservedStock(state, task.reservationId, task.carrier);
       if (picked.ok) {
@@ -1304,7 +1368,7 @@ function customerTick(state, events) {
             stock.items[customer.meal] -= 1;
             if (!stock.items[customer.meal]) delete stock.items[customer.meal];
           }
-          events.push({ type: 'tip-ready', message: '💵 Müşterinin bahşişi hazır.' });
+          events.push({ type: 'tip-ready', message: 'Müşterinin bahşişi hazır.' });
           durable = true;
         }
       } else if (customer.phase === 'leaving' && moveAlongRoute(customer)) {
@@ -1469,7 +1533,7 @@ function customerTick(state, events) {
           const firstItem = soldItems[0];
           events.push({ type: 'sale', item: firstItem, items: soldItems, amount: saleAmount,
             mood,
-            message: '+ $' + saleAmount.toFixed(2) + ' · ' + soldItems.map((item) => ITEMS[item].icon).join(' ') + ' satıldı.',
+            message: '+ $' + saleAmount.toFixed(2) + ' · ' + soldItems.map((item) => ITEMS[item].name).join(', ') + ' satıldı.',
             decorationScore: decorScore(state), decorationBonus: decorBonus(state) });
           durable = true;
         }
@@ -1506,13 +1570,13 @@ function coopTick(state) {
   return true;
 }
 
-export function advanceSimulation(state) {
+export function advanceSimulation(state, environmentObstacles = []) {
   const events = [];
   syncFarmHarvest(state);
   let durable = produceFarm(state, events);
   durable = produceMachines(state, events) || durable;
   durable = coopTick(state) || durable;
-  durable = workerTick(state) || durable;
+  durable = workerTick(state, environmentObstacles) || durable;
   syncFarmHarvest(state);
   durable = customerTick(state, events) || durable;
   if (!state.activeOrder) {

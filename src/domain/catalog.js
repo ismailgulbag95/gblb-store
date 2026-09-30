@@ -1,20 +1,20 @@
 export const MONEY_ATOMS = 10_000;
 
 export const ITEMS = Object.freeze({
-  TOMATO: { id: 'TOMATO', name: 'Domates', icon: '🍅', price: 3, color: 0xef4444 },
-  TOMATO_PASTE: { id: 'TOMATO_PASTE', name: 'Salça', icon: '🥫', price: 12, color: 0xc2410c },
-  ORANGE: { id: 'ORANGE', name: 'Portakal', icon: '🍊', price: 4, color: 0xf97316 },
-  ORANGE_JUICE: { id: 'ORANGE_JUICE', name: 'Portakal suyu', icon: '🧃', price: 16, color: 0xfbbf24 },
-  CORN: { id: 'CORN', name: 'Mısır', icon: '🌽', price: 5, color: 0xfacc15 },
-  POPCORN: { id: 'POPCORN', name: 'Popcorn', icon: '🍿', price: 20, color: 0xfde68a },
-  CHICKEN_FEED: { id: 'CHICKEN_FEED', name: 'Tavuk yemi', icon: '🌾', price: 8, color: 0xa16207 },
-  EGG: { id: 'EGG', name: 'Yumurta', icon: '🥚', price: 18, color: 0xfef3c7 },
-  WHEAT: { id: 'WHEAT', name: 'Buğday', icon: '🌾', price: 4, color: 0xfbbf24 },
-  FLOUR: { id: 'FLOUR', name: 'Un', icon: '🛍️', price: 10, color: 0xf5deb3 },
-  BREAD: { id: 'BREAD', name: 'Ekmek', icon: '🍞', price: 24, color: 0xc2410c },
-  ORANGE_TART: { id: 'ORANGE_TART', name: 'Portakallı tart', icon: '🥧', price: 42, color: 0xf59e0b },
-  BURGER: { id: 'BURGER', name: 'Gurme burger', icon: '🍔', price: 75, color: 0xfb923c },
-  PIZZA: { id: 'PIZZA', name: 'Pizza', icon: '🍕', price: 90, color: 0xdc2626 },
+  TOMATO: { id: 'TOMATO', name: 'Domates', icon: 'tomato', price: 3, color: 0xef4444 },
+  TOMATO_PASTE: { id: 'TOMATO_PASTE', name: 'Salça', icon: 'tomatoPaste', price: 12, color: 0xc2410c },
+  ORANGE: { id: 'ORANGE', name: 'Portakal', icon: 'orange', price: 4, color: 0xf97316 },
+  ORANGE_JUICE: { id: 'ORANGE_JUICE', name: 'Portakal suyu', icon: 'orangeJuice', price: 16, color: 0xfbbf24 },
+  CORN: { id: 'CORN', name: 'Mısır', icon: 'corn', price: 5, color: 0xfacc15 },
+  POPCORN: { id: 'POPCORN', name: 'Popcorn', icon: 'popcorn', price: 20, color: 0xfde68a },
+  CHICKEN_FEED: { id: 'CHICKEN_FEED', name: 'Tavuk yemi', icon: 'chickenFeed', price: 8, color: 0xa16207 },
+  EGG: { id: 'EGG', name: 'Yumurta', icon: 'egg', price: 18, color: 0xfef3c7 },
+  WHEAT: { id: 'WHEAT', name: 'Buğday', icon: 'wheat', price: 4, color: 0xfbbf24 },
+  FLOUR: { id: 'FLOUR', name: 'Un', icon: 'flour', price: 10, color: 0xf5deb3 },
+  BREAD: { id: 'BREAD', name: 'Ekmek', icon: 'bread', price: 24, color: 0xc2410c },
+  ORANGE_TART: { id: 'ORANGE_TART', name: 'Portakallı tart', icon: 'orangeTart', price: 42, color: 0xf59e0b },
+  BURGER: { id: 'BURGER', name: 'Gurme burger', icon: 'burger', price: 75, color: 0xfb923c },
+  PIZZA: { id: 'PIZZA', name: 'Pizza', icon: 'pizza', price: 90, color: 0xdc2626 },
 });
 
 export const RECIPES = Object.freeze({
@@ -103,11 +103,11 @@ export const UPGRADES = Object.freeze([
 ]);
 
 export const STAFF = Object.freeze({
-  cashier: { title: 'Kasiyer', icon: '🧑‍💼' },
-  harvester: { title: 'Hasat işçisi', icon: '🧑‍🌾' },
-  factoryFeeder: { title: 'Fabrika lojistikçisi', icon: '🧑‍🔧' },
-  caretaker: { title: 'Çiftlik bakıcısı', icon: '🧑‍🌾' },
-  chefWaiter: { title: 'Şef ve garson', icon: '🧑‍🍳' },
+  cashier: { title: 'Kasiyer', icon: 'cashier' },
+  harvester: { title: 'Hasat işçisi', icon: 'workerAvatar' },
+  factoryFeeder: { title: 'Fabrika lojistikçisi', icon: 'courierAvatar' },
+  caretaker: { title: 'Çiftlik bakıcısı', icon: 'workerAvatar' },
+  chefWaiter: { title: 'Şef ve garson', icon: 'chef' },
 });
 
 export const STAFF_HIRES = Object.freeze([
@@ -118,8 +118,13 @@ export const STAFF_HIRES = Object.freeze([
   { upgradeId: 'chefWaiter', staffTypes: ['chefWaiter', 'waiter'], effect: 'Restoran mutfağını ve masa servisini otomatikleştirir.', unlock: 'Restoran müşterisinden bahşiş alınca açılır.' },
 ]);
 
+export const FARM_AD_UPGRADE_IDS = Object.freeze(UPGRADES
+  .filter((upgrade) => upgrade.id.endsWith('Farm2') && STATIONS[upgrade.id]?.kind === 'farm'
+    && upgrade.unlocks.includes(upgrade.id))
+  .map((upgrade) => upgrade.id));
+
 export const AD_ONLY_UPGRADE_IDS = Object.freeze([
-  'tomatoFarm2', 'orangeFarm2', 'cornFarm2', 'wheatFarm2',
+  ...FARM_AD_UPGRADE_IDS,
   ...STAFF_HIRES.map((hire) => hire.upgradeId),
 ]);
 
@@ -127,6 +132,15 @@ export function getStaffCount(state, role) {
   const hire = STAFF_HIRES.find((entry) => entry.upgradeId === role);
   if (!hire) return state.workers.filter((worker) => worker.type === role).length;
   return state.workers.filter((worker) => hire.staffTypes.includes(worker.type)).length;
+}
+
+export function staffDailySalaryAtoms(workerType) {
+  const role = workerType === 'waiter' ? 'chefWaiter' : workerType;
+  const upgrade = UPGRADES.find((entry) => entry.id === role);
+  if (!upgrade) return 0;
+  const hire = STAFF_HIRES.find((entry) => entry.upgradeId === role);
+  const workerCount = Math.max(1, hire?.staffTypes.length ?? 1);
+  return Math.round(upgrade.price * MONEY_ATOMS * 0.1 / workerCount);
 }
 
 export const ITEM_ORDER = Object.keys(ITEMS);

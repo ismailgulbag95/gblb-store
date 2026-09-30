@@ -6,8 +6,14 @@ export class Engine {
     
     // Scene - Vibrant clean sky blue
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x70d6ff);
-    this.scene.fog = new THREE.Fog(0x70d6ff, 40, 75);
+    this.daySky = new THREE.Color(0x70d6ff);
+    this.nightSky = new THREE.Color(0x111d38);
+    this.dayGround = new THREE.Color(0x2ed573);
+    this.nightGround = new THREE.Color(0x162c32);
+    this.daySun = new THREE.Color(0xfffae8);
+    this.nightSun = new THREE.Color(0x8695c2);
+    this.scene.background = this.daySky.clone();
+    this.scene.fog = new THREE.Fog(this.daySky, 40, 75);
 
     // Isometric camera with a stable world scale across desktop and portrait screens.
     const aspect = window.innerWidth / window.innerHeight;
@@ -44,13 +50,13 @@ export class Engine {
 
   setupLights() {
     // Soft vibrant ambient light
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.75);
-    this.scene.add(ambientLight);
+    this.ambientLight = new THREE.AmbientLight(0xffffff, 0.75);
+    this.scene.add(this.ambientLight);
 
     // Sky & Ground Hemisphere light for colorful fill and vibrant tones
-    const hemiLight = new THREE.HemisphereLight(0x70d6ff, 0x2ed573, 0.45);
-    hemiLight.position.set(0, 40, 0);
-    this.scene.add(hemiLight);
+    this.hemiLight = new THREE.HemisphereLight(0x70d6ff, 0x2ed573, 0.45);
+    this.hemiLight.position.set(0, 40, 0);
+    this.scene.add(this.hemiLight);
 
     // Main Sunlight with crisp warm illumination
     const sunLight = new THREE.DirectionalLight(0xfffae8, 1.15);
@@ -68,6 +74,18 @@ export class Engine {
     sunLight.shadow.bias = -0.0005;
     this.scene.add(sunLight);
     this.sunLight = sunLight;
+  }
+
+  setDaylight(amount) {
+    const daylight = THREE.MathUtils.clamp(amount, 0, 1);
+    this.ambientLight.intensity = THREE.MathUtils.lerp(0.2, 0.75, daylight);
+    this.hemiLight.intensity = THREE.MathUtils.lerp(0.12, 0.45, daylight);
+    this.hemiLight.color.lerpColors(this.nightSky, this.daySky, daylight);
+    this.hemiLight.groundColor.lerpColors(this.nightGround, this.dayGround, daylight);
+    this.sunLight.intensity = THREE.MathUtils.lerp(0.08, 1.15, daylight);
+    this.sunLight.color.lerpColors(this.nightSun, this.daySun, daylight);
+    this.scene.background.lerpColors(this.nightSky, this.daySky, daylight);
+    this.scene.fog.color.lerpColors(this.nightSky, this.daySky, daylight);
   }
 
   followTarget(targetPosition, delta = 0.1) {

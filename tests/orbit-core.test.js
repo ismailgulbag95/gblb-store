@@ -20,7 +20,7 @@ import { CharacterFactory } from '../src/presentation/CharacterFactory.js';
 import { customerMood, saleMoodMultiplier, tipForMood } from '../src/domain/customerExperience.js';
 import { decorationPrice, nextOrder, orderProgress } from '../src/domain/orders.js';
 import { machineProductionSeconds, machineSpeedMultiplier, machineUpgradeCost, staffSpeedMultiplier, staffUpgradeCost } from '../src/domain/progression.js';
-import { AdMobRewardedProvider, RewardedAdService } from '../src/infrastructure/RewardedAdProvider.js';
+import { AdMobRewardedProvider, DevelopmentRewardedProvider, RewardedAdService } from '../src/infrastructure/RewardedAdProvider.js';
 
 class MemoryStorage {
   values = new Map();
@@ -43,10 +43,28 @@ test('older v2 saves migrate customer and order fields without losing inventory'
   old.customers.push({ id: 'customer-90', kind: 'shopper', x: 5, z: 5, phase: 'leaving',
     shoppingList: ['TOMATO'], basket: [], demand: 'TOMATO' });
   const migrated = hydrateState(old);
-  assert.equal(migrated.saveVersion, 6);
+  assert.equal(migrated.saveVersion, 7);
   assert.equal(migrated.stock.player.items.TOMATO, 2);
   assert.equal(migrated.customers[0].checkoutWaitTicks, 0);
   assert.equal(migrated.ordersCompleted, 0);
+});
+
+test('v6 saves migrate to the bonus-offer defaults without losing player capacity', () => {
+  const old = createInitialState(43);
+  old.saveVersion = 6;
+  delete old.bonusOffers;
+  const migrated = hydrateState(old);
+
+  assert.equal(migrated.saveVersion, 7);
+  assert.deepEqual(migrated.bonusOffers, {
+    activePlayMs: 0,
+    nextOfferAtActiveMs: 180_000,
+    nextOfferId: 1,
+    currentOffer: null,
+    walkSpeedExpiresAt: 0,
+  });
+  assert.equal(migrated.player.capacity, 6);
+  assert.equal(migrated.stock.player.capacity, 6);
 });
 
 test('customer mood changes sale and tip rewards only after meaningful waits', () => {
@@ -171,7 +189,7 @@ test('legacy farm saves retain ripe quantity and upgrade to independent timers',
   delete legacy.farms.tomatoFarm.plants;
 
   const migrated = hydrateState(legacy);
-  assert.equal(migrated.saveVersion, 6);
+  assert.equal(migrated.saveVersion, 7);
   assert.equal(migrated.farms.tomatoFarm.plants.length, 4);
   assert.equal(migrated.farms.tomatoFarm.plants.filter((plant) => plant.ready).length, 3);
   assert.equal(migrated.stock['farm:TOMATO'].items.TOMATO, 3);
@@ -192,7 +210,7 @@ test('version four farm timers migrate to one evenly phased cycle without losing
 
   const migrated = hydrateState(legacy);
   const plants = migrated.farms.tomatoFarm.plants;
-  assert.equal(migrated.saveVersion, 6);
+  assert.equal(migrated.saveVersion, 7);
   assert.equal(migrated.farms.tomatoFarm.readyCount, 1);
   assert.equal(migrated.stock['farm:TOMATO'].items.TOMATO, 1);
   assert.deepEqual(plants.map((plant) => plant.cycleTicks), [45, 45, 45, 45]);
@@ -344,7 +362,7 @@ test('all five original player models build and animate as complete character ri
   }
 });
 
-test('staff hiring options stay out of cash purchases and rewarded hire adds a working employee', async () => {
+test('staff hiring is ad-only and rewarded hire adds a working employee without spending cash', async () => {
   const storage = new MemoryStorage();
   const saved = createInitialState(19);
   saved.stats.tomatoSold = 1;
@@ -454,10 +472,10 @@ test('factory worker carries intermediate bread to the next recipe', () => {
   const state = createInitialState(51);
   state.machines.bakery = { recipe: 'bakery', progressTicks: 0, blocked: false };
   state.machines.burgerKitchen = { recipe: 'burger', progressTicks: 0, blocked: false };
-  state.workers.push({ id: 'feeder-1', type: 'factoryFeeder', x: -23, z: 0, task: null });
+  state.workers.push({ id: 'feeder-1', type: 'factoryFeeder', x: -10, z: 0, task: null });
   state.stock['machine:bakery:output'].items.BREAD = 1;
   state.stock['farm:WHEAT'].items.WHEAT = 3;
-  runTicks(state, 100);
+  runTicks(state, 220);
   assert.equal(quantityAt(state.stock, 'machine:burgerKitchen:input', 'BREAD'), 1);
 });
 
@@ -480,10 +498,9 @@ test('caretaker stocks eggs even when the coop feed bin is full', () => {
   state.stock['coop:feed'].items.CHICKEN_FEED = 20;
   state.stock['machine:feed:output'].items.CHICKEN_FEED = 1;
   state.stock['coop:eggs'].items.EGG = 1;
-  state.coops.coop = { chickens: 1, progressTicks: 0 };
   state.unlockedProducts.push('EGG');
-  state.workers.push({ id: 'caretaker-1', type: 'caretaker', x: -23, z: 3.5, task: null });
-  runTicks(state, 140);
+  state.workers.push({ id: 'caretaker-1', type: 'caretaker', x: -18, z: 0, task: null });
+  runTicks(state, 220);
   assert.equal(state.stockTransactions.some((entry) => entry.to === 'shelf:EGG' && entry.item === 'EGG'
     && entry.id.startsWith('worker-delivery:')), true);
   assert.equal(quantityAt(state.stock, 'coop:eggs', 'EGG'), 0);
@@ -747,9 +764,10 @@ test('shelves placed adjacent to walls block gap, while 1 grid away allows passa
 });
 
 class FakeRewardedProvider {
-  constructor(mode = 'complete', ready = true) {
+  constructor(mode = 'complete', ready = true, receipts = []) {
     this.mode = mode;
     this.ready = ready;
+    this.receipts = receipts;
     this.showCount = 0;
     this.context = null;
   }
@@ -771,7 +789,7 @@ class FakeRewardedProvider {
     return false;
   }
 
-  async getCompletedRewardReceipts() { return []; }
+  async getCompletedRewardReceipts() { return this.receipts; }
 }
 
 function makeAdApp(provider = new FakeRewardedProvider(), storage = new MemoryStorage()) {
@@ -850,7 +868,7 @@ test('legacy furniture save migration removes dynamic assets, their stock, and i
   assert.equal(state.diningTables.legacyTable, undefined);
   assert.equal(state.customers.some((customer) => customer.id === 'legacy-diner'), false);
   assert.deepEqual(state.layout, { tomatoFarm: { x: -10, z: 5 } });
-  assert.equal(state.saveVersion, 6);
+  assert.equal(state.saveVersion, 7);
 });
 
 test('AdMob browser adapter remains not ready until a native bridge is supplied', async () => {
@@ -858,6 +876,69 @@ test('AdMob browser adapter remains not ready until a native bridge is supplied'
   assert.equal(provider.isReady('farm-unlock'), false);
   assert.equal(await provider.show('farm-unlock', { onCompleted() {} }), false);
   assert.deepEqual(await provider.getCompletedRewardReceipts(), []);
+});
+
+test('development ad simulation waits before its marked reward and never overrides a configured AdMob bridge', async () => {
+  const native = new AdMobRewardedProvider(null);
+  const simulated = new DevelopmentRewardedProvider(native, true, 15);
+  const service = new RewardedAdService(simulated);
+  const rewardId = 'development-reward-1';
+  let completed = null;
+  const startedAt = Date.now();
+  const result = await service.show('farm-unlock', {
+    onCompleted: (receipt) => { completed = receipt; },
+  }, { rewardId });
+
+  assert.equal(result, true);
+  assert.ok(Date.now() - startedAt >= 10);
+  assert.deepEqual(completed, { rewardId, rewarded: true, source: 'development-simulation' });
+  assert.equal(service.isSimulated(), true);
+
+  const notReadyNative = new AdMobRewardedProvider({
+    isRewardedReady: () => false,
+    showRewarded: () => assert.fail('unready AdMob should not be shown'),
+  });
+  const noFallback = new DevelopmentRewardedProvider(notReadyNative, true, 1);
+  assert.equal(noFallback.isSimulated(), false);
+  assert.equal(noFallback.isReady('staff-hire'), false);
+  assert.equal(await noFallback.show('staff-hire', {}, { rewardId: 'must-not-grant' }), false);
+
+  let nativeShows = 0;
+  const configuredNative = new AdMobRewardedProvider({
+    isRewardedReady: () => true,
+    showRewarded: (_placement, callbacks, context) => {
+      nativeShows += 1;
+      callbacks.onCompleted({ rewardId: context.rewardId, rewarded: true });
+    },
+  });
+  const nativeFirst = new RewardedAdService(new DevelopmentRewardedProvider(configuredNative, true, 1));
+  assert.equal(nativeFirst.isSimulated(), false);
+  assert.equal(await nativeFirst.show('staff-hire', {}, { rewardId: 'native-reward-1' }), true);
+  assert.equal(nativeShows, 1);
+});
+
+test('development simulation makes progression-eligible ad unlocks available and awards only after its delay', async () => {
+  const provider = new DevelopmentRewardedProvider(new AdMobRewardedProvider(null), true, 25);
+  const app = new GameApplication(new SaveService(new MemoryStorage()), 1, new RewardedAdService(provider));
+  app.getState().availableUpgrades.push('cashier');
+  assert.equal(app.getState().ordersCompleted, 0);
+  assert.equal(app.adSessionTicks, 0);
+  assert.equal(app.isRewardedAdSimulated(), true);
+  assert.equal(app.canOfferRewardedAd('staff-hire', { role: 'cashier' }), true);
+  const pendingReward = app.watchRewardedAd('staff-hire', { role: 'cashier' });
+  assert.equal(getStaffCount(app.getState(), 'cashier'), 0);
+  const result = await pendingReward;
+  assert.equal(result.ok, true);
+  assert.equal(getStaffCount(app.getState(), 'cashier'), 1);
+});
+
+test('rewarded service rejects a completion receipt for another request', async () => {
+  const invalidProvider = {
+    isReady: () => true,
+    show: (_placement, callbacks) => callbacks.onCompleted({ rewardId: 'wrong-id', rewarded: true }),
+  };
+  const service = new RewardedAdService(invalidProvider);
+  assert.equal(await service.show('staff-hire', {}, { rewardId: 'expected-id' }), false);
 });
 
 test('rewarded order completion grants the order reward only once despite duplicate callbacks', async () => {
@@ -874,6 +955,143 @@ test('rewarded order completion grants the order reward only once despite duplic
   assert.equal(app.getState().lastOrderReward.claimed, true);
   assert.equal(app.getState().ads.grantedRewardIds.length, 1);
   assert.equal(app.getState().ads.events.filter((event) => event.type === 'reward_granted').length, 1);
+});
+
+test('surprise bonus offers wait for three active minutes and persist a 5–8 minute follow-up interval', () => {
+  const { app, storage } = makeAdApp();
+  app.advanceBonusOfferClock(179_999);
+  assert.equal(app.getPendingBonusOffer(), null);
+  assert.equal(app.getState().bonusOffers.activePlayMs, 179_999);
+
+  const offer = app.advanceBonusOfferClock(1);
+  assert.ok(['walk-speed', 'bag-capacity'].includes(offer.type));
+  assert.equal(offer.id, 'bonus-1');
+  const wait = app.getState().bonusOffers.nextOfferAtActiveMs - app.getState().bonusOffers.activePlayMs;
+  assert.ok(wait >= 300_000 && wait <= 480_000);
+
+  const loaded = new GameApplication(new SaveService(storage), 1);
+  assert.deepEqual(loaded.getPendingBonusOffer(), offer);
+  assert.equal(loaded.getState().bonusOffers.nextOfferAtActiveMs, app.getState().bonusOffers.nextOfferAtActiveMs);
+});
+
+test('surprise bonus clock does not advance during pauses or when layout/modal eligibility is false', () => {
+  const { app } = makeAdApp();
+  app.setPaused(true);
+  app.advanceBonusOfferClock(10_000);
+  app.setPaused(false);
+  app.advanceBonusOfferClock(10_000, false);
+  assert.equal(app.getState().bonusOffers.activePlayMs, 0);
+});
+
+test('speed bonus is player-only, persists its wall-clock expiry, and repeated ads add five minutes', async () => {
+  const { app, storage } = makeAdApp();
+  const state = app.getState();
+  state.bonusOffers.activePlayMs = 180_000;
+  state.bonusOffers.currentOffer = { id: 'speed-1', type: 'walk-speed' };
+  app.setPaused(true); // The opt-in bonus modal pauses the simulation while its button is used.
+
+  const first = await app.watchRewardedAd('bonus-offer', { offerId: 'speed-1', bonusType: 'walk-speed' });
+  assert.equal(first.ok, true);
+  assert.match(first.message, /5 dakika/);
+  const firstExpiry = app.getState().bonusOffers.walkSpeedExpiresAt;
+  assert.equal(app.getWalkSpeedMultiplier(firstExpiry - 1), 2);
+  assert.equal(app.getWalkSpeedMultiplier(firstExpiry), 1);
+  assert.equal(app.getState().speedMultiplier, 1, 'the bonus does not accelerate the simulation');
+  const unboosted = new GameApplication(new SaveService(new MemoryStorage()), 1);
+  unboosted.getState().player.x = -30;
+  unboosted.getState().player.z = 0;
+  unboosted.setPlayerMove({ x: 1, z: 0 }, 1);
+  const boosted = new GameApplication(new SaveService(new MemoryStorage()), 1);
+  boosted.getState().player.x = -30;
+  boosted.getState().player.z = 0;
+  boosted.getState().bonusOffers.walkSpeedExpiresAt = Date.now() + 10_000;
+  boosted.setPlayerMove({ x: 1, z: 0 }, 1);
+  assert.ok(Math.abs(boosted.getState().player.x + 15) < 0.01);
+  assert.ok(Math.abs(unboosted.getState().player.x + 22.5) < 0.01);
+
+  const loaded = new GameApplication(new SaveService(storage), 1);
+  assert.equal(loaded.getState().bonusOffers.walkSpeedExpiresAt, firstExpiry);
+  assert.equal(loaded.getWalkSpeedMultiplier(firstExpiry - 1), 2);
+
+  const nextState = app.getState();
+  nextState.ads.recentCompletions = [];
+  nextState.ads.lastStartedAt = Date.now() - 90_001;
+  nextState.bonusOffers.currentOffer = { id: 'speed-2', type: 'walk-speed' };
+  const second = await app.watchRewardedAd('bonus-offer', { offerId: 'speed-2', bonusType: 'walk-speed' });
+  assert.equal(second.ok, true);
+  assert.ok(app.getState().bonusOffers.walkSpeedExpiresAt >= firstExpiry + 299_000);
+});
+
+test('bag bonus adds one permanent slot up to twenty and failed ads grant nothing', async () => {
+  const { app, storage } = makeAdApp();
+  const state = app.getState();
+  state.player.capacity = 19;
+  state.stock.player.capacity = 19;
+  state.bonusOffers.activePlayMs = 180_000;
+  state.bonusOffers.currentOffer = { id: 'bag-19', type: 'bag-capacity' };
+  app.setPaused(true);
+
+  const granted = await app.watchRewardedAd('bonus-offer', { offerId: 'bag-19', bonusType: 'bag-capacity' });
+  assert.equal(granted.ok, true);
+  assert.equal(app.getState().player.capacity, 20);
+  assert.equal(app.getState().stock.player.capacity, 20);
+  const loaded = new GameApplication(new SaveService(storage), 1);
+  assert.equal(loaded.getState().player.capacity, 20);
+  assert.equal(loaded.getState().stock.player.capacity, 20);
+
+  const retry = app.getState();
+  retry.ads.recentCompletions = [];
+  retry.ads.lastStartedAt = Date.now() - 90_001;
+  retry.bonusOffers.currentOffer = { id: 'bag-cap', type: 'bag-capacity' };
+  assert.equal(app.canOfferRewardedAd('bonus-offer', { offerId: 'bag-cap', bonusType: 'bag-capacity' }), false);
+  retry.bonusOffers.currentOffer = { id: 'failed-speed', type: 'walk-speed' };
+  app.setPaused(false);
+
+  const failed = makeAdApp(new FakeRewardedProvider('closed'));
+  failed.app.getState().bonusOffers.activePlayMs = 180_000;
+  failed.app.getState().bonusOffers.currentOffer = { id: 'failed-speed', type: 'walk-speed' };
+  failed.app.setPaused(true);
+  const closed = await failed.app.watchRewardedAd('bonus-offer', { offerId: 'failed-speed', bonusType: 'walk-speed' });
+  assert.equal(closed.ok, false);
+  assert.equal(failed.app.getState().bonusOffers.walkSpeedExpiresAt, 0);
+  assert.equal(failed.app.getState().bonusOffers.currentOffer, null);
+});
+
+test('development bonus ads still obey daily and recent frequency limits', () => {
+  const provider = new DevelopmentRewardedProvider(new AdMobRewardedProvider(null), true, 1);
+  const app = new GameApplication(new SaveService(new MemoryStorage()), 1, new RewardedAdService(provider));
+  app.getState().bonusOffers.activePlayMs = 180_000;
+  app.getState().bonusOffers.currentOffer = { id: 'limited', type: 'walk-speed' };
+  const now = new Date();
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  app.getState().ads.dailyCounts[today] = { completed: 6, placements: {} };
+  assert.equal(app.canOfferRewardedAd('bonus-offer', { offerId: 'limited', bonusType: 'walk-speed' }), false);
+  app.getState().ads.dailyCounts[today].completed = 1;
+  app.getState().ads.recentCompletions = [Date.now() - 1_000, Date.now() - 2_000];
+  assert.equal(app.canOfferRewardedAd('bonus-offer', { offerId: 'limited', bonusType: 'walk-speed' }), false);
+});
+
+test('interrupted rewarded ads grant after reload only when AdMob returns a matching completion receipt', async () => {
+  for (const completed of [true, false]) {
+    const storage = new MemoryStorage();
+    const interrupted = createInitialState(801);
+    interrupted.ordersCompleted = 1;
+    interrupted.lastOrderReward = { id: 'order:resume', reward: 19, item: 'TOMATO', quantity: 2, claimed: false };
+    interrupted.ads.pending = {
+      rewardId: `resume-${completed}`, placement: 'order-double', payload: { orderId: 'order:resume' },
+      createdAt: Date.now(), started: true,
+    };
+    const initialBalance = interrupted.economy.balanceAtoms;
+    new SaveService(storage).commit(interrupted, `interrupted-ad:${completed}`);
+    const receipts = completed ? [{ rewardId: `resume-${completed}`, rewarded: true }] : [];
+    const provider = new FakeRewardedProvider('idle', true, receipts);
+    const app = new GameApplication(new SaveService(storage), 1, new RewardedAdService(provider));
+    for (let index = 0; index < 4; index += 1) await Promise.resolve();
+
+    assert.equal(app.getState().economy.balanceAtoms, initialBalance + (completed ? 190_000 : 0));
+    assert.equal(app.getState().ads.pending, null);
+    assert.equal(Boolean(app.getState().lastOrderReward.claimed), completed);
+  }
 });
 
 test('failed and closed rewarded ads clear pending state without granting any reward', async () => {
@@ -907,7 +1125,7 @@ test('not-ready ads cannot be started or rewarded', async () => {
 });
 
 test('second farm and staff hire use rewarded ads, never game cash', async () => {
-  const { app } = makeAdApp();
+  const { app, storage } = makeAdApp();
   const startBalance = app.getBalance();
   assert.equal(app.buyUpgrade('tomatoFarm2').reason, 'rewarded-ad-required');
 
@@ -915,6 +1133,25 @@ test('second farm and staff hire use rewarded ads, never game cash', async () =>
   assert.equal(farmResult.ok, true);
   assert.ok(app.getState().farms.tomatoFarm2);
   assert.equal(app.getBalance(), startBalance);
+
+  for (const [baseId, upgradeId, item, gate] of [
+    ['orangeFarm', 'orangeFarm2', 'ORANGE', 'juiceSold'],
+    ['cornFarm', 'cornFarm2', 'CORN', 'cornSold'],
+    ['wheatFarm', 'wheatFarm2', 'WHEAT', 'eggSold'],
+  ]) {
+    app.getState().farms[baseId] ??= createFarmState(app.getState().tick, baseId);
+    makeLocation(app.getState().stock, `farm:${item}`, 60);
+    app.getState().stats[gate] = 1;
+  }
+  app.tick();
+  for (const upgradeId of ['orangeFarm2', 'cornFarm2', 'wheatFarm2']) {
+    app.getState().ads.lastStartedAt = Date.now() - 90_001;
+    app.getState().ads.recentCompletions = [];
+    assert.equal(app.canOfferRewardedAd('farm-unlock', { upgradeId }), true);
+    assert.equal((await app.watchRewardedAd('farm-unlock', { upgradeId })).ok, true);
+    assert.ok(app.getState().farms[upgradeId]);
+    assert.equal(app.getBalance(), startBalance);
+  }
 
   app.getState().availableUpgrades.push('cashier');
   app.getState().ads.lastStartedAt = Date.now() - 90_001;
@@ -924,6 +1161,31 @@ test('second farm and staff hire use rewarded ads, never game cash', async () =>
   assert.equal(getStaffCount(app.getState(), 'cashier'), 1);
   assert.equal(app.getBalance(), startBalance);
   assert.equal(app.getState().workers[0].upgradeLevel, 0);
+  const loaded = new GameApplication(new SaveService(storage), 1);
+  assert.ok(loaded.getState().farms.tomatoFarm2);
+  assert.equal(getStaffCount(loaded.getState(), 'cashier'), 1);
+});
+
+test('sponsored machine input grants only the missing recipe ingredients after a blocked interval', async () => {
+  const { app } = makeAdApp();
+  app.getState().stats.tomatoSold = 1;
+  app.tick();
+  assert.equal(app.buyUpgrade('paste').ok, true);
+  for (let index = 0; index < 200; index += 1) app.tick();
+  assert.equal(app.getState().machines.paste.blocked, 'missing-input');
+  app.getState().stock.player.items.TOMATO = 1;
+  assert.equal(reserveStock(app.getState(), {
+    reservationId: 'supplier-inbound-tomato', from: 'player', to: 'machine:paste:input', item: 'TOMATO', quantity: 1,
+  }).ok, true);
+  assert.equal(app.canOfferRewardedAd('supplier-drop', { machineId: 'paste' }), true);
+
+  const result = await app.watchRewardedAd('supplier-drop', { machineId: 'paste' });
+
+  assert.equal(result.ok, true);
+  assert.equal(quantityAt(app.getState().stock, 'machine:paste:input', 'TOMATO'), 1);
+  const rewardEvent = app.getState().ads.events.find((event) => event.type === 'reward_granted' && event.placement === 'supplier-drop');
+  assert.deepEqual(rewardEvent.details.inputs, { TOMATO: 1 });
+  assert.equal(rewardEvent.details.machineId, 'paste');
 });
 
 test('machine upgrades keep timer progress, increase costs, stay bounded, and survive save/load', () => {
@@ -962,10 +1224,25 @@ test('each worker has an independent money upgrade and a safe diminishing speed 
     { id: 'worker-a', type: 'cashier', x: 0, z: 0, task: null, upgradeLevel: 0, speedModifier: 1 },
     { id: 'worker-b', type: 'cashier', x: 0, z: 1, task: null, upgradeLevel: 0, speedModifier: 1 },
   ];
+  const state = app.getState();
+  state.stock['farm:TOMATO'].items.TOMATO = 1;
+  state.farms.tomatoFarm.plants[0].ready = true;
+  state.farms.tomatoFarm.readyCount = 1;
+  makeLocation(state.stock, 'worker:worker-a', 6);
+  assert.equal(reserveStock(state, {
+    reservationId: 'staff-upgrade-active-task', from: 'farm:TOMATO', to: 'shelf:TOMATO', item: 'TOMATO', quantity: 1,
+  }).ok, true);
+  state.workers[0].task = {
+    from: 'farm:TOMATO', to: 'shelf:TOMATO', item: 'TOMATO', reservationId: 'staff-upgrade-active-task',
+    carrier: 'worker:worker-a', quantity: 1, phase: 'to-source', farmId: 'tomatoFarm',
+  };
   const price0 = staffUpgradeCost('cashier', 0);
   assert.equal(app.upgradeStaff('worker-a').ok, true);
   assert.equal(app.getState().workers.find((worker) => worker.id === 'worker-a').upgradeLevel, 1);
   assert.equal(app.getState().workers.find((worker) => worker.id === 'worker-b').upgradeLevel, 0);
+  app.tick();
+  const movingWorker = app.getState().workers.find((worker) => worker.id === 'worker-a');
+  assert.ok(Math.hypot(movingWorker.x, movingWorker.z) > 0.34, 'the upgraded worker uses its new speed while a task is active');
   assert.ok(staffUpgradeCost('cashier', 1) > price0);
   assert.ok(staffSpeedMultiplier(1) > 1);
   assert.ok(staffSpeedMultiplier(10_000) <= 1.2);

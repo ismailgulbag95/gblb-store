@@ -10,19 +10,29 @@
     <main id="game-container" aria-label="GBLB Store oyun dünyası"></main>
     <div id="ui-layer">
       <header class="top-bar" data-ui>
-        <div class="brand-pill"><span class="brand-mark">G</span><span>GBLB STORE</span></div>
-        <section class="quest-card" aria-live="polite" data-ui>
-          <div class="quest-icon">🎯</div>
-          <div class="quest-copy"><span class="eyebrow">SIRADAKİ HEDEF</span><strong id="quest-text">Domates topla, reyonu doldur ve ilk satışını yap.</strong></div>
-          <div class="quest-progress"><span id="progress-count">0 / 17</span><div class="progress-track"><i id="progress-fill"></i></div></div>
-        </section>
-        <div class="stat-group">
-          <div class="stat-pill money-pill"><span>💵</span><strong id="money-display">$100</strong></div>
-          <div class="stat-pill bag-pill"><span>🎒</span><strong id="stack-display">0 / 6</strong></div>
+        <div class="top-primary-row">
+          <div class="brand-pill"><span class="brand-mark">G</span><span>GBLB STORE</span></div>
+          <div class="stat-group">
+            <div class="stat-pill day-pill" aria-label="Oyun günü"><strong id="day-display">Gün 1</strong></div>
+            <div class="stat-pill money-pill"><span data-asset-icon="money" data-asset-size="20"></span><strong id="money-display">$100</strong></div>
+            <div class="stat-pill bag-pill"><span data-asset-icon="capacity" data-asset-size="32"></span><strong id="stack-display">0 / 6</strong></div>
+          </div>
+          <div class="top-actions">
+            <button class="icon-btn" id="btn-expansions" aria-label="İşletme geliştirmeleri"><span data-asset-icon="upgrade" data-asset-size="34"></span><span id="upgrade-count">1</span></button>
+            <button class="icon-btn" id="btn-layout" aria-label="Yerleşimi düzenle" aria-pressed="false" title="Yerleşimi düzenle">▦</button>
+            <button class="icon-btn" id="btn-decor-top" aria-label="Dekorasyon mağazası" title="Dekorasyon mağazası"><span data-asset-icon="decoration" data-asset-size="34"></span></button>
+            <button class="icon-btn" id="btn-settings" aria-label="Ayarlar"><span data-asset-icon="settings" data-asset-size="34"></span></button>
+          </div>
         </div>
-        <div class="top-utility-row">
+        <div class="top-secondary-row">
+          <button class="business-toggle" id="btn-business-toggle" data-ui aria-label="İşletme özetini aç" aria-expanded="false"><span data-asset-icon="business" data-asset-size="26"></span><span id="business-toggle-score">—</span></button>
+          <section class="quest-card" aria-live="polite" data-ui>
+            <div class="quest-icon"><span data-asset-icon="goal" data-asset-size="42"></span></div>
+            <div class="quest-copy"><span class="eyebrow">SIRADAKİ HEDEF</span><strong id="quest-text">Domates topla, reyonu doldur ve ilk satışını yap.</strong></div>
+            <div class="quest-progress"><span id="progress-count">0 / 17</span><div class="progress-track"><i id="progress-fill"></i></div></div>
+          </section>
           <section class="order-card hidden" id="order-card" data-ui aria-live="polite">
-            <div class="order-heading"><span>📋</span><strong id="order-title" data-short-label="SİPARİŞ">MÜŞTERİ SİPARİŞİ</strong><button id="btn-order-toggle" class="order-collapse" aria-label="Sipariş ayrıntılarını küçült" aria-expanded="true">⌃</button></div>
+            <div class="order-heading"><span data-asset-icon="orders" data-asset-size="34"></span><strong id="order-title" data-short-label="SİPARİŞ">MÜŞTERİ SİPARİŞİ</strong><button id="btn-order-toggle" class="order-collapse" aria-label="Sipariş ayrıntılarını küçült" aria-expanded="true">⌃</button></div>
             <div class="order-details"><span id="order-item"></span><strong id="order-reward"></strong></div>
             <div class="order-progress"><span id="order-progress"></span><div class="progress-track"><i id="order-progress-fill"></i></div></div>
             <button id="btn-deliver-order" class="order-deliver">Siparişi teslim et</button>
@@ -33,12 +43,6 @@
               <button id="btn-order-ad-decline" class="ad-decline-button">Şimdi değil</button>
             </div>
           </section>
-          <div class="top-actions">
-            <button class="icon-btn" id="btn-expansions" aria-label="İşletme geliştirmeleri">🏗️ <span id="upgrade-count">1</span></button>
-            <button class="icon-btn" id="btn-layout" aria-label="Yerleşimi düzenle" aria-pressed="false" title="Yerleşimi düzenle">▦</button>
-            <button class="icon-btn" id="btn-decor-top" aria-label="Dekorasyon mağazası" title="Dekorasyon mağazası">🎨</button>
-            <button class="icon-btn" id="btn-settings" aria-label="Ayarlar">⚙️</button>
-          </div>
         </div>
       </header>
       <div id="layout-help" class="layout-help hidden" data-ui>
@@ -46,23 +50,21 @@
         <button id="btn-rotate-layout" class="layout-rotate-btn hidden" type="button" aria-label="Seçili yapıyı döndür">↻ Döndür (R)</button>
       </div>
 
-      <button class="business-toggle" id="btn-business-toggle" data-ui aria-label="İşletme özetini aç" aria-expanded="false">🏪 <span id="business-toggle-score">—</span></button>
-
       <aside class="business-card" id="business-card" data-ui>
-        <div class="business-heading"><span>🏪</span><strong>İŞLETME</strong><span class="live-dot"></span><small>CANLI</small></div>
-        <div class="business-row"><span>🧑‍🤝‍🧑 Müşteriler</span><strong id="customer-count">0</strong></div>
-        <div class="business-row"><span>🧑‍🔧 Çalışanlar</span><strong id="worker-count">0</strong></div>
-        <div class="business-row"><span>📦 Reyon stoğu</span><strong id="shelf-count">0</strong></div>
-        <div class="business-row"><span id="mood-label">😊 Memnuniyet</span><strong id="mood-count">—</strong></div>
+        <div class="business-heading"><span data-asset-icon="business" data-asset-size="34"></span><strong>İŞLETME</strong><span class="live-dot"></span><small>CANLI</small></div>
+        <div class="business-row"><span><span data-asset-icon="customers" data-asset-size="28"></span> Müşteriler</span><strong id="customer-count">0</strong></div>
+        <div class="business-row"><span><span data-asset-icon="staff" data-asset-size="28"></span> Çalışanlar</span><strong id="worker-count">0</strong></div>
+        <div class="business-row"><span><span data-asset-icon="stock" data-asset-size="28"></span> Reyon stoğu</span><strong id="shelf-count">0</strong></div>
+        <div class="business-row"><span id="mood-label"><span data-asset-icon="satisfied" data-asset-size="28"></span> Memnuniyet</span><strong id="mood-count">—</strong></div>
         <button id="btn-inventory" class="text-button">Ürünleri gör <span>›</span></button>
-        <div class="decor-score-row"><span>✨ Dekor puanı</span><strong id="decor-score">0 · +0%</strong></div>
-        <button id="btn-decor" class="text-button decor-button">🎨 Dekorasyon mağazası <span>›</span></button>
+        <div class="decor-score-row"><span><span data-asset-icon="decorScore" data-asset-size="26"></span> Dekor puanı</span><strong id="decor-score">0 · +0%</strong></div>
+        <button id="btn-decor" class="text-button decor-button"><span data-asset-icon="decoration" data-asset-size="26"></span> Dekorasyon mağazası <span>›</span></button>
       </aside>
 
       <div class="bottom-controls" data-ui>
         <div id="joystick-zone" aria-label="Hareket kontrolü"><div id="joystick-base"><div id="joystick-thumb"></div></div></div>
         <div class="control-hint"><kbd>WASD</kbd><span>veya dokunup yürü</span></div>
-        <button id="btn-interact" class="action-button" disabled><span class="action-icon">✋</span><span id="action-label">Bir istasyona yaklaş</span><kbd>E</kbd></button>
+        <button id="btn-interact" class="action-button" disabled><span class="action-icon"><span data-asset-icon="interact" data-asset-size="34"></span></span><span id="action-label">Bir istasyona yaklaş</span><kbd>E</kbd></button>
         <div id="machine-ad-offer" class="inline-ad-offer machine-ad-offer hidden" aria-live="polite">
           <small id="machine-ad-copy"></small>
           <button id="btn-machine-ad" class="ad-reward-button">İzle ve girdiyi al</button>
@@ -71,6 +73,7 @@
       </div>
 
       <div id="toast-container" aria-live="polite"></div>
+      <div id="walk-speed-buff" class="walk-speed-buff hidden" data-ui aria-live="polite"></div>
 
       <div class="modal-overlay hidden" id="expansion-modal" data-ui>
         <section class="modal-card expansions-card" role="dialog" aria-modal="true" aria-labelledby="expansion-title">
@@ -98,20 +101,20 @@
             <label class="setting-row"><span>Ses efektleri</span><input type="checkbox" id="setting-sound" checked /></label>
             <label class="setting-row"><span>Dokunsal geri bildirim</span><input type="checkbox" id="setting-haptics" checked /></label>
             <div class="setting-note">Oyun arka plana geçtiğinde simülasyon durur. Döndüğünde kaldığın yerden devam eder.</div>
-            <button class="secondary-button" id="btn-resume">▶ Oyuna dön</button>
+            <button class="secondary-button" id="btn-resume">Oyuna dön</button>
           </div>
           <div class="settings-content hidden" data-panel="character">
             <p class="modal-intro">Oyuncu karakterini seç</p>
             <div class="character-options">
-              <button data-character="shopkeeper">🧑‍🌾<span>Marketçi</span></button><button data-character="cat">🐱<span>Kedi</span></button>
-              <button data-character="robot">🤖<span>Robot</span></button><button data-character="panda">🐼<span>Panda</span></button><button data-character="penguin">🐧<span>Penguen</span></button>
+              <button data-character="shopkeeper"><span class="character-mark character-mark-shopkeeper"><span data-asset-icon="playerAvatar" data-asset-size="52"></span></span><span>Marketçi</span></button><button data-character="cat"><span class="character-mark">K</span><span>Kedi</span></button>
+              <button data-character="robot"><span class="character-mark">R</span><span>Robot</span></button><button data-character="panda"><span class="character-mark">Pa</span><span>Panda</span></button><button data-character="penguin"><span class="character-mark">Pe</span><span>Penguen</span></button>
             </div>
           </div>
           <div class="settings-content hidden" data-panel="language">
-            <p class="modal-intro">Arayüz dili</p><div class="language-options"><button data-language="tr">🇹🇷 Türkçe</button><button data-language="en">🇬🇧 English</button></div>
+            <p class="modal-intro">Arayüz dili</p><div class="language-options"><button data-language="tr"><span class="language-code">TR</span> Türkçe</button><button data-language="en"><span class="language-code">EN</span> English</button></div>
           </div>
           <div class="settings-content hidden" data-panel="debug">
-            <div class="debug-grid"><button class="debug-button" data-debug="credit">💵 +$1.000</button><button class="debug-button" data-debug="creditLarge">♾️ +$99.999</button><button class="debug-button" data-debug="capacity">🎒 +50 kapasite</button><button class="debug-button" data-debug="speed2">⚡ 2× hız</button><button class="debug-button" data-debug="speed5">🚀 5× hız</button><button class="debug-button" data-debug="speed1">↩︎ Normal hız</button></div>
+            <div class="debug-grid"><button class="debug-button" data-debug="credit"><span data-asset-icon="money" data-asset-size="28"></span> +$1.000</button><button class="debug-button" data-debug="creditLarge"><span data-asset-icon="money" data-asset-size="28"></span> +$99.999</button><button class="debug-button" data-debug="capacity"><span data-asset-icon="capacity" data-asset-size="28"></span> +50 kapasite</button><button class="debug-button" data-debug="speed2"><span data-asset-icon="clock" data-asset-size="28"></span> 2× hız</button><button class="debug-button" data-debug="speed5"><span data-asset-icon="clock" data-asset-size="28"></span> 5× hız</button><button class="debug-button" data-debug="speed1"><span data-asset-icon="clock" data-asset-size="28"></span> Normal hız</button></div>
             <button class="reset-button" id="btn-reset">Yeni oyuna başla</button>
             <p class="setting-note">Geliştirici araçları kayıtlı oyun durumunu değiştirir.</p>
           </div>
@@ -129,16 +132,28 @@
         <section class="modal-card decor-card" role="dialog" aria-modal="true" aria-labelledby="decor-title">
           <header class="modal-header"><div><span class="eyebrow">MAĞAZANI KİŞİSELLEŞTİR</span><h1 id="decor-title">Dekorasyon mağazası</h1></div><button class="close-btn" data-close="decor-modal" aria-label="Kapat">×</button></header>
           <p class="modal-intro" id="decor-intro">Dekorasyon satın al; her parça mağazanda yer bulur ve satış kârını artırır.</p>
-          <div class="decor-score-banner"><span>✨</span><div><strong id="decor-shop-score">0 puan · +0%</strong><small id="decor-score-caption">Yerleştirilen dekorlar alışveriş keyfini artırır.</small></div></div>
+          <div class="decor-score-banner"><span data-asset-icon="decorScore" data-asset-size="46"></span><div><strong id="decor-shop-score">0 puan · +0%</strong><small id="decor-score-caption">Yerleştirilen dekorlar alışveriş keyfini artırır.</small></div></div>
           <div id="decor-list" class="decor-list"></div>
         </section>
       </div>
 
       <div class="modal-overlay hidden" id="recovery-modal" data-ui>
         <section class="modal-card recovery-card" role="alertdialog" aria-modal="true">
-          <div class="recovery-icon">⚠️</div><h1>Kayıt okunamadı</h1><p id="recovery-message"></p>
+          <div class="recovery-icon"><span data-asset-icon="warning" data-asset-size="54"></span></div><h1>Kayıt okunamadı</h1><p id="recovery-message"></p>
           <p class="setting-note">Yeni oyun başlatırsan mevcut kayıt ve yedekleri silinir.</p>
           <button class="reset-button" id="btn-recovery-reset">Yedekleri sil ve yeni oyun başlat</button>
+        </section>
+      </div>
+
+      <div class="modal-overlay bonus-offer-overlay hidden" id="bonus-offer-modal" data-ui>
+        <section class="modal-card bonus-offer-card" role="dialog" aria-modal="true" aria-labelledby="bonus-offer-title" aria-describedby="bonus-offer-description">
+          <div class="bonus-offer-icon" id="bonus-offer-icon" aria-hidden="true">⚡</div>
+          <span class="eyebrow">GÜNLÜK BONUS</span>
+          <h1 id="bonus-offer-title">Sürpriz bonus!</h1>
+          <h2 id="bonus-offer-name">Yürüyüş hızın 2 katına çıksın</h2>
+          <p id="bonus-offer-description" class="modal-intro"></p>
+          <button id="btn-bonus-ad" class="bonus-accept-button">Reklamı izle · +5 dk</button>
+          <button id="btn-bonus-decline" class="bonus-decline-button">Şimdi değil</button>
         </section>
       </div>
     </div>

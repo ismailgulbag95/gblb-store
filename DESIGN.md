@@ -47,7 +47,7 @@ Karanlık/kasvetli çizgiler yerine; enerjik, neşeli, kalın alt gölgeli ve pa
 
 ### B. HUD & Stat Kapsülleri (Duolingo Header Status)
 - Beyaz pufidik kapsüller (`#FFFFFF`), `border: 2px solid #E5E5E5`, `box-shadow: 0 4px 0 #E5E5E5`.
-- İçinde canlı emojiler, altın sarısı kalın para sayaçları.
+- İkonlarda `public/assets/ui-icon-atlas.png` içindeki illüstrasyonları kullan. Yeni UI metinlerinde emoji ikon kullanma; ikon düğmelerinde erişilebilir `aria-label` değerlerini koru.
 
 ### C. Modallar & Pencereler (Duolingo Dialogs)
 - Pufidik büyük beyaz kartlar (`#FFFFFF`), `border-radius: 28px`.

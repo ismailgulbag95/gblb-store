@@ -1,7 +1,7 @@
 /**
  * The native shell can expose this contract as `window.GBLB_ADMOB` once its
- * AdMob SDK/plugin is configured. The browser build deliberately has no
- * fallback that pretends an ad completed.
+ * AdMob SDK/plugin is configured. This provider never fabricates completion;
+ * local simulation lives in the separate development-only wrapper below.
  */
 export class AdMobRewardedProvider {
   constructor(bridge = null) {
@@ -10,6 +10,11 @@ export class AdMobRewardedProvider {
 
   getBridge() {
     return this.bridge ?? globalThis.GBLB_ADMOB ?? null;
+  }
+
+  isConfigured() {
+    const bridge = this.getBridge();
+    return typeof bridge?.isRewardedReady === 'function' && typeof bridge?.showRewarded === 'function';
   }
 
   isReady(placement) {
@@ -43,6 +48,41 @@ export class AdMobRewardedProvider {
   }
 }
 
+/**
+ * Local development only: simulates a completed opt-in ad when there is no
+ * configured AdMob bridge. A configured bridge always takes precedence.
+ */
+export class DevelopmentRewardedProvider {
+  constructor(nativeProvider, enabled = false, delayMs = 3_000) {
+    this.nativeProvider = nativeProvider;
+    this.enabled = enabled;
+    this.delayMs = delayMs;
+  }
+
+  isSimulated() {
+    return this.enabled && !this.nativeProvider?.isConfigured?.();
+  }
+
+  isReady(placement) {
+    if (this.nativeProvider?.isConfigured?.()) return this.nativeProvider.isReady(placement);
+    return this.enabled;
+  }
+
+  async show(placement, callbacks, context = {}) {
+    if (this.nativeProvider?.isConfigured?.()) return this.nativeProvider.show(placement, callbacks, context);
+    if (!this.enabled) return false;
+    callbacks.onLoaded?.();
+    callbacks.onStarted?.();
+    await new Promise((resolve) => setTimeout(resolve, this.delayMs));
+    callbacks.onCompleted?.({ rewardId: context.rewardId, rewarded: true, source: 'development-simulation' });
+    return undefined;
+  }
+
+  getCompletedRewardReceipts() {
+    return this.nativeProvider?.getCompletedRewardReceipts?.() ?? [];
+  }
+}
+
 export class RewardedAdService {
   constructor(provider) {
     this.provider = provider;
@@ -51,6 +91,14 @@ export class RewardedAdService {
   isReady(placement) {
     try {
       return this.provider?.isReady?.(placement) === true;
+    } catch {
+      return false;
+    }
+  }
+
+  isSimulated() {
+    try {
+      return this.provider?.isSimulated?.() === true;
     } catch {
       return false;
     }
@@ -81,7 +129,12 @@ export class RewardedAdService {
           callbacks.onStarted?.();
         },
         // The provider must call this only after its rewarded-completion signal.
-        onCompleted: (receipt) => finish('onCompleted', receipt),
+        onCompleted: (receipt) => {
+          if (receipt?.rewarded !== true || receipt.rewardId !== context.rewardId) {
+            return finish('onFailed', new Error('Rewarded completion receipt is invalid.'));
+          }
+          return finish('onCompleted', receipt);
+        },
         onFailed: (error) => finish('onFailed', error),
         onClosed: () => finish('onClosed'),
       };
@@ -90,7 +143,9 @@ export class RewardedAdService {
         if (result === false) return finish('onFailed', new Error('Rewarded ad could not be shown.'));
         // Providers may return a promise that resolves with an explicit earned receipt.
         if (result && typeof result === 'object' && result.rewarded === true) {
-          return finish('onCompleted', result);
+          return result.rewardId === context.rewardId
+            ? finish('onCompleted', result)
+            : finish('onFailed', new Error('Rewarded completion receipt does not match the active request.'));
         }
         if (result && typeof result === 'object' && result.error) {
           return finish('onFailed', result.error);

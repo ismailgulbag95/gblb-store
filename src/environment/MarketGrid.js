@@ -80,6 +80,51 @@ export class MarketGrid {
     gardenFloor.receiveShadow = true;
     this.scene.add(gardenFloor);
 
+    const waitingArea = new THREE.Mesh(
+      new THREE.PlaneGeometry(3.8, 3.2),
+      new THREE.MeshStandardMaterial({ color: 0xc8dcae, roughness: 0.9 }),
+    );
+    waitingArea.rotation.x = -Math.PI / 2;
+    waitingArea.position.set(-23.5, 0.025, -6.7);
+    waitingArea.receiveShadow = true;
+    this.scene.add(waitingArea);
+
+    const waitingBorder = new THREE.MeshBasicMaterial({ color: 0xe7c465 });
+    const borderSegments = [
+      { geometry: new THREE.BoxGeometry(3.8, 0.035, 0.07), x: -23.5, z: -8.3 },
+      { geometry: new THREE.BoxGeometry(3.8, 0.035, 0.07), x: -23.5, z: -5.1 },
+      { geometry: new THREE.BoxGeometry(0.07, 0.035, 3.2), x: -25.4, z: -6.7 },
+      { geometry: new THREE.BoxGeometry(0.07, 0.035, 3.2), x: -21.6, z: -6.7 },
+    ];
+    for (const segment of borderSegments) {
+      const stripe = new THREE.Mesh(segment.geometry, waitingBorder);
+      stripe.position.set(segment.x, 0.045, segment.z);
+      this.scene.add(stripe);
+    }
+
+    const waitingLabelCanvas = document.createElement('canvas');
+    waitingLabelCanvas.width = 512;
+    waitingLabelCanvas.height = 128;
+    const waitingLabelContext = waitingLabelCanvas.getContext('2d');
+    waitingLabelContext.fillStyle = '#496c4b';
+    waitingLabelContext.fillRect(0, 0, waitingLabelCanvas.width, waitingLabelCanvas.height);
+    waitingLabelContext.fillStyle = '#ffffff';
+    waitingLabelContext.font = 'bold 36px Fredoka, sans-serif';
+    waitingLabelContext.textAlign = 'center';
+    waitingLabelContext.textBaseline = 'middle';
+    waitingLabelContext.fillText('PERSONEL • STAFF', 256, 42);
+    waitingLabelContext.font = 'bold 28px Fredoka, sans-serif';
+    waitingLabelContext.fillText('BEKLEME • WAIT', 256, 91);
+    const waitingLabelTexture = new THREE.CanvasTexture(waitingLabelCanvas);
+    waitingLabelTexture.colorSpace = THREE.SRGBColorSpace;
+    const waitingLabel = new THREE.Mesh(
+      new THREE.PlaneGeometry(2.8, 0.7),
+      new THREE.MeshBasicMaterial({ map: waitingLabelTexture, toneMapped: false }),
+    );
+    waitingLabel.rotation.x = -Math.PI / 2;
+    waitingLabel.position.set(-23.5, 0.055, -8.05);
+    this.scene.add(waitingLabel);
+
     // Main Garden Promenade connecting Supermarket doorway (x = -4) to Restaurant (x = -26)
     this.createPath(-15, 0, 22, 2.8);
 
@@ -289,7 +334,7 @@ export class MarketGrid {
     ctx.font = 'bold 34px Fredoka, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('🌿 ORGANİK BAHÇE & ÇİFTLİK', 256, 64);
+    ctx.fillText('ORGANİK BAHÇE & ÇİFTLİK', 256, 64);
 
     const texture = new THREE.CanvasTexture(canvas);
     texture.colorSpace = THREE.SRGBColorSpace;
@@ -361,7 +406,7 @@ export class MarketGrid {
     ctx.font = 'bold 44px "Fredoka", sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('🍕 GOURMET BISTRO', 256, 64);
+    ctx.fillText('GOURMET BISTRO', 256, 64);
 
     const texture = new THREE.CanvasTexture(canvas);
     const textMat = new THREE.MeshBasicMaterial({ map: texture });
