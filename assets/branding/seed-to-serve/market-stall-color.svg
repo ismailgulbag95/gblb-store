@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
+  <title id="title">Tohumdan Sofraya — Pazar Tezgâhı</title>
+  <desc id="desc">A colorful market awning shades three crates of fresh produce.</desc>
+  <path fill="#FFC800" d="M58 48h140l16 43H42l16-43Z"/>
+  <path fill="#46A302" d="M42 91h43v14a21.5 21.5 0 0 1-43 0V91Z"/>
+  <path fill="#FF4B4B" d="M85 91h43v14a21.5 21.5 0 0 1-43 0V91Z"/>
+  <path fill="#FFC800" d="M128 91h43v14a21.5 21.5 0 0 1-43 0V91Z"/>
+  <path fill="#46A302" d="M171 91h43v14a21.5 21.5 0 0 1-43 0V91Z"/>
+  <path fill="#46A302" fill-rule="evenodd" d="M62 135h132v68H62v-68Zm9 9v46h36v-46H71Zm45 0v46h24v-46h-24Zm33 0v46h36v-46h-36Z"/>
+  <circle cx="89" cy="169" r="11" fill="#FF4B4B"/>
+  <path fill="#46A302" d="M86 157c-1-5 3-7 6-4 3-4 7-2 7 2-4 0-7 2-9 5-1-2-2-3-4-3Z"/>
+  <path fill="#FFC800" d="M128 154c6 0 9 7 9 16s-3 16-9 16-9-7-9-16 3-16 9-16Z"/>
+  <path fill="#46A302" d="M119 174c-6-1-8 3-7 8 5-1 8-3 10-7m15-1c6-1 8 3 7 8-5-1-8-3-10-7"/>
+  <circle cx="165" cy="170" r="11" fill="#FF4B4B"/>
+  <path fill="#46A302" d="M161 158c0-5 4-7 7-3 4-2 7 1 6 5-4-1-7 0-9 3-1-2-2-4-4-5Z"/>
+  <path fill="#46A302" d="M57 214h142v19H57v-19Z"/>
+</svg>

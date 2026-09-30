@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
+  <title id="title">Seed to Serve app icon variation — market stand</title>
+  <desc id="desc">A cheerful market stall with fresh produce on a bright blue field.</desc>
+  <rect width="256" height="256" fill="#43B9D8"/>
+  <path d="M45 113 61 61h134l16 52" fill="#FFC84A" stroke="#173D46" stroke-width="9" stroke-linejoin="round"/>
+  <path d="M46 110c3 22 29 25 41 3 10 20 33 20 41 0 11 20 33 20 42 0 11 22 37 19 41-3v17H46Z" fill="#F45E4A" stroke="#173D46" stroke-width="8" stroke-linejoin="round"/>
+  <path d="M51 127h154v77c0 10-8 18-18 18H69c-10 0-18-8-18-18Z" fill="#246C50" stroke="#173D46" stroke-width="9" stroke-linejoin="round"/>
+  <path d="M66 145h124v42H66Z" fill="#FFF8E8"/>
+  <circle cx="91" cy="166" r="14" fill="#F45E4A"/>
+  <path d="M88 152c-2-8 4-11 8-6 2-6 8-6 9 0-5 1-7 4-8 8-3-3-6-3-9-2Z" fill="#63C879"/>
+  <circle cx="128" cy="166" r="14" fill="#FFC84A"/>
+  <circle cx="165" cy="166" r="14" fill="#63C879"/>
+</svg>

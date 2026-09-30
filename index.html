@@ -3,17 +3,33 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1, user-scalable=no" />
-    <meta name="theme-color" content="#d8f3ff" />
-    <title>GBLB Store — Market ve Restoran Tycoon</title>
-    <script type="module" crossorigin src="./assets/index-NjmjRn3b.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-DMKTEI-k.css">
+    <meta name="theme-color" content="#173d46" />
+    <link rel="icon" type="image/svg+xml" href="./assets/branding/seed-to-serve/market-stall-color.svg" />
+    <title>Tohumdan Sofraya: Market Oyunu</title>
+    <script type="module" crossorigin src="./assets/index-DlySBnHd.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-23fbg_NN.css">
   </head>
   <body>
-    <main id="game-container" aria-label="GBLB Store oyun dünyası"></main>
+    <main id="game-container" aria-label="Tohumdan Sofraya oyun dünyası" aria-busy="true"></main>
+    <section id="loading-screen" class="loading-screen" aria-labelledby="loading-title">
+      <div class="loading-landscape" aria-hidden="true">
+        <span class="loading-sun"></span>
+      </div>
+      <div class="loading-content">
+        <div class="loading-logo-frame"><img class="loading-logo" src="./assets/branding/seed-to-serve/market-stall-color.svg" alt="" /></div>
+        <h1 id="loading-title">Tohumdan Sofraya</h1>
+        <p id="loading-status" class="loading-status" role="status">Oyun yükleniyor, lütfen bekleyin.</p>
+        <div class="loading-baskets" aria-hidden="true">
+          <span class="loading-basket loading-basket--tomato"><i></i></span>
+          <span class="loading-basket loading-basket--corn"><i></i></span>
+          <span class="loading-basket loading-basket--apple"><i></i></span>
+        </div>
+      </div>
+    </section>
     <div id="ui-layer">
       <header class="top-bar" data-ui>
         <div class="top-primary-row">
-          <div class="brand-pill"><span class="brand-mark">G</span><span>GBLB STORE</span></div>
+          <div class="brand-pill"><img class="brand-mark" src="./assets/branding/seed-to-serve/market-stall-color.svg" alt="" /><span>SEED TO SERVE</span></div>
           <div class="stat-group">
             <div class="stat-pill day-pill" aria-label="Oyun günü"><strong id="day-display">Gün 1</strong></div>
             <div class="stat-pill money-pill"><span data-asset-icon="money" data-asset-size="20"></span><strong id="money-display">$100</strong></div>
@@ -42,7 +58,6 @@
             <div id="order-ad-offer" class="inline-ad-offer hidden" aria-live="polite">
               <small id="order-ad-copy"></small>
               <button id="btn-order-ad" class="ad-reward-button">İzle ve ödülü al</button>
-              <button id="btn-order-ad-decline" class="ad-decline-button">Şimdi değil</button>
             </div>
           </section>
         </div>
@@ -66,11 +81,10 @@
       <div class="bottom-controls" data-ui>
         <div id="joystick-zone" aria-label="Hareket kontrolü"><div id="joystick-base"><div id="joystick-thumb"></div></div></div>
         <div class="control-hint"><kbd>WASD</kbd><span>veya dokunup yürü</span></div>
-        <button id="btn-interact" class="action-button" disabled><span class="action-icon"><span data-asset-icon="interact" data-asset-size="34"></span></span><span id="action-label">Bir istasyona yaklaş</span><kbd>E</kbd></button>
+        <button id="btn-interact" class="action-button" disabled><span id="action-label">Bir istasyona yaklaş</span></button>
         <div id="machine-ad-offer" class="inline-ad-offer machine-ad-offer hidden" aria-live="polite">
           <small id="machine-ad-copy"></small>
           <button id="btn-machine-ad" class="ad-reward-button">İzle ve girdiyi al</button>
-          <button id="btn-machine-ad-decline" class="ad-decline-button">Şimdi değil</button>
         </div>
       </div>
 
@@ -108,8 +122,11 @@
           <div class="settings-content hidden" data-panel="character">
             <p class="modal-intro">Oyuncu karakterini seç</p>
             <div class="character-options">
-              <button data-character="shopkeeper"><span class="character-mark character-mark-shopkeeper"><span data-asset-icon="playerAvatar" data-asset-size="52"></span></span><span>Marketçi</span></button><button data-character="cat"><span class="character-mark">K</span><span>Kedi</span></button>
-              <button data-character="robot"><span class="character-mark">R</span><span>Robot</span></button><button data-character="panda"><span class="character-mark">Pa</span><span>Panda</span></button><button data-character="penguin"><span class="character-mark">Pe</span><span>Penguen</span></button>
+              <button type="button" data-character="shopkeeper" aria-label="Marketçi karakterini seç"><span class="character-preview"><img data-character-preview="shopkeeper" alt="" /></span><span class="character-name" data-character-label>Marketçi</span><small class="character-state" data-character-state="shopkeeper"></small></button>
+              <button type="button" data-character="cat" aria-label="Kedi karakterini seç"><span class="character-preview"><img data-character-preview="cat" alt="" /><span class="character-lock" aria-hidden="true"></span></span><span class="character-name" data-character-label>Kedi</span><small class="character-state" data-character-state="cat"></small></button>
+              <button type="button" data-character="robot" aria-label="Robot karakterini seç"><span class="character-preview"><img data-character-preview="robot" alt="" /><span class="character-lock" aria-hidden="true"></span></span><span class="character-name" data-character-label>Robot</span><small class="character-state" data-character-state="robot"></small></button>
+              <button type="button" data-character="panda" aria-label="Panda karakterini seç"><span class="character-preview"><img data-character-preview="panda" alt="" /><span class="character-lock" aria-hidden="true"></span></span><span class="character-name" data-character-label>Panda</span><small class="character-state" data-character-state="panda"></small></button>
+              <button type="button" data-character="penguin" aria-label="Penguen karakterini seç"><span class="character-preview"><img data-character-preview="penguin" alt="" /><span class="character-lock" aria-hidden="true"></span></span><span class="character-name" data-character-label>Penguen</span><small class="character-state" data-character-state="penguin"></small></button>
             </div>
           </div>
           <div class="settings-content hidden" data-panel="language">
@@ -149,10 +166,10 @@
 
       <div class="modal-overlay bonus-offer-overlay hidden" id="bonus-offer-modal" data-ui>
         <section class="modal-card bonus-offer-card" role="dialog" aria-modal="true" aria-labelledby="bonus-offer-title" aria-describedby="bonus-offer-description">
-          <div class="bonus-offer-icon" id="bonus-offer-icon" aria-hidden="true">⚡</div>
+          <div class="bonus-offer-icon" id="bonus-offer-icon" aria-hidden="true"><span data-asset-icon="clock" data-asset-size="58"></span></div>
           <span class="eyebrow">GÜNLÜK BONUS</span>
           <h1 id="bonus-offer-title">Sürpriz bonus!</h1>
-          <h2 id="bonus-offer-name">Yürüyüş hızın 2 katına çıksın</h2>
+          <h2 id="bonus-offer-name">Yürüyüş hızın 1,5 katına çıksın</h2>
           <p id="bonus-offer-description" class="modal-intro"></p>
           <button id="btn-bonus-ad" class="bonus-accept-button">Reklamı izle · +5 dk</button>
           <button id="btn-bonus-decline" class="bonus-decline-button">Şimdi değil</button>
