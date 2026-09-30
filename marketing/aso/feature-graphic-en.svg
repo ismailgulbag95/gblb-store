@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="500" viewBox="0 0 1024 500" role="img" aria-labelledby="title desc">
+  <title id="title">Seed to Serve — Google Play feature graphic</title>
+  <desc id="desc">A bright game world connects a crop field, production machine, market and restaurant plate.</desc>
+  <rect width="1024" height="500" fill="#D9F3E9"/>
+  <circle cx="900" cy="84" r="43" fill="#FFC84A"/>
+  <path d="M0 236c105-54 200-55 302-10 92-49 192-51 293-3 116-52 263-33 429 28v249H0Z" fill="#BDE58F"/>
+  <path d="M0 300c126-39 255-30 385 15 125-45 279-47 461-6 61-14 120-15 178-3v194H0Z" fill="#78CE70"/>
+  <path d="M0 394c118-27 251-24 397 8 164-39 371-35 627 4v94H0Z" fill="#4EB767"/>
+  <g fill="#FFFFFF" opacity=".78">
+    <path d="M736 91c0-13 10-23 23-23 6-18 32-20 41-3 16-4 29 8 27 23 11 2 17 15 10 25H744c-10-5-12-13-8-22Z"/>
+    <path d="M45 189c0-10 8-18 18-18 5-14 25-16 33-2 12-3 22 6 21 17 9 2 13 12 8 19H51c-7-4-9-10-6-16Z"/>
+  </g>
+  <g font-family="Arial, sans-serif" fill="#173D46">
+    <text x="42" y="55" font-size="19" font-weight="800" letter-spacing="4">SEED TO SERVE</text>
+    <text x="40" y="116" font-size="48" font-weight="900" letter-spacing="1">GROW IT. MAKE IT.</text>
+    <text x="40" y="174" font-size="48" font-weight="900" letter-spacing="1">STOCK IT. SERVE IT.</text>
+    <text x="43" y="214" font-size="22" font-weight="700" fill="#3C6966">Build your own market and restaurant.</text>
+  </g>
+  <path d="M513 426H968" fill="none" stroke="#F5C84A" stroke-width="13" stroke-linecap="round"/>
+  <path d="m610 413 18 13-18 13m153-26 18 13-18 13m153-26 18 13-18 13" fill="none" stroke="#173D46" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Grow: crop bed and two tomato plants -->
+  <g stroke="#173D46" stroke-width="6" stroke-linejoin="round">
+    <path d="M492 350h105v62H492z" fill="#8D5A3B"/>
+    <path d="M486 343h117v17H486z" fill="#C98A50"/>
+    <path d="M517 347v-49m0 17c-19-23-34-19-37-8 9 17 22 19 37 8Zm0-10c14-21 29-19 34-8-7 14-19 18-34 8Z" fill="#57B96B"/>
+    <path d="M570 347v-40m0 16c-16-18-28-16-31-6 8 13 18 15 31 6Zm0-9c12-17 25-15 29-6-6 12-16 15-29 6Z" fill="#69C979"/>
+    <circle cx="508" cy="329" r="10" fill="#F45E4A" stroke="none"/>
+    <circle cx="582" cy="334" r="9" fill="#F45E4A" stroke="none"/>
+  </g>
+  <!-- Make: production machine -->
+  <g stroke="#173D46" stroke-width="7" stroke-linejoin="round">
+    <path d="M644 297h104v113H644z" fill="#FFF8E8"/>
+    <path d="M659 278h74v21h-74z" fill="#FFC84A"/>
+    <path d="M660 325h72v44h-72z" fill="#43B9D8"/>
+    <circle cx="681" cy="347" r="11" fill="#F45E4A" stroke="none"/>
+    <circle cx="711" cy="347" r="11" fill="#FFC84A" stroke="none"/>
+    <path d="M676 386h41m-20-17v17" fill="none" stroke-linecap="round"/>
+    <path d="M699 278v-20h32" fill="none" stroke-linecap="round"/>
+  </g>
+  <!-- Stock: market shelves beneath a canopy -->
+  <g stroke="#173D46" stroke-width="7" stroke-linejoin="round">
+    <path d="M790 320h132v91H790z" fill="#246C50"/>
+    <path d="M780 317h151l-13-43H793Z" fill="#FFC84A"/>
+    <path d="M784 314c4 17 22 20 31 2 10 18 28 18 36 0 10 18 29 17 37 0 10 18 29 15 32-2v15H784Z" fill="#F45E4A"/>
+    <path d="M803 343h105v49H803Z" fill="#FFF8E8" stroke="none"/>
+    <circle cx="828" cy="367" r="12" fill="#F45E4A" stroke="none"/>
+    <circle cx="856" cy="367" r="12" fill="#FFC84A" stroke="none"/>
+    <circle cx="884" cy="367" r="12" fill="#63C879" stroke="none"/>
+  </g>
+  <!-- Serve: a plated meal -->
+  <g stroke="#173D46" stroke-width="7" stroke-linejoin="round">
+    <circle cx="973" cy="353" r="48" fill="#FFF8E8"/>
+    <circle cx="973" cy="353" r="34" fill="none" stroke="#FFC84A" stroke-width="6"/>
+    <path d="M949 354c1-13 11-22 24-22s23 9 24 22Z" fill="#F0B53B"/>
+    <path d="M950 359h46c-2 10-10 16-23 16s-21-6-23-16Z" fill="#F45E4A"/>
+    <path d="M956 352c5-8 12-10 18-8 6-2 13 0 18 8" fill="none" stroke="#63C879" stroke-width="5" stroke-linecap="round"/>
+  </g>
+  <path d="M0 486c236-15 421-8 601 3 159-15 303-13 423 4v7H0Z" fill="#359C5C" opacity=".55"/>
+</svg>

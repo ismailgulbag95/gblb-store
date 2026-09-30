@@ -2,8 +2,9 @@ import { ITEMS, SHELVES, STATIONS } from './catalog.js';
 import { createFarmState, ensureFarmState, syncFarmHarvest } from './farm.js';
 import { canPlaceDecoration } from './layout.js';
 import { machineSpeedMultiplier, staffSpeedMultiplier } from './progression.js';
+import { PLAYER_CHARACTER_IDS } from './characters.js';
 
-export const SAVE_VERSION = 7;
+export const SAVE_VERSION = 9;
 
 function emptyStock(capacity) {
   return { capacity, items: {}, reserved: {}, reservedCapacity: 0 };
@@ -52,15 +53,16 @@ export function createInitialState(seed = 0x51f15e) {
       currentOffer: null,
       walkSpeedExpiresAt: 0,
     },
-    player: { x: 5, z: 6, facing: 0, capacity: 6, character: 'shopkeeper' },
+    player: { x: 5, z: 6, facing: 0, capacity: 6, character: 'shopkeeper', unlockedCharacters: ['shopkeeper'] },
     farms,
     machines: {},
     customStations: {},
     selfRegisters: {},
     layout: {},
+    pendingShelfIds: [],
     decorations: [
       { id: 'decoration-boxes', type: 'cardboardBoxes', x: -3.8, z: -7.5, rotation: 0 },
-      { id: 'trash-bin', type: 'trashBin', x: -2.5, z: -7.5, rotation: 0 },
+      { id: 'trash-bin', type: 'trashBin', x: 12.5, z: 7.5, rotation: 0 },
     ],
     activeOrder: null,
     lastOrderReward: null,
@@ -238,7 +240,7 @@ function removeLegacyFurniture(candidate) {
 
 export function hydrateState(candidate) {
   if (!candidate || typeof candidate !== 'object') throw new Error('Kayıt boş veya bozuk.');
-  if (![2, 3, 4, 5, 6, SAVE_VERSION].includes(candidate.saveVersion)) throw new Error(`Bu kayıt sürümü desteklenmiyor (${candidate.saveVersion ?? 'bilinmiyor'}).`);
+  if (![2, 3, 4, 5, 6, 7, 8, SAVE_VERSION].includes(candidate.saveVersion)) throw new Error(`Bu kayıt sürümü desteklenmiyor (${candidate.saveVersion ?? 'bilinmiyor'}).`);
   candidate = removeLegacyFurniture(candidate);
   const initial = createInitialState(candidate.rng);
   const hydrated = { ...initial, ...candidate };
@@ -253,6 +255,14 @@ export function hydrateState(candidate) {
     && Number.isSafeInteger(candidate.lastOrderReward.reward) && candidate.lastOrderReward.reward > 0
     ? { ...candidate.lastOrderReward, claimed: Boolean(candidate.lastOrderReward.claimed) } : null;
   hydrated.player = { ...initial.player, ...(candidate.player ?? {}) };
+  const selectedCharacter = PLAYER_CHARACTER_IDS.includes(hydrated.player.character) ? hydrated.player.character : 'shopkeeper';
+  const savedCharacters = Array.isArray(candidate.player?.unlockedCharacters) ? candidate.player.unlockedCharacters : [];
+  hydrated.player.character = selectedCharacter;
+  hydrated.player.unlockedCharacters = [...new Set([
+    'shopkeeper',
+    ...savedCharacters.filter((id) => PLAYER_CHARACTER_IDS.includes(id)),
+    selectedCharacter,
+  ])];
   const savedBonusOffers = candidate.bonusOffers && typeof candidate.bonusOffers === 'object' ? candidate.bonusOffers : {};
   const savedBonusOffer = savedBonusOffers.currentOffer;
   hydrated.bonusOffers = {
@@ -264,8 +274,13 @@ export function hydrateState(candidate) {
     nextOfferId: Number.isSafeInteger(savedBonusOffers.nextOfferId) && savedBonusOffers.nextOfferId > 0
       ? savedBonusOffers.nextOfferId : 1,
     currentOffer: savedBonusOffer && typeof savedBonusOffer.id === 'string'
-      && ['walk-speed', 'bag-capacity'].includes(savedBonusOffer.type)
-      ? { id: savedBonusOffer.id, type: savedBonusOffer.type } : null,
+      && (['walk-speed', 'bag-capacity'].includes(savedBonusOffer.type)
+        || (savedBonusOffer.type === 'character-unlock'
+          && PLAYER_CHARACTER_IDS.includes(savedBonusOffer.characterId)
+          && !hydrated.player.unlockedCharacters.includes(savedBonusOffer.characterId)))
+      ? { id: savedBonusOffer.id, type: savedBonusOffer.type,
+        ...(savedBonusOffer.type === 'character-unlock' ? { characterId: savedBonusOffer.characterId } : {}) }
+      : null,
     walkSpeedExpiresAt: Number.isFinite(savedBonusOffers.walkSpeedExpiresAt) && savedBonusOffers.walkSpeedExpiresAt > 0
       ? savedBonusOffers.walkSpeedExpiresAt : 0,
   };
@@ -291,23 +306,34 @@ export function hydrateState(candidate) {
   hydrated.selfRegisters = { ...(candidate.selfRegisters ?? {}) };
   hydrated.layout = Object.fromEntries(Object.entries(candidate.layout ?? {}).filter(([id, point]) =>
     (STATIONS[id] || candidate.customStations?.[id] || candidate.selfRegisters?.[id] || id.includes('_') || id.startsWith('selfRegister') || id.startsWith('custom_')) && Number.isFinite(point?.x) && Number.isFinite(point?.z)));
+  hydrated.pendingShelfIds = [...new Set((Array.isArray(candidate.pendingShelfIds) ? candidate.pendingShelfIds : [])
+    .filter((id) => STATIONS[id]?.kind === 'shelf' && !hydrated.layout[id]
+      && Array.isArray(hydrated.unlockedProducts) && hydrated.unlockedProducts.includes(STATIONS[id].item)))];
   hydrated.decorations = (Array.isArray(candidate.decorations) ? candidate.decorations : []).filter((entry) =>
     entry && typeof entry.id === 'string' && typeof entry.type === 'string'
       && Number.isFinite(entry.x) && Number.isFinite(entry.z) && entry.placed !== false);
+  const placeTrashBin = (trashBin) => {
+    if (canPlaceDecoration(hydrated, trashBin.id, trashBin.x, trashBin.z)) return;
+    let slot = null;
+    for (let row = 0; row <= 32 && !slot; row += 1) {
+      for (let column = 0; column <= 32; column += 1) {
+        const x = -3 + column * 0.5;
+        const z = -8 + row * 0.5;
+        if (canPlaceDecoration(hydrated, trashBin.id, x, z)) { slot = { x, z }; break; }
+      }
+    }
+    if (slot) Object.assign(trashBin, slot);
+  };
+  const defaultTrashBin = hydrated.decorations.find((entry) => entry.id === 'trash-bin' && entry.type === 'trashBin');
+  if (defaultTrashBin?.x === -2.5 && defaultTrashBin?.z === -7.5) {
+    defaultTrashBin.x = 12.5;
+    defaultTrashBin.z = 7.5;
+    placeTrashBin(defaultTrashBin);
+  }
   if (!hydrated.decorations.some((entry) => entry.type === 'trashBin')) {
     const trashBin = initial.decorations.find((entry) => entry.type === 'trashBin');
     hydrated.decorations.push({ ...trashBin });
-    if (!canPlaceDecoration(hydrated, trashBin.id, trashBin.x, trashBin.z)) {
-      let slot = null;
-      for (let row = 0; row <= 32 && !slot; row += 1) {
-        for (let column = 0; column <= 32; column += 1) {
-          const x = -3 + column * 0.5;
-          const z = -8 + row * 0.5;
-          if (canPlaceDecoration(hydrated, trashBin.id, x, z)) { slot = { x, z }; break; }
-        }
-      }
-      if (slot) Object.assign(hydrated.decorations.at(-1), slot);
-    }
+    placeTrashBin(hydrated.decorations.at(-1));
   }
   hydrated.coops = { ...initial.coops, ...(candidate.coops ?? {}) };
   hydrated.diningTables = { ...initial.diningTables, ...(candidate.diningTables ?? {}) };

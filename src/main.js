@@ -11,8 +11,53 @@ hydrateAssetIcons();
 
 const SIMULATION_STEP = 0.1;
 const MAX_TICKS_PER_FRAME = 5;
+const MIN_LOADING_VISIBLE_MS = 850;
+const loadingStartedAt = performance.now();
+const loadingScreen = document.getElementById('loading-screen');
+const loadingStatus = document.getElementById('loading-status');
+const loadingTitle = document.getElementById('loading-title');
+const loadingCopy = {
+  tr: {
+    resources: 'Oyun kaynakları hazırlanıyor…',
+    save: 'Çiftliğin kaydı yükleniyor…',
+    scene: 'Pazar ve çiftlik sahnesi kuruluyor…',
+    ready: 'Son hazırlıklar…',
+  },
+  en: {
+    resources: 'Preparing game resources…',
+    save: 'Loading your farm…',
+    scene: 'Setting up your farm and market…',
+    ready: 'Almost ready…',
+  },
+};
+let loadingLanguage = 'tr';
+let loadingDismissed = false;
+
+function setLoadingLanguage(language) {
+  loadingLanguage = language === 'en' ? 'en' : 'tr';
+  document.documentElement.lang = loadingLanguage;
+  if (loadingTitle) loadingTitle.textContent = loadingLanguage === 'en' ? 'Seed to Serve' : 'Tohumdan Sofraya';
+}
+
+function setLoadingStatus(step) {
+  if (loadingStatus) loadingStatus.textContent = loadingCopy[loadingLanguage][step];
+}
+
+function hideLoadingScreen() {
+  if (loadingDismissed) return;
+  loadingDismissed = true;
+  document.getElementById('game-container')?.setAttribute('aria-busy', 'false');
+  loadingScreen?.classList.add('is-hidden');
+  loadingScreen?.setAttribute('aria-hidden', 'true');
+}
+
+function revealGameWhenReady() {
+  const remaining = Math.max(0, MIN_LOADING_VISIBLE_MS - (performance.now() - loadingStartedAt));
+  window.setTimeout(hideLoadingScreen, remaining);
+}
 
 function showFatal(message) {
+  hideLoadingScreen();
   const container = document.getElementById('game-container');
   container.innerHTML = `<section class="fatal-card"><span data-asset-icon="warning" data-asset-size="54"></span><h1>Oyun başlatılamadı</h1><p></p><small>Sayfayı yenileyip tekrar deneyebilirsin.</small></section>`;
   hydrateAssetIcons(container);
@@ -20,6 +65,7 @@ function showFatal(message) {
 }
 
 function showRecovery(saveService, error) {
+  hideLoadingScreen();
   const modal = document.getElementById('recovery-modal');
   modal.classList.remove('hidden');
   document.getElementById('recovery-message').textContent = error.message;
@@ -38,13 +84,16 @@ async function boot() {
   let saveService;
   let app;
   try {
+    setLoadingStatus('resources');
     await preloadAssetAtlas();
+    setLoadingStatus('save');
     saveService = new SaveService();
     const admobProvider = new AdMobRewardedProvider();
     const rewardedProvider = import.meta.env.DEV
       ? new DevelopmentRewardedProvider(admobProvider, true, 3_000)
       : admobProvider;
     app = new GameApplication(saveService, undefined, new RewardedAdService(rewardedProvider));
+    setLoadingLanguage(app.getState().settings.language);
   } catch (error) {
     if (saveService && error.name === 'SaveRecoveryError') showRecovery(saveService, error);
     else showFatal(error.message);
@@ -53,6 +102,7 @@ async function boot() {
 
   let world;
   try {
+    setLoadingStatus('scene');
     world = new WorldScene();
   } catch (error) {
     showFatal(`3B sahne oluşturulamadı. ${error.message}`);
@@ -66,7 +116,11 @@ async function boot() {
   const showPendingBonusOffer = () => queueMicrotask(() => {
     if (!hud || pauseReasons.size || document.hidden || app.getState().ads.pending) return;
     const offer = app.getPendingBonusOffer();
-    if (offer && app.canOfferRewardedAd('bonus-offer', { offerId: offer.id, bonusType: offer.type })) hud.openBonusOffer(offer);
+    if (offer && app.canOfferRewardedAd('bonus-offer', {
+      offerId: offer.id,
+      bonusType: offer.type,
+      characterId: offer.characterId,
+    })) hud.openBonusOffer(offer);
   });
   const setPaused = () => {
     const paused = pauseReasons.size > 0;
@@ -184,6 +238,7 @@ async function boot() {
   let previousTime = performance.now();
   let simulationAccumulator = 0;
   let hudElapsed = 0;
+  let firstFrameRendered = false;
   function frame(now) {
     const elapsed = Math.min((now - previousTime) / 1000, 0.1);
     previousTime = now;
@@ -208,7 +263,11 @@ async function boot() {
       if (ticks === MAX_TICKS_PER_FRAME && simulationAccumulator >= SIMULATION_STEP) simulationAccumulator = 0;
       const pendingBonusOffer = app.getPendingBonusOffer();
       if (pendingBonusOffer && !input.layoutMode
-        && app.canOfferRewardedAd('bonus-offer', { offerId: pendingBonusOffer.id, bonusType: pendingBonusOffer.type })) {
+        && app.canOfferRewardedAd('bonus-offer', {
+          offerId: pendingBonusOffer.id,
+          bonusType: pendingBonusOffer.type,
+          characterId: pendingBonusOffer.characterId,
+        })) {
         hud.openBonusOffer(pendingBonusOffer);
       } else {
         app.advanceBonusOfferClock(elapsed * 1000, !input.layoutMode && pauseReasons.size === 0);
@@ -229,8 +288,13 @@ async function boot() {
       hudElapsed = 0;
       hud.render(state, app.getNearbyAction());
     }
+    if (!firstFrameRendered) {
+      firstFrameRendered = true;
+      revealGameWhenReady();
+    }
     window.requestAnimationFrame(frame);
   }
+  setLoadingStatus('ready');
   window.requestAnimationFrame(frame);
 }
 

@@ -6,6 +6,10 @@ import { MarketGrid } from '../environment/MarketGrid.js';
 import { ITEMS, RECIPES, SHELVES, STATIONS } from '../domain/catalog.js';
 import { gameDaylight } from '../domain/dayCycle.js';
 import { CharacterFactory } from './CharacterFactory.js';
+import { animateCoopChicken, createChickenCoopModel } from './ChickenCoopModel.js';
+import { createFarmBuildModel } from './FarmBuildModel.js';
+import { buildFarmDecorationModel } from './FarmDecorationModels.js';
+import { createProductionBuildModel } from './ProductionBuildModel.js';
 import { ZONES, canPlaceDecoration, canPlaceStation, getAllStationIds, getDecorationDimensions, getStationDimensions, isStationUnlocked, stationPosition } from '../domain/layout.js';
 import { DECORATIONS } from '../domain/decorCatalog.js';
 import { drawAssetIcon } from '../ui/AssetIcons.js';
@@ -827,155 +831,12 @@ export class WorldScene {
     const state = this.app?.getState();
     const station = STATIONS[id] ?? state?.customStations?.[id];
     if (!station) return;
-    const group = new THREE.Group();
     const farmPos = state ? (state.layout?.[id] ?? state.customStations?.[id] ?? STATIONS[id]) : station;
-    group.position.set(farmPos?.x ?? station.x ?? 0, 0, farmPos?.z ?? station.z ?? 0);
-    const bed = new THREE.Mesh(new RoundedBoxGeometry(1.95, 0.24, 2.55, 3, 0.13), new THREE.MeshStandardMaterial({ color: 0x8b5a3d, roughness: 0.9 }));
-    bed.position.y = 0.13;
-    bed.receiveShadow = true;
-    bed.castShadow = true;
-    group.add(bed);
-    const soil = new THREE.Mesh(new RoundedBoxGeometry(1.67, 0.1, 2.18, 3, 0.07), new THREE.MeshStandardMaterial({ color: 0x50372d, roughness: 1 }));
-    soil.position.y = 0.29;
-    group.add(soil);
-    const timber = new THREE.MeshStandardMaterial({ color: 0xc28a54, roughness: 0.88 });
-    for (const x of [-0.87, 0.87]) {
-      const rim = new THREE.Mesh(new RoundedBoxGeometry(0.085, 0.13, 2.3, 2, 0.035), timber);
-      rim.position.set(x, 0.3, 0);
-      rim.castShadow = true;
-      group.add(rim);
-    }
-    for (const z of [-1.14, 1.14]) {
-      const rim = new THREE.Mesh(new RoundedBoxGeometry(1.72, 0.13, 0.085, 2, 0.035), timber);
-      rim.position.set(0, 0.3, z);
-      group.add(rim);
-    }
-    for (let row = 0; row < 5; row += 1) {
-      const furrow = new THREE.Mesh(new THREE.TubeGeometry(
-        new THREE.CatmullRomCurve3([new THREE.Vector3(-0.72, 0.345, -0.76 + row * 0.38), new THREE.Vector3(-0.3, 0.35, -0.72 + row * 0.38), new THREE.Vector3(0.2, 0.345, -0.78 + row * 0.38), new THREE.Vector3(0.72, 0.35, -0.73 + row * 0.38)]),
-        14, 0.018, 5, false,
-      ), new THREE.MeshStandardMaterial({ color: 0x79523b, roughness: 1 }));
-      group.add(furrow);
-    }
-    const produce = [];
-    const leafMaterial = new THREE.MeshStandardMaterial({ color: 0x55a947, roughness: 0.8, side: THREE.DoubleSide });
-    const leafLight = new THREE.MeshStandardMaterial({ color: 0x83c75c, roughness: 0.76, side: THREE.DoubleSide });
-    const makeLeaf = (x, y, z, angle, length = 0.38, color = leafMaterial) => {
-      const leaf = new THREE.Mesh(new THREE.SphereGeometry(1, 10, 7), color);
-      leaf.scale.set(0.09, length, 0.025);
-      leaf.position.set(x, y, z);
-      leaf.rotation.z = angle;
-      leaf.rotation.x = angle * 0.28;
-      leaf.castShadow = true;
-      group.add(leaf);
-      const vein = new THREE.Mesh(new THREE.CylinderGeometry(0.009, 0.014, length * 1.55, 5), new THREE.MeshStandardMaterial({ color: 0xc6d985, roughness: 0.8 }));
-      vein.position.set(x, y, z + 0.018);
-      vein.rotation.z = angle;
-      group.add(vein);
-    };
-    const createCob = (x, y, z) => {
-      const cob = new THREE.Group();
-      const kernelMat = new THREE.MeshStandardMaterial({ color: 0xffd44f, roughness: 0.48 });
-      const core = new THREE.Mesh(new THREE.SphereGeometry(0.15, 12, 10), new THREE.MeshStandardMaterial({ color: 0xf3b82f, roughness: 0.55 }));
-      core.scale.set(0.76, 1.35, 0.78);
-      cob.add(core);
-      for (let row = 0; row < 4; row += 1) for (let col = 0; col < 7; col += 1) {
-        const angle = col / 7 * Math.PI * 2 + row * 0.18;
-        const kernel = new THREE.Mesh(new THREE.SphereGeometry(0.036, 7, 6), kernelMat);
-        kernel.position.set(Math.cos(angle) * 0.106, -0.15 + row * 0.1, Math.sin(angle) * 0.106);
-        kernel.scale.set(0.78, 1, 0.78);
-        cob.add(kernel);
-      }
-      cob.position.set(x, y, z);
-      cob.rotation.z = -0.15;
-      cob.traverse((part) => { if (part.isMesh) part.castShadow = true; });
-      group.add(cob);
-      return cob;
-    };
-    if (station.item === 'ORANGE') {
-      const trunkCurve = new THREE.CatmullRomCurve3([new THREE.Vector3(0, 0.34, 0), new THREE.Vector3(-0.06, 0.72, 0.02), new THREE.Vector3(0.05, 1.16, 0)]);
-      const trunk = new THREE.Mesh(new THREE.TubeGeometry(trunkCurve, 14, 0.14, 9, false), new THREE.MeshStandardMaterial({ color: 0x875536, roughness: 0.95 }));
-      trunk.castShadow = true;
-      group.add(trunk);
-      for (const [x, y, z, angle] of [[-0.42, 0.88, 0.02, -1.1], [0.43, 0.99, 0.05, 1.05], [-0.27, 1.34, -0.03, -0.82], [0.31, 1.44, 0.02, 0.84], [0, 1.65, 0, 0.1]]) {
-        const branch = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([new THREE.Vector3(0.02, 0.84, 0), new THREE.Vector3(x * 0.5, y - 0.2, z), new THREE.Vector3(x, y, z)]), 10, 0.045, 7, false), timber);
-        group.add(branch);
-      }
-      for (let i = 0; i < 22; i += 1) {
-        const angle = i * 2.399;
-        const y = 0.95 + (i % 7) * 0.12;
-        const x = Math.cos(angle) * (0.34 + (i % 3) * 0.08);
-        const z = Math.sin(angle) * 0.32;
-        makeLeaf(x, y, z, angle, 0.25 + (i % 3) * 0.045, i % 2 ? leafMaterial : leafLight);
-      }
-      for (const [x, y, z] of [[-0.47, 1.13, 0.15], [0.48, 1.27, 0.18], [-0.23, 1.55, 0.29], [0.19, 1.67, 0.24]]) {
-        const orange = new THREE.Group();
-        const fruit = new THREE.Mesh(new THREE.SphereGeometry(0.16, 14, 11), new THREE.MeshStandardMaterial({ color: 0xff972f, roughness: 0.36 }));
-        fruit.scale.set(0.94, 1, 0.88);
-        orange.add(fruit);
-        this.#part(orange, new THREE.SphereGeometry(0.045, 7, 5), 0x648a3d, 0, 0.15, 0);
-        orange.position.set(x, y, z);
-        group.add(orange);
-        produce.push(orange);
-      }
-    } else {
-      for (const x of [-0.38, 0.38]) for (const z of [-0.57, 0.57]) {
-        if (station.item === 'TOMATO') {
-          const vine = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([new THREE.Vector3(x, 0.34, z), new THREE.Vector3(x - 0.04, 0.68, z + 0.03), new THREE.Vector3(x + 0.06, 0.98, z)]), 10, 0.055, 7, false), new THREE.MeshStandardMaterial({ color: 0x4e963e }));
-          group.add(vine);
-          for (let node = 0; node < 7; node += 1) {
-            const y = 0.43 + node * 0.085;
-            const side = node % 2 ? 1 : -1;
-            makeLeaf(x + side * (0.11 + node % 3 * 0.045), y, z + (node % 2 ? 0.08 : -0.08), side * (0.65 + node % 2 * 0.35), 0.2 + (node % 3) * 0.035, node % 2 ? leafMaterial : leafLight);
-          }
-          const fruit = new THREE.Group();
-          const tomato = this.#part(fruit, new THREE.SphereGeometry(0.155, 14, 11), 0xe8493e, 0, 0.87, z + 0.14);
-          tomato.scale.set(1.06, 0.92, 0.96);
-          for (let leafIndex = 0; leafIndex < 5; leafIndex += 1) {
-            const calyx = this.#part(fruit, new THREE.ConeGeometry(0.035, 0.12, 5), 0x47873a, 0, 1.02, z + 0.14);
-            calyx.rotation.z = leafIndex * Math.PI * 0.4;
-            calyx.rotation.x = Math.PI * 0.5;
-          }
-          fruit.position.set(x, 0, 0);
-          group.add(fruit);
-          produce.push(fruit);
-        } else if (station.item === 'CORN') {
-          const stalk = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([new THREE.Vector3(x, 0.32, z), new THREE.Vector3(x + 0.04, 0.81, z), new THREE.Vector3(x + 0.08, 1.3, z)]), 12, 0.055, 7, false), new THREE.MeshStandardMaterial({ color: 0x4d983e }));
-          group.add(stalk);
-          for (let l = 0; l < 7; l += 1) {
-            const side = l % 2 ? 1 : -1;
-            const y = 0.48 + Math.floor(l / 2) * 0.22;
-            makeLeaf(x + side * 0.13, y, z + (l % 3) * 0.035, side * (0.72 + (l % 3) * 0.22), 0.39 + (l % 2) * 0.08, l % 2 ? leafMaterial : leafLight);
-          }
-          const cob = createCob(x + 0.2, 0.88, z + 0.1);
-          for (let husk = 0; husk < 3; husk += 1) {
-            const leafHusk = this.#part(cob, new THREE.ConeGeometry(0.09, 0.52, 5), 0x5caa47, 0.01, -0.07 + husk * 0.08, -0.09);
-            leafHusk.rotation.z = -0.45 + husk * 0.45;
-          }
-          produce.push(cob);
-        } else {
-          const stem = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([new THREE.Vector3(x, 0.34, z), new THREE.Vector3(x - 0.04, 0.78, z), new THREE.Vector3(x + 0.035, 1.2, z)]), 9, 0.023, 5, false), new THREE.MeshStandardMaterial({ color: 0x9caf48 }));
-          group.add(stem);
-          for (let side = -1; side <= 1; side += 2) makeLeaf(x + side * 0.11, 0.64, z + side * 0.02, side * 1.05, 0.28, leafLight);
-          const head = new THREE.Group();
-          for (let grain = 0; grain < 11; grain += 1) {
-            const berry = this.#part(head, new THREE.SphereGeometry(0.055, 8, 6), grain % 3 ? 0xe7bd52 : 0xf3d779, (grain % 2 ? 0.045 : -0.045), grain * 0.06, 0);
-            berry.scale.set(0.74, 1.25, 0.72);
-          }
-          head.position.set(x + 0.03, 1.05, z + 0.06);
-          head.rotation.z = -0.18;
-          group.add(head);
-          produce.push(head);
-        }
-      }
-    }
-    const marker = new THREE.Mesh(new THREE.RingGeometry(1.13, 1.24, 48), new THREE.MeshBasicMaterial({ color: 0x90d869, side: THREE.DoubleSide, transparent: true, opacity: 0.45 }));
-    marker.rotation.x = -Math.PI / 2;
-    marker.scale.x = 0.68;
-    marker.position.y = 0.06;
-    group.add(marker);
-    this.scene.add(group);
-    this.farms.set(id, { group, produce, item: station.item });
+    const farm = createFarmBuildModel(station.item);
+    farm.group.position.set(farmPos?.x ?? station.x ?? 0, 0, farmPos?.z ?? station.z ?? 0);
+    if (farmPos?.rotation !== undefined) farm.group.rotation.y = farmPos.rotation;
+    this.scene.add(farm.group);
+    this.farms.set(id, farm);
   }
 
   #addMachine(id) {
@@ -991,304 +852,22 @@ export class WorldScene {
     group.position.set(pos?.x ?? station.x ?? 0, 0, pos?.z ?? station.z ?? 0);
     const baseId = station.baseType ?? id.split('_')[0];
 
-    const steel = new THREE.MeshStandardMaterial({ color: 0xdcdde1, roughness: 0.35, metalness: 0.65 });
-    const darkSteel = new THREE.MeshStandardMaterial({ color: 0x353b48, roughness: 0.55, metalness: 0.4 });
-    const chrome = new THREE.MeshStandardMaterial({ color: 0xf5f6fa, roughness: 0.18, metalness: 0.85 });
-    const brass = new THREE.MeshStandardMaterial({ color: 0xfbc531, roughness: 0.3, metalness: 0.7 });
-    const glass = new THREE.MeshPhysicalMaterial({ color: 0xffffff, transparent: true, opacity: 0.45, roughness: 0.1, metalness: 0.1 });
-
-    // 1. Heavy industrial equipment foundation
-    const base = new THREE.Mesh(new RoundedBoxGeometry(2.2, 0.32, 1.75, 3, 0.08), darkSteel);
-    base.position.y = 0.16;
-    base.castShadow = true;
-    base.receiveShadow = true;
-    group.add(base);
-
-    // Bumper rail along machine base
-    const bumper = new THREE.Mesh(new RoundedBoxGeometry(2.24, 0.08, 1.79, 2, 0.03), new THREE.MeshStandardMaterial({ color: 0x2f3640, roughness: 0.8 }));
-    bumper.position.y = 0.06;
-    group.add(bumper);
-
-    // Operator digital control console
-    const consoleBox = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.42, 0.2), darkSteel);
-    consoleBox.position.set(-0.95, 0.52, 0.65);
-    consoleBox.rotation.y = 0.25;
-    group.add(consoleBox);
-
-    const screenMat = new THREE.MeshBasicMaterial({ color: 0x00d2d3 });
-    const screen = new THREE.Mesh(new THREE.PlaneGeometry(0.24, 0.15), screenMat);
-    screen.position.set(-0.94, 0.58, 0.76);
-    screen.rotation.y = 0.25;
-    group.add(screen);
-
-    // Console buttons
-    for (let b = 0; b < 3; b++) {
-      const btnMat = new THREE.MeshStandardMaterial({ color: [0x4cd137, 0xfbc531, 0xe84118][b] });
-      const btn = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.04, 8), btnMat);
-      btn.rotation.x = Math.PI / 2;
-      btn.position.set(-1.02 + b * 0.07, 0.43, 0.77);
-      group.add(btn);
-    }
-
-    // Industrial Andon signal tower / status lamp
-    const towerPole = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.65, 8), darkSteel);
-    towerPole.position.set(-0.96, 0.95, -0.68);
-    group.add(towerPole);
-
-    const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.09, 10, 8), new THREE.MeshStandardMaterial({
-      color: 0x4cd137, emissive: 0x4cd137, emissiveIntensity: 0.6, roughness: 0.2,
-    }));
-    lamp.position.set(-0.96, 1.32, -0.68);
-    group.add(lamp);
-
-    // Specialized Machine Architecture (Matching Image 3 & Image 6)
-    if (id === 'paste' || baseId === 'paste') {
-      // Tomato Paste Cooker & Canning Unit (Image 3)
-      const mainTank = new THREE.Mesh(new THREE.CylinderGeometry(0.68, 0.68, 1.15, 18), new THREE.MeshStandardMaterial({ color: 0xe84118, roughness: 0.4, metalness: 0.15 }));
-      mainTank.position.set(0, 0.88, -0.05);
-      mainTank.castShadow = true;
-      group.add(mainTank);
-
-      // Stainless steel banding on tank
-      for (const y of [0.45, 0.88, 1.32]) {
-        const band = new THREE.Mesh(new THREE.TorusGeometry(0.69, 0.025, 6, 24), chrome);
-        band.rotation.x = Math.PI / 2;
-        band.position.set(0, y, -0.05);
-        group.add(band);
-      }
-
-      // Upper cone hopper for tomatoes
-      const hopper = new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.28, 0.55, 16, 1, true), steel);
-      hopper.position.set(0, 1.68, -0.05);
-      hopper.castShadow = true;
-      group.add(hopper);
-
-      // Pressure gauge dial
-      const gauge = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.06, 12), chrome);
-      gauge.rotation.x = Math.PI / 2;
-      gauge.position.set(0, 1.15, 0.66);
-      group.add(gauge);
-      const dial = new THREE.Mesh(new THREE.CircleGeometry(0.09, 12), new THREE.MeshBasicMaterial({ color: 0xffffff }));
-      dial.position.set(0, 1.15, 0.70);
-      group.add(dial);
-
-      // Steam pipe and valve handwheel
-      const pipeCurve = new THREE.CatmullRomCurve3([
-        new THREE.Vector3(0.55, 1.25, -0.05),
-        new THREE.Vector3(0.85, 1.45, -0.05),
-        new THREE.Vector3(0.85, 1.95, -0.05),
-      ]);
-      const steamPipe = new THREE.Mesh(new THREE.TubeGeometry(pipeCurve, 12, 0.045, 8, false), chrome);
-      group.add(steamPipe);
-
-      const valveWheel = new THREE.Mesh(new THREE.TorusGeometry(0.11, 0.02, 6, 12), new THREE.MeshStandardMaterial({ color: 0xe84118 }));
-      valveWheel.rotation.y = Math.PI / 2;
-      valveWheel.position.set(0.85, 1.65, -0.05);
-      group.add(valveWheel);
-
-    } else if (id === 'juice' || baseId === 'juice') {
-      // Citrus Juicer & Bottling Station (Image 3)
-      // Stainless lower body
-      const juicerBody = new THREE.Mesh(new RoundedBoxGeometry(1.4, 0.75, 1.1, 2, 0.08), steel);
-      juicerBody.position.set(0, 0.68, 0);
-      juicerBody.castShadow = true;
-      group.add(juicerBody);
-
-      // Transparent acrylic extraction bowl with orange juice inside
-      const bowl = new THREE.Mesh(new THREE.CylinderGeometry(0.48, 0.42, 0.72, 16), glass);
-      bowl.position.set(0, 1.38, 0);
-      group.add(bowl);
-
-      const juiceLevel = new THREE.Mesh(new THREE.CylinderGeometry(0.44, 0.4, 0.52, 16), new THREE.MeshStandardMaterial({ color: 0xff9f1a, roughness: 0.2 }));
-      juiceLevel.position.set(0, 1.28, 0);
-      group.add(juiceLevel);
-
-      // Squeezing reamer cone inside
-      const reamer = new THREE.Mesh(new THREE.ConeGeometry(0.24, 0.42, 10), new THREE.MeshStandardMaterial({ color: 0xffd32a, roughness: 0.5 }));
-      reamer.position.set(0, 1.45, 0);
-      group.add(reamer);
-
-      // Orange feeder chute at top
-      const chute = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.16, 0.5, 12), chrome);
-      chute.rotation.z = 0.35;
-      chute.position.set(-0.25, 1.88, 0);
-      group.add(chute);
-
-      // Bottling dispenser tap
-      const tap = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.28, 8), chrome);
-      tap.position.set(0.55, 0.95, 0.28);
-      group.add(tap);
-
-    } else if (id === 'popcorn' || baseId === 'popcorn') {
-      // Popcorn Machine Kiosk (Image 3)
-      // Vintage red supermarket cabinet base
-      const stand = new THREE.Mesh(new RoundedBoxGeometry(1.42, 0.65, 1.15, 2, 0.06), new THREE.MeshStandardMaterial({ color: 0xe84118, roughness: 0.4 }));
-      stand.position.set(0, 0.64, 0);
-      stand.castShadow = true;
-      group.add(stand);
-
-      // Gold vintage corner pillars
-      for (const x of [-0.62, 0.62]) for (const z of [-0.48, 0.48]) {
-        const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.95, 8), brass);
-        pillar.position.set(x, 1.44, z);
-        group.add(pillar);
-      }
-
-      // Clear tempered glass display cube
-      const glassCube = new THREE.Mesh(new THREE.BoxGeometry(1.24, 0.92, 0.96), glass);
-      glassCube.position.set(0, 1.44, 0);
-      group.add(glassCube);
-
-      // Hanging stainless popping kettle inside
-      const kettle = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.28, 0.34, 14), chrome);
-      kettle.position.set(0, 1.62, 0);
-      group.add(kettle);
-      const kettleLid = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.05, 14), brass);
-      kettleLid.position.set(0, 1.8, 0);
-      group.add(kettleLid);
-
-      // Piles of popped corn kernels on warm deck
-      for (let i = 0; i < 9; i++) {
-        const cornCluster = new THREE.Mesh(new THREE.DodecahedronGeometry(0.12, 1), new THREE.MeshStandardMaterial({ color: 0xfff2a3, roughness: 0.8 }));
-        cornCluster.position.set(-0.35 + (i % 3) * 0.32, 1.04, -0.22 + Math.floor(i / 3) * 0.22);
-        group.add(cornCluster);
-      }
-
-      // Curved red canopy roof
-      const roof = new THREE.Mesh(new RoundedBoxGeometry(1.48, 0.16, 1.22, 2, 0.06), new THREE.MeshStandardMaterial({ color: 0xe84118, roughness: 0.3 }));
-      roof.position.set(0, 1.96, 0);
-      roof.castShadow = true;
-      group.add(roof);
-
-    } else if (id === 'feed' || baseId === 'feed') {
-      // Industrial Feed Mill & Bagging Station (Image 3)
-      const millBody = new THREE.Mesh(new RoundedBoxGeometry(1.35, 0.72, 1.1, 2, 0.06), darkSteel);
-      millBody.position.set(0, 0.67, 0);
-      millBody.castShadow = true;
-      group.add(millBody);
-
-      // Large intake hopper
-      const hopper = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.22, 0.68, 14, 1, true), steel);
-      hopper.position.set(-0.15, 1.35, 0);
-      group.add(hopper);
-
-      // Heavy industrial cast-iron gear wheels
-      const gear1 = new THREE.Mesh(new THREE.TorusGeometry(0.34, 0.065, 8, 16), steel);
-      gear1.rotation.y = Math.PI / 2;
-      gear1.position.set(0.72, 0.88, -0.12);
-      group.add(gear1);
-
-      const gear2 = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.05, 8, 14), brass);
-      gear2.rotation.y = Math.PI / 2;
-      gear2.position.set(0.72, 0.58, 0.24);
-      group.add(gear2);
-
-      // Discharge snout / bagging chute
-      const snout = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.24, 0.38, 10), steel);
-      snout.position.set(0.42, 0.82, 0.48);
-      group.add(snout);
-
-    } else if (id === 'bakery' || baseId === 'bakery' || id === 'pizzaKitchen' || baseId === 'pizzaKitchen') {
-      // Commercial Deck/Stone Hearth Oven (Image 3 & 6)
-      const ovenBody = new THREE.Mesh(new RoundedBoxGeometry(1.68, 1.38, 1.35, 3, 0.1), new THREE.MeshStandardMaterial({ color: 0xc87b48, roughness: 0.88 }));
-      ovenBody.position.set(0, 0.98, 0);
-      ovenBody.castShadow = true;
-      group.add(ovenBody);
-
-      // Stainless top surround
-      const topPlate = new THREE.Mesh(new RoundedBoxGeometry(1.72, 0.14, 1.38, 2, 0.04), steel);
-      topPlate.position.set(0, 1.72, 0);
-      group.add(topPlate);
-
-      // Arched oven opening with glowing embers inside
-      const openingFrame = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.58, 0.15), darkSteel);
-      openingFrame.position.set(0, 0.95, 0.65);
-      group.add(openingFrame);
-
-      const ovenMouth = new THREE.Mesh(new THREE.PlaneGeometry(0.82, 0.46), new THREE.MeshBasicMaterial({ color: 0x1e150a }));
-      ovenMouth.position.set(0, 0.95, 0.73);
-      group.add(ovenMouth);
-
-      // Glowing fire core
-      const fireGlow = new THREE.Mesh(new THREE.SphereGeometry(0.24, 8, 6), new THREE.MeshStandardMaterial({
-        color: 0xff6b35, emissive: 0xff4d00, emissiveIntensity: 0.9, roughness: 0.1,
-      }));
-      fireGlow.scale.set(1.4, 0.5, 0.4);
-      fireGlow.position.set(0, 0.85, 0.68);
-      group.add(fireGlow);
-
-      // Stainless exhaust hood chimney
-      const chimney = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.22, 0.65, 12), darkSteel);
-      chimney.position.set(-0.48, 2.08, -0.32);
-      group.add(chimney);
-
-      // Pizza peel / Baker's wooden paddle on side
-      const peelHandle = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 1.2, 6), new THREE.MeshStandardMaterial({ color: 0xcd8d56 }));
-      peelHandle.rotation.x = 0.2;
-      peelHandle.position.set(0.88, 1.1, 0.15);
-      group.add(peelHandle);
-
-    } else if (id === 'burgerKitchen' || baseId === 'burgerKitchen') {
-      // Gourmet Flat-Top Burger Griddle & Prep Station (Image 3)
-      const kitchenCounter = new THREE.Mesh(new RoundedBoxGeometry(1.65, 0.82, 1.25, 2, 0.08), steel);
-      kitchenCounter.position.set(0, 0.72, 0);
-      kitchenCounter.castShadow = true;
-      group.add(kitchenCounter);
-
-      // Cast iron heavy cooking griddle plate
-      const griddle = new THREE.Mesh(new THREE.BoxGeometry(1.22, 0.08, 0.78), new THREE.MeshStandardMaterial({ color: 0x222f3e, roughness: 0.3, metalness: 0.7 }));
-      griddle.position.set(0, 1.15, 0.12);
-      group.add(griddle);
-
-      // Sizzling burger patties on griddle
-      for (const [bx, bz] of [[-0.34, 0.05], [0.12, 0.05], [0.38, 0.18], [-0.15, 0.22]]) {
-        const patty = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.045, 12), new THREE.MeshStandardMaterial({ color: 0x4a2711, roughness: 0.75 }));
-        patty.position.set(bx, 1.2, bz);
-        group.add(patty);
-      }
-
-      // Stainless overhead ventilation hood
-      const hood = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.25, 1.1), chrome);
-      hood.position.set(0, 1.95, 0);
-      group.add(hood);
-
-      // Squeeze sauce dispenser bottles (Ketchup red & Mustard yellow)
-      const ketchup = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.055, 0.24, 10), new THREE.MeshStandardMaterial({ color: 0xe84118 }));
-      ketchup.position.set(-0.62, 1.24, -0.38);
-      const mustard = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.055, 0.24, 10), new THREE.MeshStandardMaterial({ color: 0xfbc531 }));
-      mustard.position.set(-0.48, 1.24, -0.38);
-      group.add(ketchup, mustard);
-    }
-
-    // Input staging area with metal tray
-    const input = new THREE.Group();
-    input.position.set(-0.95, 0.42, 0.65);
-    const inputTray = new THREE.Mesh(new RoundedBoxGeometry(0.85, 0.08, 0.65, 2, 0.03), steel);
-    inputTray.position.set(0.18, -0.06, 0.12);
-    input.add(inputTray);
+    const { lamp, input, output, badgeY } = createProductionBuildModel(group, baseId);
 
     const inputMeshes = [];
     for (const [itemId, quantity] of Object.entries(recipe.inputs)) {
       for (let index = 0; index < quantity; index += 1) {
         const mesh = new THREE.Mesh(this.#getItemGeometry(itemId), this.#getItemMaterial(itemId));
-        mesh.position.set((inputMeshes.length % 2) * 0.32, 0.12 + Math.floor(inputMeshes.length / 2) * 0.26, 0.12);
+        mesh.position.set((inputMeshes.length % 2) * 0.24 - 0.12,
+          0.12 + Math.floor(inputMeshes.length / 2) * 0.2, (inputMeshes.length % 2) * 0.12 - 0.04);
         mesh.castShadow = true;
         input.add(mesh);
         inputMeshes.push({ mesh, itemId, index });
       }
     }
-    group.add(input);
-
-    // Output staging area with roller conveyor or delivery deck
-    const output = new THREE.Group();
-    output.position.set(1.12, 0.42, 0.45);
-    const outTray = new THREE.Mesh(new RoundedBoxGeometry(0.88, 0.08, 0.72, 2, 0.03), steel);
-    outTray.position.set(0.16, -0.06, 0.12);
-    output.add(outTray);
-    group.add(output);
 
     this.scene.add(group);
-    this.machines.set(id, { group, inputMeshes, output, outputItem: recipe.output, lamp });
+    this.machines.set(id, { group, inputMeshes, output, outputItem: recipe.output, lamp, badgeY });
   }
 
   #addShelf(itemId) {
@@ -1740,33 +1319,11 @@ export class WorldScene {
 
   #addCoop() {
     const station = STATIONS.coop;
-    const group = new THREE.Group();
+    const coop = createChickenCoopModel();
+    const { group } = coop;
     group.position.set(station.x, 0, station.z);
-    const base = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.25, 2.2), new THREE.MeshStandardMaterial({ color: 0x9b7045, roughness: 0.9 }));
-    base.position.y = 0.15;
-    base.receiveShadow = true;
-    group.add(base);
-    const fenceMaterial = new THREE.MeshStandardMaterial({ color: 0xe7c58d, roughness: 0.88 });
-    for (let index = 0; index < 4; index += 1) {
-      const post = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.78, 0.12), fenceMaterial);
-      post.position.set(index < 2 ? (index ? 1.15 : -1.15) : 0, 0.54, index < 2 ? -0.92 : (index === 2 ? -0.92 : 0.92));
-      group.add(post);
-    }
-    const chickens = [];
-    for (let index = 0; index < 3; index += 1) {
-      const chicken = new THREE.Group();
-      const body = new THREE.Mesh(new THREE.SphereGeometry(0.25, 9, 8), new THREE.MeshStandardMaterial({ color: 0xfffbeb, roughness: 0.9 }));
-      const beak = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.14, 5), new THREE.MeshStandardMaterial({ color: 0xf97316 }));
-      beak.rotation.z = -Math.PI / 2;
-      beak.position.set(0.22, 0.07, 0);
-      body.position.y = 0.18;
-      chicken.add(body, beak);
-      chicken.position.set(-0.55 + index * 0.55, 0.3, index % 2 ? 0.38 : -0.3);
-      group.add(chicken);
-      chickens.push(chicken);
-    }
     this.scene.add(group);
-    this.coop = { group, chickens };
+    this.coop = coop;
   }
 
   #addDecoration(entry) {
@@ -2273,6 +1830,8 @@ export class WorldScene {
       handleT.position.set(0, 0.9, -0.22);
       jack.add(handleT);
       group.add(jack);
+    } else {
+      buildFarmDecorationModel(group, type);
     }
   }
 
@@ -2655,8 +2214,10 @@ export class WorldScene {
     const time = this.clock.elapsedTime;
     const daylight = gameDaylight(state.tick);
     this.engine.setDaylight(daylight);
+    this.environment.setDaylight(daylight);
     this.sun.material.opacity = daylight;
     this.sun.visible = daylight > 0.01;
+    this.environment.setRestaurantUnlocked(state.unlocked?.restaurant);
     this.environment.update(frameDelta, time);
     const wasMoving = Math.hypot(state.player.x - this.playerMesh.position.x, state.player.z - this.playerMesh.position.z) > 0.001;
     if (this.playerCharacter.type !== state.player.character) {
@@ -2689,7 +2250,7 @@ export class WorldScene {
       });
       const distance = Math.hypot(state.player.x - farm.group.position.x, state.player.z - farm.group.position.z);
       this.#statusBadge(farm.group, count ? (state.settings.language === 'en' ? `READY ${count}` : `HAZIR ${count}`)
-        : (state.settings.language === 'en' ? 'GROWING' : 'BÜYÜYOR'), count ? '#58cc02' : '#1cb0f6', distance < 10, 2.1);
+        : (state.settings.language === 'en' ? 'GROWING' : 'BÜYÜYOR'), count ? '#58cc02' : '#1cb0f6', distance < 10, farm.badgeY ?? 3.05);
     }
     this.#syncCollection(this.machines, Object.keys(state.machines), (id) => this.#addMachine(id), (entry) => this.#disposeVisual(entry));
     const shelfItems = state.unlockedProducts.filter((item) => SHELVES[item]);
@@ -2712,6 +2273,8 @@ export class WorldScene {
     for (const [item, shelf] of this.shelves) {
       const id = Object.keys(STATIONS).find((key) => STATIONS[key].kind === 'shelf' && STATIONS[key].item === item);
       const p = stationPosition(state, id);
+      shelf.group.visible = Boolean(p);
+      if (!p) continue;
       shelf.group.position.set(p.x, 0, p.z);
       if (p.rotation !== undefined) shelf.group.rotation.y = p.rotation;
     }
@@ -2762,9 +2325,14 @@ export class WorldScene {
     }
     if (this.coop) {
       this.coop.chickens.forEach((chicken, index) => {
-        chicken.visible = index < state.coops.coop.chickens;
-        chicken.rotation.y = Math.sin(time * 2 + index * 2) * 0.1;
+        chicken.group.visible = index < state.coops.coop.chickens;
+        chicken.group.rotation.y = Math.sin(time * 1.1 + index * 2) * 0.08;
+        animateCoopChicken(chicken, time);
       });
+      const storedEggs = state.stock['coop:eggs']?.items?.EGG ?? 0;
+      this.coop.eggMeshes.forEach((egg, index) => { egg.visible = index < storedEggs; });
+      const feedAvailable = state.stock['coop:feed']?.items?.CHICKEN_FEED ?? 0;
+      this.coop.feedBits.forEach((grain, index) => { grain.visible = index < Math.min(7, feedAvailable * 2); });
     }
     if (this.selectedStation) {
       const group = this.#selectedGroup(this.selectedStation);
@@ -2804,7 +2372,8 @@ export class WorldScene {
       }
       machine.output.children.forEach((mesh, index) => {
         mesh.visible = index < shown;
-        mesh.position.set((index % 2) * 0.34, 0.15 + Math.floor(index / 2) * 0.3, Math.floor(index / 2) * 0.2);
+        mesh.position.set((index % 2) * 0.25 - 0.12,
+          0.15 + Math.floor(index / 2) * 0.26, Math.floor(index / 2) * 0.18 - 0.06);
       });
       const entry = state.machines[machineId];
       for (const { mesh, itemId, index } of machine.inputMeshes) {
@@ -2817,7 +2386,7 @@ export class WorldScene {
       const status = count ? (state.settings.language === 'en' ? `READY ${count}` : `HAZIR ${count}`)
         : entry?.progressTicks ? (state.settings.language === 'en' ? 'WORKING' : 'ÜRETİYOR')
           : (state.settings.language === 'en' ? 'NEEDS STOCK' : 'MALZEME GEREK');
-      this.#statusBadge(machine.group, status, count ? '#58cc02' : entry?.progressTicks ? '#ffc800' : '#ff9600', distance < 10, 2.85);
+      this.#statusBadge(machine.group, status, count ? '#58cc02' : entry?.progressTicks ? '#ffc800' : '#ff9600', distance < 10, machine.badgeY ?? 3.25);
     }
 
     for (const [id, table] of this.tables) {

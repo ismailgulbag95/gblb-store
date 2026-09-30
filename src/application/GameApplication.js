@@ -5,10 +5,11 @@ import { createInitialState, hydrateState } from '../domain/state.js';
 import { advanceSimulation } from '../domain/simulation.js';
 import { gameDayNumber } from '../domain/dayCycle.js';
 import { createFarmState, removeFarmReady, syncFarmHarvest } from '../domain/farm.js';
-import { canPlaceDecoration, canPlaceStation, getAllStationIds, getMarketCollisionBoxes, getShelfLocations, isStationUnlocked, stationPosition, syncCatalogLayout } from '../domain/layout.js';
+import { ZONES, canPlaceDecoration, canPlaceStation, getAllStationIds, getDecorationDimensions, getDecorationZone, getMarketCollisionBoxes, getShelfLocations, getStationDimensions, isStationUnlocked, nextShelfStagingPosition, stationPosition, syncCatalogLayout } from '../domain/layout.js';
 import { DECORATIONS } from '../domain/decorCatalog.js';
 import { decorationPrice, nextOrder } from '../domain/orders.js';
 import { machineProductionSeconds, machineSpeedMultiplier, machineUpgradeCost, percentGain, staffSpeedMultiplier, staffUpgradeCost } from '../domain/progression.js';
+import { PLAYER_CHARACTERS, PLAYER_CHARACTER_IDS } from '../domain/characters.js';
 
 function clone(value) {
   return structuredClone(value);
@@ -62,7 +63,7 @@ const BONUS_FIRST_OFFER_MS = 3 * 60_000;
 const BONUS_NEXT_OFFER_MIN_MS = 5 * 60_000;
 const BONUS_NEXT_OFFER_MAX_MS = 8 * 60_000;
 const BONUS_BAG_CAPACITY_MAX = 20;
-const WALK_SPEED_BONUS_MULTIPLIER = 2;
+const WALK_SPEED_BONUS_MULTIPLIER = 1.5;
 const WALK_SPEED_BONUS_DURATION_MS = 5 * 60_000;
 
 function localDayKey(timestamp = Date.now()) {
@@ -90,6 +91,7 @@ export class GameApplication {
     const migrateLegacyCharacter = validCharacter && this.state.player.character === 'shopkeeper' && legacyCharacter !== 'shopkeeper';
     if (migrateLegacyCharacter) {
       this.state.player.character = legacyCharacter;
+      this.state.player.unlockedCharacters = [...new Set([...(this.state.player.unlockedCharacters ?? ['shopkeeper']), legacyCharacter])];
     }
     const previousAvailableUpgrades = this.state.availableUpgrades.join(',');
     this.#refreshUpgrades(this.state);
@@ -145,18 +147,28 @@ export class GameApplication {
     if (offers.currentOffer || offers.activePlayMs < offers.nextOfferAtActiveMs
       || !this.canOfferRewardedAd('bonus-offer', { scheduled: true })) return null;
 
-    const availableTypes = ['walk-speed'];
-    if (this.state.player.capacity < BONUS_BAG_CAPACITY_MAX) availableTypes.push('bag-capacity');
-    const type = availableTypes[Math.floor(Math.random() * availableTypes.length)];
+    const availableTypes = [{ type: 'walk-speed' }];
+    if (this.state.player.capacity < BONUS_BAG_CAPACITY_MAX) availableTypes.push({ type: 'bag-capacity' });
+    const unlockedCharacters = new Set(this.state.player.unlockedCharacters ?? ['shopkeeper']);
+    for (const characterId of PLAYER_CHARACTER_IDS) {
+      if (characterId !== 'shopkeeper' && !unlockedCharacters.has(characterId)) {
+        availableTypes.push({ type: 'character-unlock', characterId });
+      }
+    }
+    const selectedOffer = availableTypes[Math.floor(Math.random() * availableTypes.length)];
     const result = this.#command(`bonus-offer:${offers.nextOfferId}`, (draft) => {
       if (draft.bonusOffers.currentOffer || draft.ads.pending) return { ok: false, reason: 'offer-unavailable' };
-      const offer = { id: `bonus-${draft.bonusOffers.nextOfferId}`, type };
+      const offer = { id: `bonus-${draft.bonusOffers.nextOfferId}`, ...selectedOffer };
       draft.bonusOffers.nextOfferId += 1;
       draft.bonusOffers.currentOffer = offer;
       const interval = BONUS_NEXT_OFFER_MIN_MS
         + Math.floor(Math.random() * (BONUS_NEXT_OFFER_MAX_MS - BONUS_NEXT_OFFER_MIN_MS + 1));
       draft.bonusOffers.nextOfferAtActiveMs = draft.bonusOffers.activePlayMs + interval;
-      addAdEvent(draft.ads, 'offer_shown', 'bonus-offer', null, 0, Date.now(), { bonusId: offer.id, bonusType: offer.type });
+      addAdEvent(draft.ads, 'offer_shown', 'bonus-offer', null, 0, Date.now(), {
+        bonusId: offer.id,
+        bonusType: offer.type,
+        ...(offer.characterId ? { characterId: offer.characterId } : {}),
+      });
       return { ok: true, offer };
     });
     if (!result.ok) return null;
@@ -172,7 +184,11 @@ export class GameApplication {
       }
       draft.bonusOffers.currentOffer = null;
       draft.ads.dismissedUntil['bonus-offer'] = Date.now() + AD_LIMITS.declinedCooldownMs;
-      addAdEvent(draft.ads, 'offer_declined', 'bonus-offer', null, 0, Date.now(), { bonusId: offer.id, bonusType: offer.type });
+      addAdEvent(draft.ads, 'offer_declined', 'bonus-offer', null, 0, Date.now(), {
+        bonusId: offer.id,
+        bonusType: offer.type,
+        ...(offer.characterId ? { characterId: offer.characterId } : {}),
+      });
       return { ok: true };
     });
   }
@@ -202,8 +218,19 @@ export class GameApplication {
     if (placement === 'bonus-offer') {
       const offer = state.bonusOffers.currentOffer;
       if (payload.scheduled) return Boolean(!offer && state.bonusOffers.activePlayMs >= state.bonusOffers.nextOfferAtActiveMs);
-      if (!offer || offer.id !== payload.offerId || offer.type !== payload.bonusType) return false;
-      return offer.type !== 'bag-capacity' || state.player.capacity < BONUS_BAG_CAPACITY_MAX;
+      if (!offer || offer.id !== payload.offerId || offer.type !== payload.bonusType
+        || (offer.type === 'character-unlock' && offer.characterId !== payload.characterId)) return false;
+      if (offer.type === 'bag-capacity') return state.player.capacity < BONUS_BAG_CAPACITY_MAX;
+      if (offer.type === 'character-unlock') {
+        return PLAYER_CHARACTER_IDS.includes(offer.characterId)
+          && !state.player.unlockedCharacters.includes(offer.characterId);
+      }
+      return offer.type === 'walk-speed';
+    }
+    if (placement === 'character-unlock') {
+      return PLAYER_CHARACTER_IDS.includes(payload.characterId)
+        && payload.characterId !== 'shopkeeper'
+        && !state.player.unlockedCharacters.includes(payload.characterId);
     }
     if (placement === 'order-double') {
       const orderReward = state.lastOrderReward;
@@ -239,7 +266,7 @@ export class GameApplication {
 
   markRewardedOfferShown(placement, payload = {}) {
     if (!this.canOfferRewardedAd(placement, payload)) return false;
-    const key = `${placement}:${payload.orderId ?? payload.upgradeId ?? payload.role ?? payload.machineId ?? ''}:${Math.floor(Date.now() / AD_LIMITS.declinedCooldownMs)}`;
+    const key = `${placement}:${payload.orderId ?? payload.upgradeId ?? payload.role ?? payload.machineId ?? payload.characterId ?? ''}:${Math.floor(Date.now() / AD_LIMITS.declinedCooldownMs)}`;
     if (this.shownAdOffers.has(key) || this.state.ads.shownOfferKeys.includes(key)) return true;
     this.shownAdOffers.add(key);
     return this.#command(`ad-offer-shown:${key}`, (draft) => {
@@ -422,9 +449,13 @@ export class GameApplication {
       }
       return { ok: true, amount: 0, details: { role }, message: `${STAFF[role]?.title ?? role} reklamla ekibe katıldı.` };
     }
+    if (placement === 'character-unlock') {
+      return this.#grantCharacterUnlock(state, payload.characterId);
+    }
     if (placement === 'bonus-offer') {
       const offer = state.bonusOffers.currentOffer;
-      if (!offer || offer.id !== payload.offerId || offer.type !== payload.bonusType) return { ok: false };
+      if (!offer || offer.id !== payload.offerId || offer.type !== payload.bonusType
+        || (offer.type === 'character-unlock' && offer.characterId !== payload.characterId)) return { ok: false };
       if (offer.type === 'walk-speed') {
         const now = Date.now();
         const expiresAt = Math.max(now, state.bonusOffers.walkSpeedExpiresAt) + WALK_SPEED_BONUS_DURATION_MS;
@@ -433,7 +464,7 @@ export class GameApplication {
         return {
           ok: true, amount: 0,
           details: { bonusId: offer.id, bonusType: offer.type, multiplier: WALK_SPEED_BONUS_MULTIPLIER, durationAddedMs: WALK_SPEED_BONUS_DURATION_MS, expiresAt },
-          message: 'Yürüyüş hızın 5 dakika boyunca 2 katına çıktı.',
+          message: 'Yürüyüş hızın 5 dakika boyunca 1,5 katına çıktı.',
         };
       }
       if (offer.type === 'bag-capacity' && state.player.capacity < BONUS_BAG_CAPACITY_MAX) {
@@ -446,8 +477,29 @@ export class GameApplication {
           message: `Çanta kapasiten kalıcı olarak ${state.player.capacity} oldu.`,
         };
       }
+      if (offer.type === 'character-unlock') {
+        const reward = this.#grantCharacterUnlock(state, offer.characterId, offer.id);
+        if (reward.ok) state.bonusOffers.currentOffer = null;
+        return reward;
+      }
     }
     return { ok: false };
+  }
+
+  #grantCharacterUnlock(state, characterId, bonusId = null) {
+    if (!PLAYER_CHARACTER_IDS.includes(characterId) || characterId === 'shopkeeper'
+      || state.player.unlockedCharacters.includes(characterId)) return { ok: false };
+    state.player.unlockedCharacters.push(characterId);
+    state.player.character = characterId;
+    const name = PLAYER_CHARACTERS[characterId].label[state.settings.language] ?? PLAYER_CHARACTERS[characterId].label.tr;
+    return {
+      ok: true,
+      amount: 0,
+      details: { ...(bonusId ? { bonusId } : {}), bonusType: 'character-unlock', characterId },
+      message: state.settings.language === 'en'
+        ? `${name} is unlocked and ready to play.`
+        : `${name} karakteri reklamla açıldı ve seçildi.`,
+    };
   }
 
   #supplierDropItems(state, machineId, recipe) {
@@ -508,6 +560,7 @@ export class GameApplication {
           if (worker.type === 'cashier') { worker.x = snappedX; worker.z = snappedZ - 1.75; }
         }
       }
+      this.#stageNextPendingShelf(draft);
       const title = STATIONS[id]?.title ?? draft.customStations?.[id]?.title ?? 'Yapı';
       return { ok: true, message: `${title} taşındı.` };
     });
@@ -547,6 +600,7 @@ export class GameApplication {
       if (!decoration) return { ok: false, reason: 'unknown-decoration' };
       decoration.x = snappedX;
       decoration.z = snappedZ;
+      this.#stageNextPendingShelf(draft);
       return { ok: true, message: 'Dekorasyon taşındı.' };
     });
   }
@@ -558,11 +612,16 @@ export class GameApplication {
       const id = `decoration-${draft.nextEntityId++}`;
       const decoration = { id, type, x: 0, z: 0 };
       draft.decorations.push(decoration);
+      const zone = ZONES[getDecorationZone(type)];
+      const minX = Math.ceil((zone.minX + 0.5) * 2) / 2;
+      const minZ = Math.ceil((zone.minZ + 0.5) * 2) / 2;
+      const columns = Math.floor((zone.maxX - 0.5 - minX) * 2) + 1;
+      const rows = Math.floor((zone.maxZ - 0.5 - minZ) * 2) + 1;
       let slot = null;
-      for (let row = 0; row < 29 && !slot; row += 1) {
-        for (let column = 0; column < 29; column += 1) {
-          const x = -2 + column * 0.5;
-          const z = -7 + row * 0.5;
+      for (let row = 0; row < rows && !slot; row += 1) {
+        for (let column = 0; column < columns; column += 1) {
+          const x = minX + column * 0.5;
+          const z = minZ + row * 0.5;
           if (canPlaceDecoration(draft, id, x, z)) { slot = { x, z }; break; }
         }
       }
@@ -571,7 +630,17 @@ export class GameApplication {
       new EconomyLedger(draft.economy).debit(`decoration-purchase:${id}`, price, `decoration:${type}`);
       if (draft.decorVouchers > 0) draft.decorVouchers -= 1;
       Object.assign(decoration, slot);
-      return { ok: true, message: `${definition.name[this.state.settings.language]} mağazaya eklendi.`, decorationId: id };
+      const language = this.state.settings.language;
+      const destination = getDecorationZone(type) === 'farm'
+        ? { tr: 'çiftliğe', en: 'to your farm' }
+        : { tr: 'mağazana', en: 'to your market' };
+      return {
+        ok: true,
+        message: language === 'en'
+          ? `${definition.name.en} added ${destination.en}.`
+          : `${definition.name.tr} ${destination.tr} eklendi.`,
+        decorationId: id,
+      };
     });
   }
 
@@ -655,16 +724,30 @@ export class GameApplication {
   }
 
   #applyUpgrade(state, upgradeId) {
+    const newStationIds = new Set();
     const shelfFor = (itemId) => {
       const definition = SHELVES[itemId];
       if (!definition) return;
       makeLocation(state.stock, definition.id, definition.capacity);
       state.unlocked[`${itemId.toLowerCase()}Shelf`] = true;
+      const shelfId = Object.entries(STATIONS).find(([, station]) => station.kind === 'shelf' && station.item === itemId)?.[0];
+      if (shelfId && state.unlockedProducts.includes(itemId) && !state.layout?.[shelfId]) {
+        const stagingPosition = nextShelfStagingPosition(state, shelfId);
+        if (stagingPosition) {
+          state.layout ??= {};
+          state.layout[shelfId] = { ...stagingPosition };
+          newStationIds.add(shelfId);
+        } else {
+          state.pendingShelfIds ??= [];
+          if (!state.pendingShelfIds.includes(shelfId)) state.pendingShelfIds.push(shelfId);
+        }
+      }
     };
     const addMachine = (id) => {
       const station = STATIONS[id];
       const recipe = RECIPES[station.recipe];
       state.machines[id] = { progressTicks: 0, recipe: station.recipe, blocked: false, blockedTicks: 0, blockedSinceTick: null, upgradeLevel: 0, speedModifier: 1 };
+      newStationIds.add(id);
       makeLocation(state.stock, `machine:${id}:input`, 12);
       makeLocation(state.stock, `machine:${id}:output`, 8);
       if (recipe.output !== 'CHICKEN_FEED') shelfFor(recipe.output);
@@ -672,6 +755,7 @@ export class GameApplication {
     const addFarm = (id) => {
       const station = STATIONS[id];
       state.farms[id] = createFarmState(state.tick, id);
+      newStationIds.add(id);
       makeLocation(state.stock, `farm:${station.item}`, 60);
     };
     const unlockProduct = (itemId) => {
@@ -711,12 +795,80 @@ export class GameApplication {
       state.diningTables = Object.fromEntries(['table1', 'table2', 'table3', 'table4'].map((id) => [id, {
         customerId: null, meal: null, tipAtoms: 0, eatTicks: 0,
       }]));
+      for (const id of Object.keys(state.diningTables)) newStationIds.add(id);
     }
     if (upgradeId === 'chefWaiter') {
       this.#hire(state, 'chefWaiter');
       this.#hire(state, 'waiter');
     }
     this.#refreshUpgrades(state);
+    for (const id of newStationIds) this.#pushPlayerClearOfStation(state, id);
+  }
+
+  #stageNextPendingShelf(state) {
+    const stationId = state.pendingShelfIds?.[0];
+    if (!stationId) return;
+    const stagingPosition = nextShelfStagingPosition(state, stationId);
+    if (!stagingPosition) return;
+    state.layout ??= {};
+    state.layout[stationId] = { ...stagingPosition };
+    state.pendingShelfIds = state.pendingShelfIds.slice(1);
+    this.#pushPlayerClearOfStation(state, stationId);
+  }
+
+  #pushPlayerClearOfStation(state, stationId) {
+    const position = stationPosition(state, stationId);
+    if (!position) return;
+    const dimensions = getStationDimensions(stationId, position.rotation ?? 0);
+    const clearance = 0.4;
+    const player = state.player;
+    if (Math.abs(player.x - position.x) >= dimensions.width / 2 + clearance
+      || Math.abs(player.z - position.z) >= dimensions.depth / 2 + clearance) return;
+
+    const directions = [
+      { x: -1, z: 0 }, { x: 1, z: 0 }, { x: 0, z: -1 }, { x: 0, z: 1 },
+      { x: -1, z: -1 }, { x: 1, z: -1 }, { x: -1, z: 1 }, { x: 1, z: 1 },
+    ];
+    const candidates = [];
+    for (const extraSpace of [0.62, 1, 1.5, 2, 2.8, 3.6]) {
+      for (const direction of directions) {
+        const x = position.x + direction.x * (dimensions.width / 2 + extraSpace);
+        const z = position.z + direction.z * (dimensions.depth / 2 + extraSpace);
+        candidates.push({ x, z, distance: Math.hypot(player.x - x, player.z - z) });
+      }
+    }
+
+    candidates.sort((a, b) => a.distance - b.distance);
+    const destination = candidates.find(({ x, z }) => this.#isPlayerPositionClear(state, x, z));
+    if (!destination) return;
+    player.x = Math.max(-49, Math.min(13.2, destination.x));
+    player.z = Math.max(-8.2, Math.min(11.8, destination.z));
+    this.target = null;
+  }
+
+  #isPlayerPositionClear(state, x, z) {
+    if (x < -49 || x > 13.2 || z < -8.2 || z > 11.8) return false;
+    const radius = 0.38;
+    const marketBoxes = getMarketCollisionBoxes(state);
+    if (marketBoxes.some((box) => x > box.minX - radius && x < box.maxX + radius
+      && z > box.minZ - radius && z < box.maxZ + radius)) return false;
+
+    for (const id of getAllStationIds(state)) {
+      if (!isStationUnlocked(state, id)) continue;
+      const station = stationPosition(state, id);
+      if (!station) continue;
+      const dimensions = getStationDimensions(id, station.rotation ?? 0);
+      if (Math.abs(x - station.x) < dimensions.width / 2 + radius
+        && Math.abs(z - station.z) < dimensions.depth / 2 + radius) return false;
+    }
+
+    for (const decoration of state.decorations ?? []) {
+      if (decoration.type === 'welcomeMat') continue;
+      const dimensions = getDecorationDimensions(decoration.type, decoration.rotation ?? 0);
+      if (Math.abs(x - decoration.x) < dimensions.width / 2 + radius
+        && Math.abs(z - decoration.z) < dimensions.depth / 2 + radius) return false;
+    }
+    return true;
   }
 
   #hire(state, type) {
@@ -779,7 +931,7 @@ export class GameApplication {
     if (state.stats.breadSold === 0) return '2 buğday ve 1 yumurtayı fırına yükle; ekmek üretip sat.';
     if (!state.unlocked.restaurant) return 'Gurme restoranı aç.';
     if (!state.unlocked.chefWaiter) return 'Burger veya pizza pişir, müşteriye servis et ve bahşiş topla.';
-    return 'Tebrikler! GBLB STORE ve Gurme Restoran işletmen tamamlandı.';
+    return 'Tebrikler! Marketini üretimden restorana kadar büyüttün.';
   }
 
   #processPayroll(state, dayStarted) {
@@ -872,6 +1024,7 @@ export class GameApplication {
     const isUnlocked = isStationUnlocked(state, targetId);
     if (!isUnlocked) return { ok: false, reason: 'locked' };
     const pos = stationPosition(state, targetId);
+    if (!pos) return { ok: false, reason: 'pending-delivery' };
     const distance = Math.hypot(player.x - pos.x, player.z - pos.z);
     if (distance > 2.5) return { ok: false, reason: 'too-far' };
 
@@ -1173,7 +1326,8 @@ export class GameApplication {
   }
 
   setCharacter(character) {
-    if (!['shopkeeper', 'cat', 'robot', 'panda', 'penguin'].includes(character)) return { ok: false, reason: 'unsupported-character' };
+    if (!PLAYER_CHARACTER_IDS.includes(character)) return { ok: false, reason: 'unsupported-character' };
+    if (!this.state.player.unlockedCharacters.includes(character)) return { ok: false, reason: 'locked-character' };
     const result = this.#command(`character:${character}:${this.state.revision + 1}`, (draft) => {
       draft.player.character = character;
       return { ok: true };

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
+  <title id="title">Seed to Serve app icon variation — plate and sprout</title>
+  <desc id="desc">A fresh sprout rises from a bright serving plate against deep teal.</desc>
+  <rect width="256" height="256" fill="#173D46"/>
+  <circle cx="128" cy="139" r="82" fill="#FFF8E8" stroke="#0F3039" stroke-width="8"/>
+  <circle cx="128" cy="139" r="63" fill="none" stroke="#FFC84A" stroke-width="7"/>
+  <circle cx="128" cy="147" r="28" fill="#F45E4A"/>
+  <path d="M126 119c-2-15-1-26 2-38m-2 28c-16-17-31-16-37-6 5 12 17 17 37 6Zm3-11c16-19 31-18 37-8-5 13-17 19-37 8Z" fill="#63C879" stroke="#173D46" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

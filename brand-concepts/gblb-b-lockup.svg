@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 256" role="img" aria-labelledby="title">
+  <title id="title">GBLB Store — Şef Domates logo taslağı</title>
+  <rect x="15" y="18" width="220" height="220" rx="54" fill="#48C8D7"/>
+  <path d="M125 100c-12-16-26-14-34-5-16-6-29 5-27 19-16 1-23 17-15 29-11 11-7 27 5 33 1 22 19 37 40 37h61c22 0 38-15 39-37 12-8 15-24 4-35 8-13 1-27-15-29 1-16-12-26-28-19-8-10-21-10-30 7Z" fill="#F25248" stroke="#183A45" stroke-width="6" stroke-linejoin="round"/>
+  <path d="M95 102c-2-15 11-22 21-12 3-17 24-21 33-7 14-4 24 6 22 19-11 2-19 7-25 15-6-8-14-11-23-11-8 7-17 9-28 7Z" fill="#59BF69" stroke="#183A45" stroke-width="6" stroke-linejoin="round"/>
+  <path d="M89 95c-7-8-5-19 3-23-2-16 17-27 30-17 11-14 34-6 34 11 14 4 16 22 4 29Z" fill="#FFF8E8" stroke="#183A45" stroke-width="6" stroke-linejoin="round"/>
+  <circle cx="110" cy="155" r="4" fill="#183A45"/><circle cx="148" cy="155" r="4" fill="#183A45"/>
+  <path d="M114 171c9 10 20 10 29 0" fill="none" stroke="#183A45" stroke-width="5" stroke-linecap="round"/>
+  <text x="274" y="125" fill="#183A45" font-family="Arial, sans-serif" font-size="74" font-weight="900" letter-spacing="-3">GBLB</text>
+  <text x="280" y="180" fill="#E64D43" font-family="Arial, sans-serif" font-size="35" font-weight="800" letter-spacing="7">STORE</text>
+  <text x="282" y="218" fill="#496B70" font-family="Arial, sans-serif" font-size="20" font-weight="700" letter-spacing="2">MARKET  •  RESTORAN  •  TYCOON</text>
+</svg>

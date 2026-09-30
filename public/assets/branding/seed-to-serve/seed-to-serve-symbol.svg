@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
+  <title id="title">Seed to Serve symbol</title>
+  <desc id="desc">An S-shaped golden route flows from a sprout into a serving plate.</desc>
+  <path d="M181 63C155 41 119 42 91 59 57 80 55 115 90 134l59 26c34 15 37 44 11 63-24 18-58 9-75-12" fill="none" stroke="#FFC84A" stroke-width="28" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M181 63c0-12-1-21-2-29m2 18c-11-13-22-13-27-6 4 10 14 13 27 6Zm0-5c11-14 22-13 27-6-4 10-14 13-27 6Z" fill="#63C879" stroke="#173D46" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="58" cy="211" r="29" fill="#FFF8E8" stroke="#173D46" stroke-width="7"/>
+  <circle cx="58" cy="213" r="12" fill="#F45E4A"/>
+  <path d="M55 201c-2-7 3-10 7-6 2-5 7-5 8 0-4 1-6 4-7 7-2-2-5-2-8-1Z" fill="#63C879"/>
+</svg>

@@ -5,10 +5,11 @@ export const GAME_DAY_TICKS = GAME_DAY_SECONDS * SIMULATION_TICKS_PER_SECOND;
 export const GAME_NIGHT_TICKS = GAME_NIGHT_SECONDS * SIMULATION_TICKS_PER_SECOND;
 
 export const STAFF_WAITING_AREA = Object.freeze({
-  minX: -24.8,
-  minZ: -7.65,
+  minX: -24.6,
+  minZ: -7.2,
   columns: 5,
-  spacing: 0.65,
+  spacing: 0.55,
+  bounds: Object.freeze({ minX: -24.9, maxX: -22.1, minZ: -7.8, maxZ: -5.6 }),
 });
 
 export function gameDayNumber(tick) {

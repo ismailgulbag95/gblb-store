@@ -1,6 +1,6 @@
-# GBLB Store — Market ve Restoran Tycoon
+# Tohumdan Sofraya — Market ve Restoran Oyunu
 
-Three.js ile çalışan, tek oyunculu 3B market ve restoran oyunu. Oyuncu ürün yetiştirir, üretim hatlarını besler, reyonları doldurur, müşterilere hizmet eder ve kazancını yeni aşamalara yatırır.
+Three.js ile çalışan, tek oyunculu 3B market ve restoran oyunu. Oyuncu tarladan ürün toplar, üretim hatlarını besler, reyonları doldurur, müşterilere hizmet eder ve kazancını yeni aşamalara yatırır.
 
 ## Oynanış
 

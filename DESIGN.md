@@ -1,4 +1,4 @@
-# Duolingo Design System for GBLB STORE 3D (DESIGN.md)
+# Tohumdan Sofraya 3D — Arayüz Tasarım Sistemi
 
 > Bu belge, oyunun arayüz mimarisi, görsel kimliği ve bileşen tasarım standardını belirler. Tüm UI, HUD, modal, tipografi ve efekt geliştirmelerinde bağlayıcıdır.
 

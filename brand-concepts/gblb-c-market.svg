@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
+  <title id="title">GBLB Store — Renkli Pazar</title>
+  <desc id="desc">Gök mavisi karede çizgili güneşlik, ürün kasası ve renkli ürünlerden oluşan yalın market simgesi.</desc>
+  <rect x="10" y="10" width="236" height="236" rx="58" fill="#40B9E5"/>
+  <path d="M51 112 66 66h124l15 46" fill="#FFC84A" stroke="#173B46" stroke-width="8" stroke-linejoin="round"/>
+  <path d="M52 111c3 19 29 22 39 3 10 18 31 19 39 0 10 19 31 18 40 0 11 19 34 15 37-3v15H52Z" fill="#F45E4A" stroke="#173B46" stroke-width="7" stroke-linejoin="round"/>
+  <path d="M53 125h150v77c0 10-8 18-18 18H71c-10 0-18-8-18-18Z" fill="#1D704E" stroke="#173B46" stroke-width="8" stroke-linejoin="round"/>
+  <path d="M67 144h122v42H67Z" fill="#FFF7DE"/>
+  <circle cx="91" cy="165" r="13" fill="#F25248"/>
+  <path d="M87 152c0-6 5-9 9-5 2-5 7-5 8 0-4 1-6 4-7 7-3-3-6-3-10-2Z" fill="#59BF69"/>
+  <circle cx="128" cy="165" r="13" fill="#FFC84A"/>
+  <path d="M123 167c4-7 8-9 13-10m-12 16c5-7 9-9 14-10" fill="none" stroke="#D99A25" stroke-width="3" stroke-linecap="round"/>
+  <circle cx="165" cy="165" r="13" fill="#65C97B"/>
+  <path d="M159 169c3-10 9-15 15-17-1 9-5 15-15 17Z" fill="#1D704E"/>
+</svg>

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
+  <title id="title">GBLB Store — Hasat Döngüsü</title>
+  <desc id="desc">Koyu teal kare içinde altın renkli, üretim bandını andıran G harfi ve küçük domates çekirdeği.</desc>
+  <rect x="10" y="10" width="236" height="236" rx="58" fill="#153B45"/>
+  <path d="M179 81a78 78 0 1 0 4 79h-48" fill="none" stroke="#0D2E37" stroke-width="43" stroke-linecap="round" stroke-linejoin="round" transform="translate(0 5)"/>
+  <path d="M179 81a78 78 0 1 0 4 79h-48" fill="none" stroke="#FFC84A" stroke-width="34" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="111" cy="128" r="19" fill="#F45E4A"/>
+  <path d="M106 109c-2-10 4-14 10-9 3-8 10-8 12-1-5 2-8 7-9 12-4-4-8-4-13-2Z" fill="#63C879"/>
+</svg>

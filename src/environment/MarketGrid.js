@@ -1,11 +1,14 @@
 import * as THREE from 'three';
 import { GAME_CONFIG } from '../config/GameConfig.js';
+import { SHELF_STAGING_AREA } from '../domain/layout.js';
 import { EnvironmentProps } from './EnvironmentProps.js';
 
 export class MarketGrid {
   constructor(scene) {
     this.scene = scene;
     this.obstacles = []; // array of { min: {x, z}, max: {x, z} }
+    this.restaurantGates = [];
+    this.restaurantUnlocked = false;
     this.props = new EnvironmentProps(scene);
     this.buildEnvironment();
   }
@@ -67,6 +70,7 @@ export class MarketGrid {
     storeFloor.position.set(5, 0, 0);
     storeFloor.receiveShadow = true;
     this.scene.add(storeFloor);
+    this.createShelfStagingArea();
 
     // 4. ZONE 2: Organic Garden & Greenhouse Farm Floor (Lush Garden Grass on Left x = -26 to -4)
     const gardenGeo = new THREE.PlaneGeometry(22, 18);
@@ -81,7 +85,7 @@ export class MarketGrid {
     this.scene.add(gardenFloor);
 
     const waitingArea = new THREE.Mesh(
-      new THREE.PlaneGeometry(3.8, 3.2),
+      new THREE.PlaneGeometry(2.8, 2.2),
       new THREE.MeshStandardMaterial({ color: 0xc8dcae, roughness: 0.9 }),
     );
     waitingArea.rotation.x = -Math.PI / 2;
@@ -91,10 +95,10 @@ export class MarketGrid {
 
     const waitingBorder = new THREE.MeshBasicMaterial({ color: 0xe7c465 });
     const borderSegments = [
-      { geometry: new THREE.BoxGeometry(3.8, 0.035, 0.07), x: -23.5, z: -8.3 },
-      { geometry: new THREE.BoxGeometry(3.8, 0.035, 0.07), x: -23.5, z: -5.1 },
-      { geometry: new THREE.BoxGeometry(0.07, 0.035, 3.2), x: -25.4, z: -6.7 },
-      { geometry: new THREE.BoxGeometry(0.07, 0.035, 3.2), x: -21.6, z: -6.7 },
+      { geometry: new THREE.BoxGeometry(2.8, 0.035, 0.07), x: -23.5, z: -7.8 },
+      { geometry: new THREE.BoxGeometry(2.8, 0.035, 0.07), x: -23.5, z: -5.6 },
+      { geometry: new THREE.BoxGeometry(0.07, 0.035, 2.2), x: -24.9, z: -6.7 },
+      { geometry: new THREE.BoxGeometry(0.07, 0.035, 2.2), x: -22.1, z: -6.7 },
     ];
     for (const segment of borderSegments) {
       const stripe = new THREE.Mesh(segment.geometry, waitingBorder);
@@ -122,7 +126,7 @@ export class MarketGrid {
       new THREE.MeshBasicMaterial({ map: waitingLabelTexture, toneMapped: false }),
     );
     waitingLabel.rotation.x = -Math.PI / 2;
-    waitingLabel.position.set(-23.5, 0.055, -8.05);
+    waitingLabel.position.set(-23.5, 0.055, -8.18);
     this.scene.add(waitingLabel);
 
     // Main Garden Promenade connecting Supermarket doorway (x = -4) to Restaurant (x = -26)
@@ -149,6 +153,7 @@ export class MarketGrid {
     // 7. Store & Restaurant Walls
     this.createStoreWalls();
     this.createRestaurantWalls();
+    this.createInteriorLighting();
 
     // 8. Supermarket Entrance & Fixtures (Directly from Reference Photo!)
     // A. Automatic Sliding Glass Doors at entrance (x = 5, z = 9)
@@ -200,6 +205,56 @@ export class MarketGrid {
     this.props.createPineTree(18, 4, 1.2);
     this.props.createPineTree(-30, -14, 1.2);
     this.props.createPineTree(-42, -14, 1.1);
+  }
+
+  createShelfStagingArea() {
+    const bounds = SHELF_STAGING_AREA.bounds;
+    const width = bounds.maxX - bounds.minX;
+    const depth = bounds.maxZ - bounds.minZ;
+    const centerX = (bounds.minX + bounds.maxX) / 2;
+    const centerZ = (bounds.minZ + bounds.maxZ) / 2;
+    const floor = new THREE.Mesh(
+      new THREE.PlaneGeometry(width, depth),
+      new THREE.MeshStandardMaterial({ color: 0xe4eee2, roughness: 0.8 }),
+    );
+    floor.rotation.x = -Math.PI / 2;
+    floor.position.set(centerX, 0.025, centerZ);
+    floor.receiveShadow = true;
+    this.scene.add(floor);
+
+    const borderMaterial = new THREE.MeshBasicMaterial({ color: 0x6f9b79 });
+    const border = [
+      { geometry: new THREE.BoxGeometry(width, 0.035, 0.07), x: centerX, z: bounds.minZ },
+      { geometry: new THREE.BoxGeometry(width, 0.035, 0.07), x: centerX, z: bounds.maxZ },
+      { geometry: new THREE.BoxGeometry(0.07, 0.035, depth), x: bounds.minX, z: centerZ },
+      { geometry: new THREE.BoxGeometry(0.07, 0.035, depth), x: bounds.maxX, z: centerZ },
+    ];
+    for (const segment of border) {
+      const line = new THREE.Mesh(segment.geometry, borderMaterial);
+      line.position.set(segment.x, 0.045, segment.z);
+      this.scene.add(line);
+    }
+
+    const labelCanvas = document.createElement('canvas');
+    labelCanvas.width = 512;
+    labelCanvas.height = 96;
+    const context = labelCanvas.getContext('2d');
+    context.fillStyle = '#355941';
+    context.fillRect(0, 0, labelCanvas.width, labelCanvas.height);
+    context.fillStyle = '#ffffff';
+    context.font = 'bold 34px Fredoka, sans-serif';
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    context.fillText('YENİ REYON TESLİM ALANI', 256, 48);
+    const texture = new THREE.CanvasTexture(labelCanvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    const label = new THREE.Mesh(
+      new THREE.PlaneGeometry(width - 0.3, 0.42),
+      new THREE.MeshBasicMaterial({ map: texture, toneMapped: false }),
+    );
+    label.rotation.x = -Math.PI / 2;
+    label.position.set(centerX, 0.055, bounds.maxZ + 0.28);
+    this.scene.add(label);
   }
 
   /**
@@ -280,6 +335,7 @@ export class MarketGrid {
     // Bottom Wall (z = 9, with entrance door gap)
     this.addWall(-45, 9, 6, wallHeight, thickness, wallMat);
     this.addWall(-29, 9, 6, wallHeight, thickness, wallMat);
+    this.createRestaurantGate(-37, 9, 10, 'x');
 
     // Left Wall (x = -48, z = -9 to 9)
     this.addWall(-48, 0, thickness, wallHeight, 18, wallMat);
@@ -288,6 +344,144 @@ export class MarketGrid {
     this.addWall(-26, -5.4, thickness, wallHeight, 7.2, wallMat);
     this.addWall(-26, 5.4, thickness, wallHeight, 7.2, wallMat);
     this.createRestaurantGardenDoorway(-26, 0);
+    this.createRestaurantGate(-26, 0, 3.6, 'z');
+  }
+
+  createInteriorLighting() {
+    const glowCanvas = document.createElement('canvas');
+    glowCanvas.width = 128;
+    glowCanvas.height = 128;
+    const glowContext = glowCanvas.getContext('2d');
+    const gradient = glowContext.createRadialGradient(64, 64, 4, 64, 64, 64);
+    gradient.addColorStop(0, 'rgba(255, 245, 221, 0.48)');
+    gradient.addColorStop(0.45, 'rgba(255, 231, 191, 0.2)');
+    gradient.addColorStop(1, 'rgba(255, 221, 176, 0)');
+    glowContext.fillStyle = gradient;
+    glowContext.fillRect(0, 0, 128, 128);
+    const glowTexture = new THREE.CanvasTexture(glowCanvas);
+    glowTexture.colorSpace = THREE.SRGBColorSpace;
+
+    this.interiorLights = [];
+    for (const centerX of [5, -37]) {
+      for (const xOffset of [-4, 4]) {
+        for (const z of [-3.5, 3.5]) {
+          const lightX = centerX + xOffset;
+          const light = new THREE.PointLight(0xfff0d6, 0, 12, 2);
+          light.position.set(lightX, 2.95, z);
+          this.scene.add(light);
+
+          const glow = new THREE.Mesh(
+            new THREE.PlaneGeometry(8, 8),
+            new THREE.MeshBasicMaterial({
+              map: glowTexture,
+              color: 0xfff0d6,
+              transparent: true,
+              opacity: 0,
+              depthWrite: false,
+              toneMapped: false,
+            }),
+          );
+          glow.rotation.x = -Math.PI / 2;
+          glow.position.set(lightX, 0.018, z);
+          this.scene.add(glow);
+          this.interiorLights.push({ light, glow });
+        }
+      }
+    }
+
+    this.setDaylight(1);
+  }
+
+  setDaylight(daylight) {
+    const nightLighting = 1 - THREE.MathUtils.smoothstep(daylight, 0.25, 0.85);
+    for (const { light, glow } of this.interiorLights ?? []) {
+      light.intensity = 2.6 * nightLighting;
+      glow.material.opacity = 0.72 * nightLighting;
+    }
+  }
+
+  createRestaurantGate(x, z, width, axis) {
+    const group = new THREE.Group();
+    group.position.set(x, 0, z);
+
+    const doorMat = new THREE.MeshStandardMaterial({ color: 0x55372e, roughness: 0.72 });
+    const trimMat = new THREE.MeshStandardMaterial({ color: 0x9a7045, roughness: 0.48 });
+    const handleMat = new THREE.MeshStandardMaterial({ color: 0xf1c40f, metalness: 0.72, roughness: 0.3 });
+    const height = 2.35;
+    const thickness = 0.18;
+    const panelWidth = width / 2 - 0.03;
+    const leaves = [];
+
+    for (const side of [-1, 1]) {
+      const hinge = new THREE.Group();
+      if (axis === 'x') hinge.position.set(side * width / 2, 0, 0);
+      else hinge.position.set(0, 0, side * width / 2);
+
+      const panel = new THREE.Mesh(
+        axis === 'x'
+          ? new THREE.BoxGeometry(panelWidth, height, thickness)
+          : new THREE.BoxGeometry(thickness, height, panelWidth),
+        doorMat,
+      );
+      if (axis === 'x') panel.position.set(-side * panelWidth / 2, height / 2, 0);
+      else panel.position.set(0, height / 2, -side * panelWidth / 2);
+      panel.castShadow = true;
+      panel.receiveShadow = true;
+      hinge.add(panel);
+
+      // Narrow rails make the closed leaves read as a pair of timber doors.
+      for (const y of [0.16, height - 0.16]) {
+        const rail = new THREE.Mesh(
+          axis === 'x'
+            ? new THREE.BoxGeometry(panelWidth, 0.11, thickness + 0.035)
+            : new THREE.BoxGeometry(thickness + 0.035, 0.11, panelWidth),
+          trimMat,
+        );
+        if (axis === 'x') rail.position.set(-side * panelWidth / 2, y, 0);
+        else rail.position.set(0, y, -side * panelWidth / 2);
+        rail.castShadow = true;
+        hinge.add(rail);
+      }
+
+      const handle = new THREE.Mesh(new THREE.SphereGeometry(0.09, 10, 8), handleMat);
+      if (axis === 'x') handle.position.set(-side * (panelWidth - 0.22), 1.12, -0.13);
+      else handle.position.set(-0.13, 1.12, -side * (panelWidth - 0.22));
+      hinge.add(handle);
+
+      group.add(hinge);
+      leaves.push({
+        hinge,
+        openRotation: axis === 'x' ? side * Math.PI / 2 : -side * Math.PI / 2,
+      });
+    }
+
+    this.scene.add(group);
+    const obstacleWidth = axis === 'x' ? width : thickness + 0.24;
+    const obstacleDepth = axis === 'x' ? thickness + 0.24 : width;
+    this.restaurantGates.push({
+      group,
+      leaves,
+      obstacle: {
+        min: { x: x - obstacleWidth / 2, z: z - obstacleDepth / 2 },
+        max: { x: x + obstacleWidth / 2, z: z + obstacleDepth / 2 },
+      },
+    });
+    this.obstacles.push(this.restaurantGates[this.restaurantGates.length - 1].obstacle);
+  }
+
+  setRestaurantUnlocked(unlocked) {
+    const isUnlocked = Boolean(unlocked);
+    if (this.restaurantUnlocked === isUnlocked) return;
+    this.restaurantUnlocked = isUnlocked;
+
+    for (const gate of this.restaurantGates) {
+      const obstacleIndex = this.obstacles.indexOf(gate.obstacle);
+      if (isUnlocked && obstacleIndex !== -1) this.obstacles.splice(obstacleIndex, 1);
+      if (!isUnlocked && obstacleIndex === -1) this.obstacles.push(gate.obstacle);
+      for (const leaf of gate.leaves) {
+        leaf.hinge.rotation.y = isUnlocked ? leaf.openRotation : 0;
+      }
+    }
   }
 
   createGardenDoorway(x, z) {

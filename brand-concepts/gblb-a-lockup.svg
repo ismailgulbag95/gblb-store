@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 256" role="img" aria-labelledby="title">
+  <title id="title">GBLB Store — Hasat Döngüsü logo taslağı</title>
+  <rect x="15" y="18" width="220" height="220" rx="54" fill="#153B45"/>
+  <path d="M169 78a72 72 0 1 0 4 73h-44" fill="none" stroke="#FFC84A" stroke-width="31" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="106" cy="128" r="17" fill="#F45E4A"/>
+  <path d="M102 111c-2-9 4-13 9-8 3-7 9-7 11-1-5 2-8 6-9 11-3-4-7-4-11-2Z" fill="#63C879"/>
+  <text x="274" y="125" fill="#153B45" font-family="Arial, sans-serif" font-size="74" font-weight="900" letter-spacing="-3">GBLB</text>
+  <text x="280" y="180" fill="#E65E43" font-family="Arial, sans-serif" font-size="35" font-weight="800" letter-spacing="7">STORE</text>
+  <text x="282" y="218" fill="#496B70" font-family="Arial, sans-serif" font-size="20" font-weight="700" letter-spacing="2">MARKET  •  RESTORAN  •  TYCOON</text>
+</svg>

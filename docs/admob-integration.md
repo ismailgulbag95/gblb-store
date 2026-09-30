@@ -42,9 +42,11 @@ persisted completion receipt and grants nothing after reload. An unconfigured
 bridge cannot grant anything on its own.
 
 Placement IDs currently used by the game are `order-double`, `supplier-drop`,
-`farm-unlock`, `staff-hire`, and `bonus-offer`. The bonus placement is shown in
-a surprise offer modal after active-play timing; the video itself starts only
-after the player taps its accept button. Its payload identifies either a
-five-minute player-walking speed boost or a permanent bag-capacity increase.
+`farm-unlock`, `staff-hire`, `character-unlock`, and `bonus-offer`. The bonus
+placement is shown in a surprise offer modal after active-play timing; the
+video starts only after the player taps its accept button. Its payload identifies
+a five-minute walking speed boost, a permanent bag-capacity increase, or an
+unlockable character. Locked character cards use `character-unlock` directly;
+surprise offers can grant that same character reward too.
 Ad unit IDs, consent flow, SDK initialization, and Android/iOS plugin selection
 are intentionally left for the native setup stage.

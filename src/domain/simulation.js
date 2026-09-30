@@ -156,6 +156,8 @@ function locationPosition(state, locationId) {
   if (locationId.startsWith('shelf:')) {
     // Önce custom shelf id'yi ara (format: shelf:tomatoShelf_5)
     const rest = locationId.slice('shelf:'.length);
+    const shelf = getShelfLocations(state, rest).find((entry) => entry.stockId === locationId);
+    if (shelf) return { x: shelf.x, z: shelf.z };
     if (SHELVES[rest]) return { x: SHELVES[rest].x, z: SHELVES[rest].z };
     // custom shelf id (e.g. tomatoShelf_5)
     const pos = state.layout?.[rest] ?? state.customStations?.[rest];

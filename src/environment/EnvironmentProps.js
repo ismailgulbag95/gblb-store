@@ -160,10 +160,10 @@ export class EnvironmentProps {
     ctx.fillStyle = '#1e272e';
     ctx.fillRect(0, 0, 512, 128);
     ctx.fillStyle = '#ffc048';
-    ctx.font = 'bold 52px "Fredoka", sans-serif';
+    ctx.font = 'bold 44px "Fredoka", sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('GBLB STORE', 256, 64);
+    ctx.fillText('SEED TO SERVE', 256, 64);
 
     const texture = new THREE.CanvasTexture(canvas);
     const textMat = new THREE.MeshBasicMaterial({ map: texture });

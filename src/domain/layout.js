@@ -1,4 +1,5 @@
 import { SHELVES, STATIONS } from './catalog.js';
+import { STAFF_WAITING_AREA } from './dayCycle.js';
 
 export const GRID_SIZE = 0.5;
 const DEFAULT_POSITIONS = Object.fromEntries(Object.entries(STATIONS).map(([id, station]) => [id, { x: station.x, z: station.z }]));
@@ -8,6 +9,13 @@ export const ZONES = {
   market: { minX: -3.5, maxX: 13.5, minZ: -8.5, maxZ: 8.5 },
   restaurant: { minX: -47.5, maxX: -26.5, minZ: -8.5, maxZ: 8.5 },
 };
+
+export const SHELF_STAGING_AREA = Object.freeze({
+  bounds: Object.freeze({ minX: -2.75, maxX: -0.25, minZ: -8.475, maxZ: -6.525 }),
+  slots: Object.freeze([
+    Object.freeze({ x: -1.5, z: -7.5 }),
+  ]),
+});
 
 /**
  * 3D modellerin gerçek görsel taban boyutları (genişlik: x ekseni, derinlik: z ekseni).
@@ -34,24 +42,28 @@ export const STATION_FOOTPRINTS = Object.freeze({
   selfRegister: { width: 1.4, depth: 1.1 },
 
   // Tarlalar (Farms)
-  tomatoFarm: { width: 1.95, depth: 2.55 },
-  tomatoFarm2: { width: 1.95, depth: 2.55 },
-  orangeFarm: { width: 1.95, depth: 2.55 },
-  orangeFarm2: { width: 1.95, depth: 2.55 },
-  cornFarm: { width: 1.95, depth: 2.55 },
-  wheatFarm: { width: 1.95, depth: 2.55 },
+  tomatoFarm: { width: 3.35, depth: 3.35 },
+  tomatoFarm2: { width: 3.35, depth: 3.35 },
+  orangeFarm: { width: 3.35, depth: 3.35 },
+  orangeFarm2: { width: 3.35, depth: 3.35 },
+  cornFarm: { width: 3.35, depth: 3.35 },
+  cornFarm2: { width: 3.35, depth: 3.35 },
+  wheatFarm: { width: 3.35, depth: 3.35 },
+  wheatFarm2: { width: 3.35, depth: 3.35 },
 
   // Fabrika ve Mutfak Makineleri
-  paste: { width: 2.6, depth: 1.8 },
-  juice: { width: 2.6, depth: 1.8 },
-  popcorn: { width: 2.6, depth: 1.8 },
-  feed: { width: 2.6, depth: 1.8 },
-  bakery: { width: 2.6, depth: 1.8 },
-  burgerKitchen: { width: 2.6, depth: 1.8 },
-  pizzaKitchen: { width: 2.6, depth: 1.8 },
+  paste: { width: 3.2, depth: 2.9 },
+  juice: { width: 3.2, depth: 2.9 },
+  popcorn: { width: 3.2, depth: 2.9 },
+  feed: { width: 3.2, depth: 2.9 },
+  bakery: { width: 3.2, depth: 2.9 },
+  flourMill: { width: 3.2, depth: 2.9 },
+  orangeTartKitchen: { width: 3.2, depth: 2.9 },
+  burgerKitchen: { width: 3.2, depth: 2.9 },
+  pizzaKitchen: { width: 3.2, depth: 2.9 },
 
   // Tavuk Kümesi
-  coop: { width: 2.6, depth: 2.2 },
+  coop: { width: 3.3, depth: 3.2 },
 
   // Restoran Masaları
   table1: { width: 1.85, depth: 2.4 },
@@ -73,6 +85,14 @@ export const DECORATION_FOOTPRINTS = Object.freeze({
   citrusTopiary: { width: 1.0, depth: 1.0 },
   windowDisplay: { width: 1.6, depth: 1.0 },
   cardboardBoxes: { width: 1.2, depth: 1.1 },
+  stoneWell: { width: 1.95, depth: 1.85, zone: 'farm' },
+  scarecrow: { width: 1.9, depth: 1.7, zone: 'farm' },
+  farmWindmill: { width: 2.0, depth: 1.9, zone: 'farm' },
+  flowerTrellis: { width: 1.85, depth: 1.75, zone: 'farm' },
+  hayBales: { width: 1.75, depth: 1.65, zone: 'farm' },
+  harvestWagon: { width: 1.95, depth: 2.35, zone: 'farm' },
+  roosterVane: { width: 1.9, depth: 1.7, zone: 'farm' },
+  gardenPond: { width: 2.0, depth: 1.9, zone: 'farm' },
 });
 
 export const DEFAULT_DECORATION_FOOTPRINT = Object.freeze({ width: 1.0, depth: 1.0 });
@@ -98,6 +118,10 @@ export function getDecorationDimensions(type, rotation = 0) {
   return isRotated90 ? { width: base.depth, depth: base.width } : { width: base.width, depth: base.depth };
 }
 
+export function getDecorationZone(type) {
+  return DECORATION_FOOTPRINTS[type]?.zone ?? 'market';
+}
+
 export function stationZone(id) {
   const baseId = id.split('_')[0];
   if (baseId === 'register' || baseId === 'selfRegister' || STATIONS[baseId]?.kind === 'shelf' || baseId.endsWith('Shelf')) return 'market';
@@ -106,6 +130,7 @@ export function stationZone(id) {
 }
 
 export function stationPosition(state, id) {
+  if (state.pendingShelfIds?.includes(id) && !state.layout?.[id]) return null;
   return state.layout?.[id] ?? state.customStations?.[id] ?? STATIONS[id];
 }
 
@@ -180,6 +205,12 @@ export function canPlaceStation(state, id, x, z, rotation = undefined) {
   const halfW = dims.width / 2;
   const halfD = dims.depth / 2;
 
+  const overlaps = (bounds) => x + halfW > bounds.minX && x - halfW < bounds.maxX
+    && z + halfD > bounds.minZ && z - halfD < bounds.maxZ;
+  if (overlaps(STAFF_WAITING_AREA.bounds)) return false;
+  if (STATIONS[id]?.kind !== 'shelf' && state.customStations?.[id]?.kind !== 'shelf'
+    && overlaps(SHELF_STAGING_AREA.bounds)) return false;
+
   const zone = ZONES[stationZone(id)];
   if (!zone) return false;
 
@@ -229,7 +260,11 @@ export function canPlaceDecoration(state, decorationId, x, z, rotation = undefin
   const halfW = dims.width / 2;
   const halfD = dims.depth / 2;
 
-  const zone = ZONES.market;
+  const overlaps = (bounds) => x + halfW > bounds.minX && x - halfW < bounds.maxX
+    && z + halfD > bounds.minZ && z - halfD < bounds.maxZ;
+  if (overlaps(STAFF_WAITING_AREA.bounds) || overlaps(SHELF_STAGING_AREA.bounds)) return false;
+
+  const zone = ZONES[getDecorationZone(entry.type)];
   if (
     x - halfW < zone.minX - 0.001 ||
     x + halfW > zone.maxX + 0.001 ||
@@ -243,6 +278,7 @@ export function canPlaceDecoration(state, decorationId, x, z, rotation = undefin
   const freeFromStations = Object.keys(STATIONS).every((id) => {
     if (!isStationUnlocked(state, id)) return true;
     const point = stationPosition(state, id);
+    if (!point) return true;
     const stRot = state.layout?.[id]?.rotation ?? 0;
     const stDims = getStationDimensions(id, stRot);
 
@@ -267,6 +303,10 @@ export function canPlaceDecoration(state, decorationId, x, z, rotation = undefin
   return freeFromDecorations;
 }
 
+export function nextShelfStagingPosition(state, stationId) {
+  return SHELF_STAGING_AREA.slots.find(({ x, z }) => canPlaceStation(state, stationId, x, z)) ?? null;
+}
+
 export function getMarketCollisionBoxes(state) {
   const boxes = [];
   const marketZone = ZONES.market;
@@ -285,6 +325,7 @@ export function getMarketCollisionBoxes(state) {
     if (!isStationUnlocked(state, id)) continue;
 
     const pos = stationPosition(state, id);
+    if (!pos) continue;
     const rot = state.layout?.[id]?.rotation ?? 0;
     const dims = getStationDimensions(id, rot);
     const halfW = dims.width / 2;

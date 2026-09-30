@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
+  <title id="title">Pazar Tezgâhı</title>
+  <desc id="desc">A compact market canopy shelters three harvest crates.</desc>
+  <path fill="#111" fill-rule="evenodd" d="M42 91 58 51h140l16 40v16c0 13-10 23-23 23-9 0-17-5-21-13-4 8-12 13-21 13s-17-5-21-13c-4 8-12 13-21 13s-17-5-21-13c-4 8-12 13-21 13-13 0-23-10-23-23V91Zm20 48h132v66H62v-66Zm-5 76h142v18H57v-18ZM72 156h32v31H72v-31Zm40 0h32v31h-32v-31Zm40 0h32v31h-32v-31Z"/>
+</svg>

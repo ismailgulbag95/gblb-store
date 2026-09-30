@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
+  <title id="title">Tarla Harfi</title>
+  <desc id="desc">A custom T letterform with field furrows cut into the crown.</desc>
+  <path fill="#111" fill-rule="evenodd" d="M46 57c0-9 7-16 16-16h132c9 0 16 7 16 16v24c0 9-7 16-16 16h-42v104c0 9-7 16-16 16h-16c-9 0-16-7-16-16V97H62c-9 0-16-7-16-16V57Zm21-1h122v8H67v-8Zm0 18h122v8H67v-8Z"/>
+</svg>

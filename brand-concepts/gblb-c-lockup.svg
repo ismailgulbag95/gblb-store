@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 256" role="img" aria-labelledby="title">
+  <title id="title">GBLB Store — Renkli Pazar logo taslağı</title>
+  <rect x="15" y="18" width="220" height="220" rx="54" fill="#40B9E5"/>
+  <path d="M51 112 66 66h124l15 46" fill="#FFC84A" stroke="#173B46" stroke-width="7" stroke-linejoin="round"/>
+  <path d="M52 111c3 17 27 20 36 3 9 16 28 17 37 0 9 17 28 16 36 0 10 17 31 14 34-3v14H52Z" fill="#F45E4A" stroke="#173B46" stroke-width="6" stroke-linejoin="round"/>
+  <path d="M53 125h150v69c0 9-7 16-16 16H69c-9 0-16-7-16-16Z" fill="#1D704E" stroke="#173B46" stroke-width="7" stroke-linejoin="round"/>
+  <path d="M66 142h124v39H66Z" fill="#FFF7DE"/>
+  <circle cx="89" cy="161" r="12" fill="#F25248"/><circle cx="128" cy="161" r="12" fill="#FFC84A"/><circle cx="167" cy="161" r="12" fill="#65C97B"/>
+  <text x="274" y="125" fill="#173B46" font-family="Arial, sans-serif" font-size="74" font-weight="900" letter-spacing="-3">GBLB</text>
+  <text x="280" y="180" fill="#E65E43" font-family="Arial, sans-serif" font-size="35" font-weight="800" letter-spacing="7">STORE</text>
+  <text x="282" y="218" fill="#496B70" font-family="Arial, sans-serif" font-size="20" font-weight="700" letter-spacing="2">MARKET  •  RESTORAN  •  TYCOON</text>
+</svg>
