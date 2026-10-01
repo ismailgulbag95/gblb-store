@@ -1267,6 +1267,30 @@ export class GameApplication {
     return { ...nearest, label: 'Müşteriler kasada ödeme yapıyor', actionable: false };
   }
 
+  tryAutoPickup() {
+    if (!this.state.settings?.autoPickup) return null;
+    const action = this.getNearbyAction();
+    if (!action || !action.actionable) return null;
+    if (action.kind === 'upgrade' || action.kind === 'trashBin') return null;
+    if (action.kind === 'shelf' && quantityAt(this.state.stock, 'player', action.item) <= 0) return null;
+    if (action.kind === 'machine') {
+      const carried = Object.values(this.state.stock.player.items).reduce((a, b) => a + b, 0);
+      const full = carried >= this.state.player.capacity;
+      const recipe = RECIPES[action.recipe];
+      const input = recipe && Object.keys(recipe.inputs).some((item) => quantityAt(this.state.stock, 'player', item) > 0);
+      if (full && !input) return null;
+    }
+    if (action.kind === 'coop') {
+      const carried = Object.values(this.state.stock.player.items).reduce((a, b) => a + b, 0);
+      const full = carried >= this.state.player.capacity;
+      const feed = quantityAt(this.state.stock, 'player', 'CHICKEN_FEED');
+      const eggs = quantityAt(this.state.stock, 'coop:eggs', 'EGG');
+      if ((full || eggs <= 0) && feed <= 0) return null;
+    }
+    const result = this.interact(action.id);
+    return result.ok ? result : null;
+  }
+
   tick() {
     const draft = clone(this.state);
     this.adSessionTicks += 1;
@@ -1318,7 +1342,7 @@ export class GameApplication {
   }
 
   setSetting(key, value) {
-    if (!['sound', 'haptics'].includes(key)) return;
+    if (!['sound', 'haptics', 'autoPickup'].includes(key)) return;
     return this.#command(`setting:${key}:${this.state.revision + 1}`, (draft) => {
       draft.settings[key] = Boolean(value);
       return { ok: true };

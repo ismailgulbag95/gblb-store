@@ -3,9 +3,9 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
 
 const mat = (color, roughness = 0.86, metalness = 0) => new THREE.MeshStandardMaterial({ color, roughness, metalness });
 
-function add(parent, geometry, material, position, rotation = undefined, scale = undefined) {
+function add(parent, geometry, material, position = [0, 0, 0], rotation = undefined, scale = undefined) {
   const mesh = new THREE.Mesh(geometry, material);
-  mesh.position.set(...position);
+  if (position) mesh.position.set(...position);
   if (rotation) mesh.rotation.set(...rotation);
   if (scale) mesh.scale.set(...scale);
   mesh.castShadow = true;
@@ -21,6 +21,10 @@ function box(parent, size, material, position, rotation = undefined, radius = 0.
 
 function sphere(parent, radius, material, position, scale = [1, 1, 1], segments = 8) {
   return add(parent, new THREE.SphereGeometry(radius, segments, Math.max(5, segments - 2)), material, position, undefined, scale);
+}
+
+function cylinder(parent, radiusTop, radiusBottom, height, material, position, segments = 10, rotation = undefined, openEnded = false) {
+  return add(parent, new THREE.CylinderGeometry(radiusTop, radiusBottom, height, segments, 1, openEnded), material, position, rotation);
 }
 
 function island(group, m, width = 1.9, depth = 1.65) {
@@ -183,7 +187,7 @@ function trellis(group, m) {
     new THREE.Vector3(0.43, 1.92, -0.05), new THREE.Vector3(0.58, 1.65, -0.05),
     new THREE.Vector3(0.58, 1.34, -0.05),
   ]);
-  add(group, new THREE.TubeGeometry(arch, 20, 0.07, 7, false), m.wood);
+  add(group, new THREE.TubeGeometry(arch, 20, 0.07, 7, false), m.wood, [0, 0, 0]);
   for (let rung = 0; rung < 7; rung += 1) {
     const t = rung / 6;
     const x = -0.5 + t;

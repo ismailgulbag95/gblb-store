@@ -86,7 +86,7 @@ export function createInitialState(seed = 0x51f15e) {
       customersSatisfied: 0, customersUnhappy: 0,
     },
     quest: 'Domates topla, reyonu doldur ve ilk satışını yap.',
-    settings: { language: 'tr', sound: true, haptics: true },
+    settings: { language: 'tr', sound: true, haptics: true, autoPickup: true },
   };
 
   for (const [itemId, shelf] of Object.entries(SHELVES)) {

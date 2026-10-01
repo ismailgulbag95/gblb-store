@@ -141,25 +141,33 @@ async function boot() {
   const layoutHelp = document.getElementById('layout-help');
   const layoutHelpText = document.getElementById('layout-help-text');
   const rotateButton = document.getElementById('btn-rotate-layout');
+  const cancelButton = document.getElementById('btn-cancel-layout');
   input.onLayoutMessage = (message) => {
     if (layoutHelpText) layoutHelpText.textContent = message;
-    else layoutHelp.textContent = message;
+    else if (layoutHelp) layoutHelp.textContent = message;
   };
   input.onSelectionChange = (selected) => {
     if (rotateButton) rotateButton.classList.toggle('hidden', !selected);
+    if (cancelButton) cancelButton.classList.toggle('hidden', !selected);
   };
   rotateButton?.addEventListener('click', (e) => {
     e.stopPropagation();
     input.rotateCurrentSelection();
   });
-  layoutButton.addEventListener('click', () => {
+  cancelButton?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    input.cancelCurrentSelection();
+  });
+  layoutButton?.addEventListener('click', () => {
     const enabled = !input.layoutMode;
     input.setLayoutMode(enabled);
     layoutButton.setAttribute('aria-pressed', String(enabled));
-    layoutHelp.classList.toggle('hidden', !enabled);
-    if (layoutHelpText) layoutHelpText.textContent = 'Taşımak için bir yapıya dokun, sonra boş bir kareye dokun. Bitirmek için ▦ düğmesine bas.';
-    else layoutHelp.textContent = 'Taşımak için bir yapıya dokun, sonra boş bir kareye dokun. Bitirmek için ▦ düğmesine bas.';
+    layoutHelp?.classList.toggle('hidden', !enabled);
+    const initialMsg = 'Taşımak istediğin yapıya dokun, ardından yeni konumu seç. Bitirmek için ▦ düğmesine bas.';
+    if (layoutHelpText) layoutHelpText.textContent = initialMsg;
+    else if (layoutHelp) layoutHelp.textContent = initialMsg;
     if (rotateButton) rotateButton.classList.add('hidden');
+    if (cancelButton) cancelButton.classList.add('hidden');
   });
   if (app.recovered) hud.toast('Yedek kayıttan devam edildi.');
   if (app.getState().paused) {
@@ -238,6 +246,7 @@ async function boot() {
   let previousTime = performance.now();
   let simulationAccumulator = 0;
   let hudElapsed = 0;
+  let autoPickupElapsed = 0;
   let firstFrameRendered = false;
   function frame(now) {
     const elapsed = Math.min((now - previousTime) / 1000, 0.1);
@@ -251,6 +260,15 @@ async function boot() {
         app.setPlayerMove(movement, elapsed);
       } else {
         app.updateTargetMove(elapsed);
+      }
+      autoPickupElapsed += elapsed;
+      if (autoPickupElapsed >= 0.15) {
+        autoPickupElapsed = 0;
+        const autoResult = app.tryAutoPickup();
+        if (autoResult) {
+          hud.feedback();
+          hud.render(app.getState(), app.getNearbyAction(), true);
+        }
       }
       simulationAccumulator = Math.min(0.5, simulationAccumulator + elapsed * app.getState().speedMultiplier);
       let ticks = 0;

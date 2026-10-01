@@ -22,7 +22,7 @@ const EN = {
   normal: 'Normal speed', resume: 'Resume game', noUpgrade: 'No upgrades available right now. Make a sale to unlock the next step.',
   live: 'LIVE', grow: 'GROW YOUR BUSINESS', newUpgrades: 'New upgrades', stock: 'STOCK STATUS',
   general: 'General', character: 'Character', developer: 'Developer', sound: 'Sound effects',
-  haptics: 'Haptic feedback', backgroundNote: 'The simulation pauses while the app is in the background. Tap resume when you return.',
+  haptics: 'Haptic feedback', autoPickup: 'Auto-pickup', backgroundNote: 'The simulation pauses while the app is in the background. Tap resume when you return.',
   resetGame: 'Start a new game', orTap: 'or tap to move', businessTab: 'Business', staffTab: 'Staff',
   staffEffect: {
     cashier: 'Handles customer payments at the register.', harvester: 'Stocks shelves first, then supplies production machines.',
@@ -156,6 +156,7 @@ export class HUD {
     }));
     document.getElementById('setting-sound').addEventListener('change', (event) => this.app.setSetting('sound', event.target.checked));
     document.getElementById('setting-haptics').addEventListener('change', (event) => this.app.setSetting('haptics', event.target.checked));
+    document.getElementById('setting-autopickup').addEventListener('change', (event) => this.app.setSetting('autoPickup', event.target.checked));
     document.querySelectorAll('[data-debug]').forEach((button) => button.addEventListener('click', () => this.#debug(button.dataset.debug)));
     document.getElementById('expansion-modal').addEventListener('click', (event) => {
       const adButton = event.target.closest('[data-ad-accept]');
@@ -269,6 +270,10 @@ export class HUD {
     if (action === 'speed5') this.app.setSpeedMultiplier(5);
     if (action === 'speed1') this.app.setSpeedMultiplier(1);
     this.render(this.app.getState(), this.app.getNearbyAction(), true);
+  }
+
+  feedback() {
+    this.#feedback();
   }
 
   #feedback() {
@@ -394,6 +399,7 @@ export class HUD {
   #syncSettings(state) {
     document.getElementById('setting-sound').checked = state.settings.sound;
     document.getElementById('setting-haptics').checked = state.settings.haptics;
+    document.getElementById('setting-autopickup').checked = Boolean(state.settings.autoPickup);
     document.querySelectorAll('[data-character]').forEach((button) => {
       const characterId = button.dataset.character;
       const unlocked = state.player.unlockedCharacters.includes(characterId);
@@ -575,8 +581,11 @@ export class HUD {
     document.querySelector('.settings-tabs [data-tab="character"]').textContent = english ? EN.character : 'Karakter';
     document.querySelector('.settings-tabs [data-tab="language"]').textContent = english ? 'Language' : 'Dil';
     document.querySelector('.settings-tabs [data-tab="debug"]').textContent = english ? EN.developer : 'Geliştirici';
+    const generalLabels = english
+      ? [EN.sound, EN.haptics, EN.autoPickup]
+      : ['Ses efektleri', 'Dokunsal geri bildirim', 'Otomatik üstüne alma'];
     document.querySelectorAll('.settings-content[data-panel="general"] .setting-row span').forEach((node, index) => {
-      node.textContent = english ? (index === 0 ? EN.sound : EN.haptics) : (index === 0 ? 'Ses efektleri' : 'Dokunsal geri bildirim');
+      if (generalLabels[index]) node.textContent = generalLabels[index];
     });
     document.querySelector('.settings-content[data-panel="general"] .setting-note').textContent = english ? EN.backgroundNote : 'Oyun arka plana geçtiğinde simülasyon durur. Döndüğünde kaldığın yerden devam eder.';
     document.getElementById('btn-reset').textContent = english ? EN.resetGame : 'Yeni oyuna başla';

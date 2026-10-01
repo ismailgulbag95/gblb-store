@@ -45,6 +45,12 @@ export class InputManager {
           this.rotateCurrentSelection();
         }
       }
+      if (this.enabled && event.code === 'Escape' && !event.repeat) {
+        if (this.layoutMode && this.selectedStation) {
+          event.preventDefault();
+          this.cancelCurrentSelection();
+        }
+      }
     });
     window.addEventListener('keyup', (event) => this.keys.delete(event.code));
     window.addEventListener('blur', () => this.reset());
@@ -205,6 +211,14 @@ export class InputManager {
     if (result.ok) {
       this.world.refreshPreview(this.app.getState());
     }
+  }
+
+  cancelCurrentSelection() {
+    if (!this.layoutMode || !this.selectedStation) return;
+    this.selectedStation = null;
+    this.world.selectStation(null);
+    this.onSelectionChange?.(null);
+    this.onLayoutMessage?.('Seçim iptal edildi. Taşımak istediğin yapıya dokun.');
   }
 
   getMovementVector() {

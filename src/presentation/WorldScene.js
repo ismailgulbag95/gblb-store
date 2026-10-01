@@ -14,6 +14,10 @@ import { ZONES, canPlaceDecoration, canPlaceStation, getAllStationIds, getDecora
 import { DECORATIONS } from '../domain/decorCatalog.js';
 import { drawAssetIcon } from '../ui/AssetIcons.js';
 
+import { LightingManager } from './LightingManager.js';
+import { Item3DFactory } from './Item3DFactory.js';
+import { createRegisterModel } from './RegisterModel.js';
+
 const CUSTOMER_SHIRTS = [0xff4757, 0xffa502, 0x2ed573, 0x1e90ff, 0xa55eea, 0xff6b81, 0x00d2d3, 0xffc048];
 const CUSTOMER_HAIR = [0x2c3e50, 0x6d4c41, 0xdfe6e9, 0xf1c40f, 0xb33939];
 
@@ -35,8 +39,7 @@ export class WorldScene {
     this.decorationLoader = new GLTFLoader();
     this.coop = null;
     this.upgradeMarkers = new Map();
-    this.itemGeometry = new Map();
-    this.itemMaterials = new Map();
+    this.itemFactory = new Item3DFactory();
     this.raycaster = new THREE.Raycaster();
     this.pointer = new THREE.Vector2();
     this.groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
@@ -44,6 +47,7 @@ export class WorldScene {
     this.effects = [];
     this.reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
     this.#createPlayer();
+    this.lighting = new LightingManager(this.scene);
     this.#createAtmosphere();
     this.#createRegister();
     this.#loadDecorationModels();
@@ -115,7 +119,7 @@ export class WorldScene {
     for (const [itemId, count] of Object.entries(items)) {
       if (!ITEMS[itemId]) continue;
       for (let i = 0; i < count && index < 24; i += 1, index += 1) {
-        const mesh = new THREE.Mesh(this.#getItemGeometry(itemId), this.#getItemMaterial(itemId));
+        const mesh = new THREE.Mesh(this.itemFactory.getItemGeometry(itemId), this.itemFactory.getItemMaterial(itemId));
         mesh.scale.setScalar(0.78);
         mesh.position.set((index % 2 ? 0.14 : -0.14), 0.99 + Math.floor(index / 4) * 0.23, -0.12 - (Math.floor(index / 2) % 2) * 0.24);
         mesh.castShadow = true;
@@ -135,141 +139,7 @@ export class WorldScene {
   }
 
   #createRegister() {
-    const group = new THREE.Group();
-    group.position.set(STATIONS.register.x, 0, STATIONS.register.z);
-
-    const redMat = new THREE.MeshStandardMaterial({ color: 0xe74c3c, roughness: 0.35 });
-    const whiteMat = new THREE.MeshStandardMaterial({ color: 0xf5f6fa, roughness: 0.25 });
-    const darkMat = new THREE.MeshStandardMaterial({ color: 0x2f3542, roughness: 0.6 });
-    const beltMat = new THREE.MeshStandardMaterial({ color: 0x1e272e, roughness: 0.85 });
-    const chromeMat = new THREE.MeshStandardMaterial({ color: 0xdcdde1, metalness: 0.85, roughness: 0.2 });
-    const bagMat = new THREE.MeshStandardMaterial({ color: 0xd4a373, roughness: 0.85 }); // Kraft grocery paper bag
-
-    // 1. Red counter body with dark base kickplate
-    const counterBody = new THREE.Mesh(new THREE.BoxGeometry(2.5, 0.82, 1.1), redMat);
-    counterBody.position.y = 0.41;
-    counterBody.castShadow = true;
-    counterBody.receiveShadow = true;
-    group.add(counterBody);
-
-    const kickplate = new THREE.Mesh(new THREE.BoxGeometry(2.54, 0.1, 1.14), darkMat);
-    kickplate.position.y = 0.05;
-    group.add(kickplate);
-
-    // 2. Clean white countertop with raised edges
-    const counterTop = new THREE.Mesh(new THREE.BoxGeometry(2.56, 0.1, 1.16), whiteMat);
-    counterTop.position.y = 0.87;
-    counterTop.castShadow = true;
-    group.add(counterTop);
-
-    // 3. Black conveyor belt inset with silver divider bars
-    const conveyorBelt = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.02, 0.55), beltMat);
-    conveyorBelt.position.set(-0.4, 0.93, 0.16);
-    group.add(conveyorBelt);
-
-    // Silver divider sticks on conveyor
-    for (const sx of [-0.85, -0.15]) {
-      const stick = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.5, 6), chromeMat);
-      stick.rotation.x = Math.PI / 2;
-      stick.position.set(sx, 0.95, 0.16);
-      group.add(stick);
-    }
-
-    // 4. Modern dual-screen POS cash register unit
-    const posPedestal = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.05, 0.28, 8), darkMat);
-    posPedestal.position.set(0.38, 1.05, -0.22);
-    group.add(posPedestal);
-
-    // Cashier touchscreen (tilted towards cashier at z < -4)
-    const cashierScreen = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.28, 0.08), darkMat);
-    cashierScreen.position.set(0.38, 1.25, -0.22);
-    cashierScreen.rotation.x = 0.25;
-    group.add(cashierScreen);
-
-    const touchGlass = new THREE.Mesh(
-      new THREE.PlaneGeometry(0.32, 0.22),
-      new THREE.MeshBasicMaterial({ color: 0x00d2d3 })
-    );
-    touchGlass.position.set(0.38, 1.25, -0.265);
-    touchGlass.rotation.y = Math.PI;
-    touchGlass.rotation.x = -0.25;
-    group.add(touchGlass);
-
-    // Customer-facing price display
-    const customerDisplay = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.16, 0.06), darkMat);
-    customerDisplay.position.set(0.38, 1.22, -0.15);
-    const priceText = new THREE.Mesh(
-      new THREE.PlaneGeometry(0.28, 0.12),
-      new THREE.MeshBasicMaterial({ color: 0x2ed573 })
-    );
-    priceText.position.set(0.38, 1.22, -0.115);
-    group.add(customerDisplay, priceText);
-
-    // Flush-mount laser barcode scanner glass plate
-    const scannerPlate = new THREE.Mesh(
-      new THREE.BoxGeometry(0.25, 0.02, 0.22),
-      new THREE.MeshStandardMaterial({
-        color: 0x2ed573,
-        emissive: 0x2ed573,
-        emissiveIntensity: 0.6,
-        roughness: 0.1,
-      })
-    );
-    scannerPlate.position.set(0.38, 0.93, 0.16);
-    group.add(scannerPlate);
-
-    // PIN pad payment terminal on customer side
-    const pinPad = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.05, 0.18), darkMat);
-    pinPad.position.set(0.72, 0.96, 0.35);
-    pinPad.rotation.x = -0.25;
-    group.add(pinPad);
-
-    // 5. Packing station with standing brown paper grocery bags
-    for (const [bx, bz] of [[0.95, -0.15], [1.12, 0.18]]) {
-      const bag = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.38, 0.2), bagMat);
-      bag.position.set(bx, 1.11, bz);
-      bag.castShadow = true;
-      group.add(bag);
-
-      // Leek/celery green tops sticking out of bag
-      const greenTop = new THREE.Mesh(
-        new THREE.ConeGeometry(0.06, 0.18, 5),
-        new THREE.MeshStandardMaterial({ color: 0x2ed573 })
-      );
-      greenTop.position.set(bx - 0.04, 1.35, bz + 0.03);
-      greenTop.rotation.z = -0.2;
-      group.add(greenTop);
-
-      // Crusty baguette sticking out
-      const baguette = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.03, 0.035, 0.32, 6),
-        new THREE.MeshStandardMaterial({ color: 0xc27c38 })
-      );
-      baguette.position.set(bx + 0.05, 1.38, bz - 0.02);
-      baguette.rotation.z = 0.25;
-      group.add(baguette);
-    }
-
-    // 6. Polished chrome queue guide stanchions & rails (Image 1 & 6)
-    const railingGroup = new THREE.Group();
-    for (const rx of [-1.15, 0.15, 1.25]) {
-      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.95, 8), chromeMat);
-      post.position.set(rx, 0.475, 0.72);
-      post.castShadow = true;
-      railingGroup.add(post);
-
-      const cap = new THREE.Mesh(new THREE.SphereGeometry(0.04, 8, 8), chromeMat);
-      cap.position.set(rx, 0.96, 0.72);
-      railingGroup.add(cap);
-    }
-    const railTop = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 2.4, 8), chromeMat);
-    railTop.rotation.z = Math.PI / 2;
-    railTop.position.set(0.05, 0.88, 0.72);
-    const railMid = railTop.clone();
-    railMid.position.y = 0.45;
-    railingGroup.add(railTop, railMid);
-    group.add(railingGroup);
-
+    const group = createRegisterModel();
     this.scene.add(group);
     this.registerMesh = group;
   }
@@ -374,7 +244,7 @@ export class WorldScene {
     if (!group) return;
     const productMeshes = [];
     group.traverse((child) => {
-      if (child.isMesh && child.geometry === this.#getItemGeometry(station.item)) {
+      if (child.isMesh && child.geometry === this.itemFactory.getItemGeometry(station.item)) {
         productMeshes.push(child);
       }
     });
@@ -503,263 +373,7 @@ export class WorldScene {
     return entry ? { x: entry.x, z: entry.z } : { x: 0, z: 0 };
   }
 
-  #getItemGeometry(itemId) {
-    if (!this.itemGeometry.has(itemId)) {
-      // High-detail lathe profiles matching commercial supermarket goods in Image 3
-      const tomatoProfile = [
-        new THREE.Vector2(0.015, -0.15),
-        new THREE.Vector2(0.12, -0.145),
-        new THREE.Vector2(0.185, -0.06),
-        new THREE.Vector2(0.19, 0.05),
-        new THREE.Vector2(0.15, 0.135),
-        new THREE.Vector2(0.025, 0.15),
-      ];
-      const canProfile = [
-        new THREE.Vector2(0.01, -0.175),
-        new THREE.Vector2(0.122, -0.175),
-        new THREE.Vector2(0.128, -0.16),
-        new THREE.Vector2(0.12, -0.145),
-        new THREE.Vector2(0.12, 0.145),
-        new THREE.Vector2(0.128, 0.16),
-        new THREE.Vector2(0.122, 0.175),
-        new THREE.Vector2(0.01, 0.175),
-      ];
-      const orangeProfile = [
-        new THREE.Vector2(0.015, -0.17),
-        new THREE.Vector2(0.12, -0.15),
-        new THREE.Vector2(0.18, -0.05),
-        new THREE.Vector2(0.182, 0.06),
-        new THREE.Vector2(0.125, 0.15),
-        new THREE.Vector2(0.02, 0.17),
-      ];
-      const juiceBottleProfile = [
-        new THREE.Vector2(0.01, -0.19),
-        new THREE.Vector2(0.095, -0.19),
-        new THREE.Vector2(0.098, 0.10),
-        new THREE.Vector2(0.055, 0.15),
-        new THREE.Vector2(0.048, 0.20),
-        new THREE.Vector2(0.01, 0.20),
-      ];
-      const cornProfile = [
-        new THREE.Vector2(0.02, -0.18),
-        new THREE.Vector2(0.095, -0.14),
-        new THREE.Vector2(0.118, 0.02),
-        new THREE.Vector2(0.08, 0.15),
-        new THREE.Vector2(0.03, 0.20),
-        new THREE.Vector2(0.01, 0.21),
-      ];
-      const popcornProfile = [
-        new THREE.Vector2(0.01, -0.18),
-        new THREE.Vector2(0.095, -0.18),
-        new THREE.Vector2(0.142, 0.11),
-        new THREE.Vector2(0.152, 0.13),
-        new THREE.Vector2(0.14, 0.17),
-        new THREE.Vector2(0.085, 0.22),
-        new THREE.Vector2(0.01, 0.23),
-      ];
-      const sackProfile = [
-        new THREE.Vector2(0.02, -0.19),
-        new THREE.Vector2(0.135, -0.17),
-        new THREE.Vector2(0.165, -0.04),
-        new THREE.Vector2(0.085, 0.11),
-        new THREE.Vector2(0.128, 0.18),
-        new THREE.Vector2(0.02, 0.19),
-      ];
-      const eggProfile = [
-        new THREE.Vector2(0.01, -0.17),
-        new THREE.Vector2(0.10, -0.12),
-        new THREE.Vector2(0.14, -0.02),
-        new THREE.Vector2(0.125, 0.09),
-        new THREE.Vector2(0.065, 0.16),
-        new THREE.Vector2(0.01, 0.19),
-      ];
-      const wheatProfile = [
-        new THREE.Vector2(0.03, -0.18),
-        new THREE.Vector2(0.065, -0.04),
-        new THREE.Vector2(0.055, 0.02),
-        new THREE.Vector2(0.135, 0.16),
-        new THREE.Vector2(0.02, 0.22),
-      ];
-      const loafProfile = [
-        new THREE.Vector2(0.02, -0.12),
-        new THREE.Vector2(0.11, -0.13),
-        new THREE.Vector2(0.16, -0.06),
-        new THREE.Vector2(0.17, 0.04),
-        new THREE.Vector2(0.12, 0.13),
-        new THREE.Vector2(0.02, 0.15),
-      ];
-      const burgerProfile = [
-        new THREE.Vector2(0.02, -0.14),
-        new THREE.Vector2(0.16, -0.13),
-        new THREE.Vector2(0.175, -0.03),
-        new THREE.Vector2(0.165, 0.08),
-        new THREE.Vector2(0.02, 0.14),
-      ];
-      const pizzaProfile = [
-        new THREE.Vector2(0.01, -0.04),
-        new THREE.Vector2(0.20, -0.04),
-        new THREE.Vector2(0.21, 0.03),
-        new THREE.Vector2(0.17, 0.02),
-        new THREE.Vector2(0.01, 0.02),
-      ];
 
-      const geometry = {
-        TOMATO: new THREE.LatheGeometry(tomatoProfile, 16),
-        TOMATO_PASTE: new THREE.LatheGeometry(canProfile, 16),
-        ORANGE: new THREE.LatheGeometry(orangeProfile, 16),
-        ORANGE_JUICE: new THREE.LatheGeometry(juiceBottleProfile, 14),
-        CORN: new THREE.LatheGeometry(cornProfile, 12),
-        POPCORN: new THREE.LatheGeometry(popcornProfile, 16),
-        CHICKEN_FEED: new THREE.LatheGeometry(sackProfile, 14),
-        EGG: new THREE.LatheGeometry(eggProfile, 16),
-        WHEAT: new THREE.LatheGeometry(wheatProfile, 10),
-        BREAD: new THREE.LatheGeometry(loafProfile, 16),
-        BURGER: new THREE.LatheGeometry(burgerProfile, 16),
-        PIZZA: new THREE.LatheGeometry(pizzaProfile, 20),
-      }[itemId] ?? new THREE.DodecahedronGeometry(0.17, 1);
-
-      geometry.userData.sharedAsset = true;
-      this.itemGeometry.set(itemId, geometry);
-    }
-    return this.itemGeometry.get(itemId);
-  }
-
-  #getItemMaterial(itemId) {
-    if (!this.itemMaterials.has(itemId)) {
-      let material;
-
-      if (itemId === 'TOMATO_PASTE') {
-        const canvas = document.createElement('canvas');
-        canvas.width = 256; canvas.height = 256;
-        const ctx = canvas.getContext('2d');
-        ctx.fillStyle = '#bdc3c7'; ctx.fillRect(0, 0, 256, 256);
-        ctx.fillStyle = '#c0392b'; ctx.fillRect(0, 36, 256, 184);
-        ctx.fillStyle = '#f1c40f'; ctx.fillRect(0, 34, 256, 5); ctx.fillRect(0, 217, 256, 5);
-        ctx.fillStyle = '#ffffff'; ctx.font = 'bold 36px Fredoka, sans-serif'; ctx.textAlign = 'center';
-        ctx.fillText('SALÇA', 128, 115);
-        ctx.font = 'bold 28px Fredoka, sans-serif'; ctx.fillText('EV YAPIMI', 128, 165);
-        const texture = new THREE.CanvasTexture(canvas);
-        material = new THREE.MeshStandardMaterial({ map: texture, roughness: 0.35, metalness: 0.3 });
-      } else if (itemId === 'POPCORN') {
-        const canvas = document.createElement('canvas');
-        canvas.width = 256; canvas.height = 256;
-        const ctx = canvas.getContext('2d');
-        for (let x = 0; x < 256; x += 32) {
-          ctx.fillStyle = (x / 32) % 2 === 0 ? '#e74c3c' : '#ffffff';
-          ctx.fillRect(x, 48, 32, 208);
-        }
-        ctx.fillStyle = '#f5cd79'; ctx.fillRect(0, 0, 256, 55);
-        ctx.fillStyle = '#f1c40f';
-        for (let i = 0; i < 8; i++) {
-          ctx.beginPath(); ctx.arc(i * 34 + 17, 26, 18, 0, Math.PI * 2); ctx.fill();
-        }
-        ctx.fillStyle = '#2980b9'; ctx.beginPath(); ctx.arc(128, 140, 48, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = '#f1c40f'; ctx.font = 'bold 22px Fredoka, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        ctx.fillText('POPCORN', 128, 140);
-        const texture = new THREE.CanvasTexture(canvas);
-        material = new THREE.MeshStandardMaterial({ map: texture, roughness: 0.5 });
-      } else if (itemId === 'ORANGE_JUICE') {
-        const canvas = document.createElement('canvas');
-        canvas.width = 256; canvas.height = 256;
-        const ctx = canvas.getContext('2d');
-        const grad = ctx.createLinearGradient(0, 0, 0, 256);
-        grad.addColorStop(0, '#f39c12'); grad.addColorStop(1, '#f1c40f');
-        ctx.fillStyle = grad; ctx.fillRect(0, 0, 256, 256);
-        ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(128, 130, 45, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = '#e67e22'; ctx.beginPath(); ctx.arc(128, 130, 40, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = '#ffffff'; ctx.font = 'bold 30px Fredoka, sans-serif'; ctx.textAlign = 'center';
-        ctx.fillText('MEYVE', 128, 60); ctx.fillText('SUYU', 128, 205);
-        const texture = new THREE.CanvasTexture(canvas);
-        material = new THREE.MeshStandardMaterial({ map: texture, roughness: 0.35 });
-      } else if (itemId === 'BURGER') {
-        const canvas = document.createElement('canvas');
-        canvas.width = 256; canvas.height = 256;
-        const ctx = canvas.getContext('2d');
-        ctx.fillStyle = '#e58e26'; ctx.fillRect(0, 0, 256, 95);
-        ctx.fillStyle = '#fffdf0';
-        for (let i = 0; i < 20; i++) ctx.fillRect(20 + (i * 37) % 216, 20 + (i * 23) % 65, 4, 3);
-        ctx.fillStyle = '#2ecc71'; ctx.fillRect(0, 95, 256, 24);
-        ctx.fillStyle = '#e74c3c'; ctx.fillRect(0, 119, 256, 22);
-        ctx.fillStyle = '#f1c40f'; ctx.fillRect(0, 141, 256, 20);
-        ctx.fillStyle = '#4a2711'; ctx.fillRect(0, 161, 256, 42);
-        ctx.fillStyle = '#e58e26'; ctx.fillRect(0, 203, 256, 53);
-        const texture = new THREE.CanvasTexture(canvas);
-        material = new THREE.MeshStandardMaterial({ map: texture, roughness: 0.5 });
-      } else if (itemId === 'PIZZA') {
-        const canvas = document.createElement('canvas');
-        canvas.width = 256; canvas.height = 256;
-        const ctx = canvas.getContext('2d');
-        ctx.fillStyle = '#d35400'; ctx.beginPath(); ctx.arc(128, 128, 126, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = '#c0392b'; ctx.beginPath(); ctx.arc(128, 128, 110, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = '#f9f6e8'; ctx.beginPath(); ctx.arc(128, 128, 98, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = '#96281b';
-        for (let i = 0; i < 6; i++) {
-          const angle = i * Math.PI / 3;
-          ctx.beginPath(); ctx.arc(128 + Math.cos(angle) * 55, 128 + Math.sin(angle) * 55, 18, 0, Math.PI * 2); ctx.fill();
-        }
-        ctx.beginPath(); ctx.arc(128, 128, 18, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = '#27ae60';
-        for (let i = 0; i < 14; i++) ctx.fillRect(50 + (i * 47) % 156, 50 + (i * 39) % 156, 6, 6);
-        const texture = new THREE.CanvasTexture(canvas);
-        material = new THREE.MeshStandardMaterial({ map: texture, roughness: 0.45 });
-      } else if (itemId === 'CHICKEN_FEED') {
-        const canvas = document.createElement('canvas');
-        canvas.width = 256; canvas.height = 256;
-        const ctx = canvas.getContext('2d');
-        ctx.fillStyle = '#d4a373'; ctx.fillRect(0, 0, 256, 256);
-        ctx.strokeStyle = '#c29263'; ctx.lineWidth = 2;
-        for (let p = 0; p < 256; p += 16) {
-          ctx.beginPath(); ctx.moveTo(0, p); ctx.lineTo(256, p); ctx.stroke();
-          ctx.beginPath(); ctx.moveTo(p, 0); ctx.lineTo(p, 256); ctx.stroke();
-        }
-        ctx.fillStyle = '#5c3a21'; ctx.fillRect(0, 185, 256, 16);
-        ctx.fillStyle = '#3e2723'; ctx.font = 'bold 36px sans-serif'; ctx.textAlign = 'center';
-        ctx.fillText('TAVUK YEMİ', 128, 120);
-        const texture = new THREE.CanvasTexture(canvas);
-        material = new THREE.MeshStandardMaterial({ map: texture, roughness: 0.85 });
-      } else if (itemId === 'BREAD') {
-        const canvas = document.createElement('canvas');
-        canvas.width = 256; canvas.height = 256;
-        const ctx = canvas.getContext('2d');
-        const bg = ctx.createLinearGradient(0, 0, 256, 0);
-        bg.addColorStop(0, '#c27c38'); bg.addColorStop(0.5, '#e09852'); bg.addColorStop(1, '#c27c38');
-        ctx.fillStyle = bg; ctx.fillRect(0, 0, 256, 256);
-        ctx.fillStyle = '#f8f9fa'; ctx.fillRect(0, 30, 256, 8); ctx.fillRect(0, 120, 256, 12);
-        ctx.fillStyle = '#7a3e14';
-        for (let i = 0; i < 4; i++) ctx.fillRect(30 + i * 55, 60, 35, 130);
-        const texture = new THREE.CanvasTexture(canvas);
-        material = new THREE.MeshStandardMaterial({ map: texture, roughness: 0.7 });
-      } else if (itemId === 'CORN') {
-        const canvas = document.createElement('canvas');
-        canvas.width = 256; canvas.height = 256;
-        const ctx = canvas.getContext('2d');
-        ctx.fillStyle = '#f1c40f'; ctx.fillRect(0, 0, 256, 256);
-        ctx.fillStyle = '#f39c12';
-        for (let r = 0; r < 256; r += 16) {
-          for (let c = 0; c < 256; c += 16) if ((r / 16 + c / 16) % 2 === 0) ctx.fillRect(c, r, 15, 15);
-        }
-        ctx.fillStyle = '#27ae60';
-        ctx.beginPath(); ctx.moveTo(0, 256); ctx.lineTo(60, 120); ctx.lineTo(0, 0); ctx.fill();
-        ctx.beginPath(); ctx.moveTo(256, 256); ctx.lineTo(196, 120); ctx.lineTo(256, 0); ctx.fill();
-        const texture = new THREE.CanvasTexture(canvas);
-        material = new THREE.MeshStandardMaterial({ map: texture, roughness: 0.55 });
-      } else if (itemId === 'TOMATO') {
-        material = new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.22, metalness: 0.05 });
-      } else if (itemId === 'ORANGE') {
-        material = new THREE.MeshStandardMaterial({ color: 0xf97316, roughness: 0.42 });
-      } else if (itemId === 'EGG') {
-        material = new THREE.MeshStandardMaterial({ color: 0xfffcf2, roughness: 0.35 });
-      } else if (itemId === 'WHEAT') {
-        material = new THREE.MeshStandardMaterial({ color: 0xf1c40f, roughness: 0.65 });
-      } else {
-        material = new THREE.MeshStandardMaterial({ color: ITEMS[itemId]?.color ?? 0x58cc02, roughness: 0.5 });
-      }
-
-      material.userData.sharedAsset = true;
-      this.itemMaterials.set(itemId, material);
-    }
-    return this.itemMaterials.get(itemId);
-  }
 
   #statusBadge(group, label, tone, visible, height = 2.45) {
     let sprite = group.getObjectByName('status-badge');
@@ -857,7 +471,7 @@ export class WorldScene {
     const inputMeshes = [];
     for (const [itemId, quantity] of Object.entries(recipe.inputs)) {
       for (let index = 0; index < quantity; index += 1) {
-        const mesh = new THREE.Mesh(this.#getItemGeometry(itemId), this.#getItemMaterial(itemId));
+        const mesh = new THREE.Mesh(this.itemFactory.getItemGeometry(itemId), this.itemFactory.getItemMaterial(itemId));
         mesh.position.set((inputMeshes.length % 2) * 0.24 - 0.12,
           0.12 + Math.floor(inputMeshes.length / 2) * 0.2, (inputMeshes.length % 2) * 0.12 - 0.04);
         mesh.castShadow = true;
@@ -936,7 +550,7 @@ export class WorldScene {
 
       // Stacked produce items inside crates
       for (let index = 0; index < shelfDef.capacity; index += 1) {
-        const mesh = new THREE.Mesh(this.#getItemGeometry(itemId), this.#getItemMaterial(itemId));
+        const mesh = new THREE.Mesh(this.itemFactory.getItemGeometry(itemId), this.itemFactory.getItemMaterial(itemId));
         const col = index % 3;
         const row = Math.floor(index / 3);
         const cx = -0.75 + col * 0.75;
@@ -1004,7 +618,7 @@ export class WorldScene {
 
       // Chilled products on internal racks
       for (let index = 0; index < shelfDef.capacity; index += 1) {
-        const mesh = new THREE.Mesh(this.#getItemGeometry(itemId), this.#getItemMaterial(itemId));
+        const mesh = new THREE.Mesh(this.itemFactory.getItemGeometry(itemId), this.itemFactory.getItemMaterial(itemId));
         const col = index % 3;
         const row = Math.floor(index / 3);
         mesh.position.set(-0.62 + col * 0.62, 0.72 + (itemId === 'EGG' ? 0.08 : 0.14), (row === 0 ? 0.26 : -0.26));
@@ -1065,7 +679,7 @@ export class WorldScene {
 
       // Fresh bread loaves neatly arrayed
       for (let index = 0; index < shelfDef.capacity; index += 1) {
-        const mesh = new THREE.Mesh(this.#getItemGeometry(itemId), this.#getItemMaterial(itemId));
+        const mesh = new THREE.Mesh(this.itemFactory.getItemGeometry(itemId), this.itemFactory.getItemMaterial(itemId));
         const col = index % 3;
         const row = Math.floor(index / 3);
         mesh.position.set(-0.58 + col * 0.58, bakeryRows[row % bakeryRows.length] + 0.18, 0.12);
@@ -1143,7 +757,7 @@ export class WorldScene {
 
       // Packaged / canned goods
       for (let index = 0; index < shelfDef.capacity; index += 1) {
-        const mesh = new THREE.Mesh(this.#getItemGeometry(itemId), this.#getItemMaterial(itemId));
+        const mesh = new THREE.Mesh(this.itemFactory.getItemGeometry(itemId), this.itemFactory.getItemMaterial(itemId));
         const row = Math.floor(index / 3);
         const column = index % 3;
         mesh.position.set(-0.5 + column * 0.5, rows[row % rows.length], 0.12);
@@ -1251,7 +865,7 @@ export class WorldScene {
     plate.receiveShadow = true;
     mealGroup.add(plate);
 
-    const foodMesh = new THREE.Mesh(this.#getItemGeometry('BURGER'), this.#getItemMaterial('BURGER'));
+    const foodMesh = new THREE.Mesh(this.itemFactory.getItemGeometry('BURGER'), this.itemFactory.getItemMaterial('BURGER'));
     foodMesh.position.y = 0.08;
     foodMesh.scale.setScalar(0.7);
     foodMesh.visible = false;
@@ -1997,7 +1611,7 @@ export class WorldScene {
     };
     const [uniformColor] = uniforms[type] ?? uniforms.cashier;
     const body = this.#makeHumanoid(group, uniformColor, 0x6d4c41, type.length, type);
-    const cargo = new THREE.Mesh(this.#getItemGeometry('TOMATO'), this.#getItemMaterial('TOMATO'));
+    const cargo = new THREE.Mesh(this.itemFactory.getItemGeometry('TOMATO'), this.itemFactory.getItemMaterial('TOMATO'));
     cargo.name = 'worker-cargo';
     cargo.position.set(0.36, 0.68, 0.18);
     cargo.scale.setScalar(0.8);
@@ -2048,7 +1662,7 @@ export class WorldScene {
     // Items collected into cart or basket
     const cargo = [];
     for (let index = 0; index < 3; index += 1) {
-      const mesh = new THREE.Mesh(this.#getItemGeometry('TOMATO'), this.#getItemMaterial('TOMATO'));
+      const mesh = new THREE.Mesh(this.itemFactory.getItemGeometry('TOMATO'), this.itemFactory.getItemMaterial('TOMATO'));
       if (hasCart) {
         mesh.scale.setScalar(0.7);
         mesh.position.set((index === 1 ? 0.12 : index === 2 ? -0.12 : 0), 0.52 + Math.floor(index / 2) * 0.16, 0.58 + (index % 2 ? 0.08 : -0.06));
@@ -2163,8 +1777,8 @@ export class WorldScene {
     (customer.basket ?? []).forEach((itemId, index) => {
       const mesh = actor.cargo[index];
       if (!mesh || !ITEMS[itemId]) return;
-      mesh.geometry = this.#getItemGeometry(itemId);
-      mesh.material = this.#getItemMaterial(itemId);
+      mesh.geometry = this.itemFactory.getItemGeometry(itemId);
+      mesh.material = this.itemFactory.getItemMaterial(itemId);
       mesh.visible = true;
     });
     for (let index = customer.basket?.length ?? 0; index < actor.cargo.length; index += 1) actor.cargo[index].visible = false;
@@ -2212,11 +1826,7 @@ export class WorldScene {
   render(state, availableUpgrades = []) {
     const frameDelta = Math.min(this.clock.getDelta(), 0.05);
     const time = this.clock.elapsedTime;
-    const daylight = gameDaylight(state.tick);
-    this.engine.setDaylight(daylight);
-    this.environment.setDaylight(daylight);
-    this.sun.material.opacity = daylight;
-    this.sun.visible = daylight > 0.01;
+    this.lighting.updateDaylight(gameDaylight, state.tick, THREE);
     this.environment.setRestaurantUnlocked(state.unlocked?.restaurant);
     this.environment.update(frameDelta, time);
     const wasMoving = Math.hypot(state.player.x - this.playerMesh.position.x, state.player.z - this.playerMesh.position.z) > 0.001;
@@ -2367,7 +1977,7 @@ export class WorldScene {
       const count = state.stock[`machine:${machineId}:output`]?.items[machine.outputItem] ?? 0;
       const shown = Math.min(count, 5);
       while (machine.output.children.length < shown) {
-        const mesh = new THREE.Mesh(this.#getItemGeometry(machine.outputItem), this.#getItemMaterial(machine.outputItem));
+        const mesh = new THREE.Mesh(this.itemFactory.getItemGeometry(machine.outputItem), this.itemFactory.getItemMaterial(machine.outputItem));
         machine.output.add(mesh);
       }
       machine.output.children.forEach((mesh, index) => {
@@ -2399,8 +2009,8 @@ export class WorldScene {
       if (table.userData?.foodMesh) {
         const mealItem = customer?.meal ?? customer?.demand;
         if (eating && mealItem && ITEMS[mealItem]) {
-          table.userData.foodMesh.geometry = this.#getItemGeometry(mealItem);
-          table.userData.foodMesh.material = this.#getItemMaterial(mealItem);
+          table.userData.foodMesh.geometry = this.itemFactory.getItemGeometry(mealItem);
+          table.userData.foodMesh.material = this.itemFactory.getItemMaterial(mealItem);
           table.userData.foodMesh.visible = true;
           table.userData.foodMesh.rotation.y = time * 0.5;
         } else {
@@ -2476,8 +2086,8 @@ export class WorldScene {
       const carriedItem = Object.keys(stock)[0];
       actor.cargo.visible = Boolean(carriedItem);
       if (carriedItem) {
-        actor.cargo.geometry = this.#getItemGeometry(carriedItem);
-        actor.cargo.material = this.#getItemMaterial(carriedItem);
+        actor.cargo.geometry = this.itemFactory.getItemGeometry(carriedItem);
+        actor.cargo.material = this.itemFactory.getItemMaterial(carriedItem);
       }
     });
 
