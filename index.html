@@ -9,9 +9,9 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700;800;900&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet" />
     <title>Tohumdan Sofraya: Market Oyunu</title>
-    <script type="module" crossorigin src="./assets/index-LsdgfWLJ.js"></script>
-    <link rel="modulepreload" crossorigin href="./assets/three-ClgaRAdk.js">
-    <link rel="stylesheet" crossorigin href="./assets/index-DYHrcuop.css">
+    <script type="module" crossorigin src="./assets/index-BeHEg3vW.js"></script>
+    <link rel="modulepreload" crossorigin href="./assets/three-DT7PEnyd.js">
+    <link rel="stylesheet" crossorigin href="./assets/index-C_tzNTlq.css">
   </head>
   <body>
     <main id="game-container" aria-label="Tohumdan Sofraya oyun dünyası" aria-busy="true"></main>
@@ -81,6 +81,7 @@
         <button id="btn-inventory" class="text-button"><span>Ürünleri gör</span><span data-asset-icon="chevronRight" data-asset-size="18"></span></button>
         <div class="decor-score-row"><span><span data-asset-icon="decorScore" data-asset-size="26"></span> Dekor puanı</span><strong id="decor-score">0 · +0%</strong></div>
         <button id="btn-decor" class="text-button decor-button"><span><span data-asset-icon="decoration" data-asset-size="26"></span> Dekorasyon mağazası</span><span data-asset-icon="chevronRight" data-asset-size="18"></span></button>
+        <button id="btn-procurement" class="text-button hidden">Toptan sipariş terminali</button>
       </aside>
 
       <div class="bottom-controls" data-ui>
@@ -106,6 +107,22 @@
           </div>
           <div class="upgrade-panel" role="tabpanel" data-upgrade-panel="business"><div id="upgrade-list" class="upgrade-list"></div></div>
           <div class="upgrade-panel hidden" role="tabpanel" data-upgrade-panel="staff"><div id="staff-list" class="upgrade-list"></div></div>
+        </section>
+      </div>
+
+      <div class="modal-overlay hidden" id="procurement-modal" data-ui>
+        <section class="modal-card crt-terminal" role="dialog" aria-modal="true" aria-labelledby="procurement-title">
+          <header class="crt-header"><div><span>MANAGER OFFICE · LOGISTICS NETWORK</span><h1 id="procurement-title">Wholesale Procurement OS</h1></div><button type="button" class="crt-close" data-close="procurement-modal" aria-label="Terminali kapat / Close terminal">[ ESC / X ]</button></header>
+          <div id="procurement-content" class="crt-content"></div>
+          <footer class="crt-footer">FARM &amp; MARKET SYSTEMS · v1.0<span>▌</span></footer>
+        </section>
+      </div>
+
+      <div class="modal-overlay hidden" id="staff-candidates-modal" data-ui>
+        <section class="modal-card staff-candidates-card" role="dialog" aria-modal="true" aria-labelledby="staff-candidate-title" aria-describedby="staff-candidate-intro">
+          <header class="modal-header"><div><span class="eyebrow" id="staff-candidate-eyebrow">PERSONEL</span><h1 id="staff-candidate-title">Personelini seç</h1></div><button class="close-btn" data-close="staff-candidates-modal" aria-label="Kapat"><span data-asset-icon="close" data-asset-size="22"></span></button></header>
+          <p class="modal-intro" id="staff-candidate-intro">Üç adayı karşılaştır. Yalnızca işe alınca ödeme yapılır.</p>
+          <div id="staff-candidate-list" class="staff-candidate-list"></div>
         </section>
       </div>
 
