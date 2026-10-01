@@ -1,17 +1,61 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
-  <title id="title">Tohumdan Sofraya — Pazar Tezgâhı</title>
-  <desc id="desc">A colorful market awning shades three crates of fresh produce.</desc>
-  <path fill="#FFC800" d="M58 48h140l16 43H42l16-43Z"/>
-  <path fill="#46A302" d="M42 91h43v14a21.5 21.5 0 0 1-43 0V91Z"/>
-  <path fill="#FF4B4B" d="M85 91h43v14a21.5 21.5 0 0 1-43 0V91Z"/>
-  <path fill="#FFC800" d="M128 91h43v14a21.5 21.5 0 0 1-43 0V91Z"/>
-  <path fill="#46A302" d="M171 91h43v14a21.5 21.5 0 0 1-43 0V91Z"/>
-  <path fill="#46A302" fill-rule="evenodd" d="M62 135h132v68H62v-68Zm9 9v46h36v-46H71Zm45 0v46h24v-46h-24Zm33 0v46h36v-46h-36Z"/>
-  <circle cx="89" cy="169" r="11" fill="#FF4B4B"/>
-  <path fill="#46A302" d="M86 157c-1-5 3-7 6-4 3-4 7-2 7 2-4 0-7 2-9 5-1-2-2-3-4-3Z"/>
-  <path fill="#FFC800" d="M128 154c6 0 9 7 9 16s-3 16-9 16-9-7-9-16 3-16 9-16Z"/>
-  <path fill="#46A302" d="M119 174c-6-1-8 3-7 8 5-1 8-3 10-7m15-1c6-1 8 3 7 8-5-1-8-3-10-7"/>
-  <circle cx="165" cy="170" r="11" fill="#FF4B4B"/>
-  <path fill="#46A302" d="M161 158c0-5 4-7 7-3 4-2 7 1 6 5-4-1-7 0-9 3-1-2-2-4-4-5Z"/>
-  <path fill="#46A302" d="M57 214h142v19H57v-19Z"/>
+  <title id="title">Tohumdan Sofraya — Neobrutalist Market Stall</title>
+  <desc id="desc">High-contrast neo-brutalist market stall with bold black strokes and saturated color blocks.</desc>
+
+  <!-- Hard shadow block -->
+  <rect x="52" y="218" width="156" height="18" rx="4" fill="#000000"/>
+  <rect x="56" y="142" width="148" height="70" rx="6" fill="#000000"/>
+
+  <!-- Base Table Counter -->
+  <rect x="52" y="138" width="148" height="70" rx="6" fill="#ffffff" stroke="#000000" stroke-width="6" stroke-linejoin="round"/>
+  
+  <!-- Counter Wooden Planks / Shelves -->
+  <rect x="62" y="148" width="38" height="48" rx="4" fill="#fef08a" stroke="#000000" stroke-width="4"/>
+  <rect x="108" y="148" width="38" height="48" rx="4" fill="#ffd35e" stroke="#000000" stroke-width="4"/>
+  <rect x="154" y="148" width="38" height="48" rx="4" fill="#fef08a" stroke="#000000" stroke-width="4"/>
+
+  <!-- Produce items inside crates with thick outlines -->
+  <!-- Left: Tomatoes -->
+  <circle cx="81" cy="172" r="10" fill="#ff4757" stroke="#000000" stroke-width="3"/>
+  <path d="M78 162 C79 159 83 159 84 162" stroke="#2ed573" stroke-width="3" stroke-linecap="round" fill="none"/>
+
+  <!-- Center: Corn / Lemons -->
+  <ellipse cx="127" cy="172" rx="9" ry="13" fill="#ffa502" stroke="#000000" stroke-width="3"/>
+  <path d="M127 159 L127 156" stroke="#2ed573" stroke-width="3" stroke-linecap="round"/>
+
+  <!-- Right: Green Apples / Produce -->
+  <circle cx="173" cy="172" r="10" fill="#2ed573" stroke="#000000" stroke-width="3"/>
+  <path d="M171 162 C172 159 175 159 176 162" stroke="#000000" stroke-width="3" stroke-linecap="round" fill="none"/>
+
+  <!-- Table Footing Base -->
+  <rect x="46" y="206" width="160" height="14" rx="4" fill="#ffd35e" stroke="#000000" stroke-width="6" stroke-linejoin="round"/>
+
+  <!-- Support Pillars -->
+  <line x1="56" y1="94" x2="56" y2="138" stroke="#000000" stroke-width="6" stroke-linecap="round"/>
+  <line x1="196" y1="94" x2="196" y2="138" stroke="#000000" stroke-width="6" stroke-linecap="round"/>
+
+  <!-- Awning Canopy Hard Shadow -->
+  <polygon points="38,92 218,92 202,46 54,46" fill="#000000"/>
+
+  <!-- Awning Top Slope -->
+  <polygon points="34,88 214,88 198,42 50,42" fill="#ffd35e" stroke="#000000" stroke-width="6" stroke-linejoin="round"/>
+
+  <!-- Striped Scalloped Awning Drops (Neo-brutalist blocks) -->
+  <!-- Stripe 1: Red -->
+  <path d="M34 88 H70 V106 C70 114 34 114 34 106 Z" fill="#ff4757" stroke="#000000" stroke-width="6" stroke-linejoin="round"/>
+  <!-- Stripe 2: White/Cream -->
+  <path d="M70 88 H106 V106 C106 114 70 114 70 106 Z" fill="#ffffff" stroke="#000000" stroke-width="6" stroke-linejoin="round"/>
+  <!-- Stripe 3: Emerald Green -->
+  <path d="M106 88 H142 V106 C142 114 106 114 106 106 Z" fill="#2ed573" stroke="#000000" stroke-width="6" stroke-linejoin="round"/>
+  <!-- Stripe 4: Sunshine Yellow -->
+  <path d="M142 88 H178 V106 C178 114 142 114 142 106 Z" fill="#ffd35e" stroke="#000000" stroke-width="6" stroke-linejoin="round"/>
+  <!-- Stripe 5: Red -->
+  <path d="M178 88 H214 V106 C214 114 178 114 178 106 Z" fill="#ff4757" stroke="#000000" stroke-width="6" stroke-linejoin="round"/>
+
+  <!-- Market Stall Sign Badge on top -->
+  <rect x="94" y="24" width="68" height="26" rx="4" fill="#ffffff" stroke="#000000" stroke-width="5"/>
+  <rect x="98" y="28" width="60" height="18" rx="2" fill="#2ed573" stroke="#000000" stroke-width="3"/>
+  <circle cx="114" cy="37" r="4" fill="#ffd35e" stroke="#000000" stroke-width="2"/>
+  <circle cx="128" cy="37" r="4" fill="#ff4757" stroke="#000000" stroke-width="2"/>
+  <circle cx="142" cy="37" r="4" fill="#ffffff" stroke="#000000" stroke-width="2"/>
 </svg>
