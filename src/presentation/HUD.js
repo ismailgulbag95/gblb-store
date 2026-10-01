@@ -45,9 +45,28 @@ export class HUD {
     this.lastUpgradeSignature = '';
     this.lastInventorySignature = '';
     this.lastLanguage = null;
+    this.elements = {};
     hydrateAssetIcons();
+    this.#cacheElements();
     this.characterPreviewSources = mountCharacterPreviews();
     this.#bind();
+  }
+
+  #cacheElements() {
+    const ids = [
+      'money-display', 'day-display', 'stack-display', 'walk-speed-buff',
+      'customer-count', 'worker-count', 'shelf-count', 'mood-count',
+      'business-toggle-score', 'order-card', 'order-item', 'order-reward',
+      'order-progress', 'order-progress-fill', 'btn-deliver-order',
+      'order-bonus-progress', 'decor-score', 'quest-text', 'progress-count',
+      'progress-fill', 'btn-interact', 'action-label', 'upgrade-count',
+      'order-ad-offer', 'order-ad-copy', 'machine-ad-offer', 'machine-ad-copy',
+      'setting-sound', 'setting-haptics', 'setting-autopickup',
+    ];
+    for (const id of ids) {
+      this.elements[id] = document.getElementById(id);
+    }
+    this.elements.moneyPill = document.querySelector('.money-pill');
   }
 
   #bind() {
@@ -397,9 +416,9 @@ export class HUD {
   }
 
   #syncSettings(state) {
-    document.getElementById('setting-sound').checked = state.settings.sound;
-    document.getElementById('setting-haptics').checked = state.settings.haptics;
-    document.getElementById('setting-autopickup').checked = Boolean(state.settings.autoPickup);
+    if (this.elements['setting-sound']) this.elements['setting-sound'].checked = state.settings.sound;
+    if (this.elements['setting-haptics']) this.elements['setting-haptics'].checked = state.settings.haptics;
+    if (this.elements['setting-autopickup']) this.elements['setting-autopickup'].checked = Boolean(state.settings.autoPickup);
     document.querySelectorAll('[data-character]').forEach((button) => {
       const characterId = button.dataset.character;
       const unlocked = state.player.unlockedCharacters.includes(characterId);
@@ -425,56 +444,62 @@ export class HUD {
     this.#applyLanguage(language);
     const balance = state.economy.balanceAtoms / 10_000;
     const moneyLabel = `$${balance.toLocaleString(language === 'tr' ? 'tr-TR' : 'en-US', { maximumFractionDigits: 2 })}`;
-    document.getElementById('money-display').textContent = moneyLabel;
-    document.querySelector('.money-pill').classList.toggle('compact', moneyLabel.length >= 8);
-    document.getElementById('day-display').textContent = language === 'en'
-      ? `Day ${gameDayNumber(state.tick)}` : `Gün ${gameDayNumber(state.tick)}`;
-    const playerCount = Object.values(state.stock.player.items).reduce((sum, count) => sum + count, 0);
-    document.getElementById('stack-display').textContent = `${playerCount} / ${state.player.capacity}`;
-    const walkSpeedRemaining = this.app.getWalkSpeedBonusRemainingMs();
-    const walkSpeedBadge = document.getElementById('walk-speed-buff');
-    walkSpeedBadge.classList.toggle('hidden', walkSpeedRemaining <= 0);
-    if (walkSpeedRemaining > 0) {
-      const seconds = Math.ceil(walkSpeedRemaining / 1000);
-      const timer = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
-      walkSpeedBadge.textContent = `${language === 'en' ? 'Walk x1.5' : 'Yürüyüş x1,5'} · ${timer}`;
+    if (this.elements['money-display']) this.elements['money-display'].textContent = moneyLabel;
+    if (this.elements.moneyPill) this.elements.moneyPill.classList.toggle('compact', moneyLabel.length >= 8);
+    if (this.elements['day-display']) {
+      this.elements['day-display'].textContent = language === 'en'
+        ? `Day ${gameDayNumber(state.tick)}` : `Gün ${gameDayNumber(state.tick)}`;
     }
-    document.getElementById('customer-count').textContent = String(state.customers.length);
-    document.getElementById('worker-count').textContent = String(state.workers.length);
+    const playerCount = Object.values(state.stock.player.items).reduce((sum, count) => sum + count, 0);
+    if (this.elements['stack-display']) this.elements['stack-display'].textContent = `${playerCount} / ${state.player.capacity}`;
+    const walkSpeedRemaining = this.app.getWalkSpeedBonusRemainingMs();
+    const walkSpeedBadge = this.elements['walk-speed-buff'];
+    if (walkSpeedBadge) {
+      walkSpeedBadge.classList.toggle('hidden', walkSpeedRemaining <= 0);
+      if (walkSpeedRemaining > 0) {
+        const seconds = Math.ceil(walkSpeedRemaining / 1000);
+        const timer = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+        walkSpeedBadge.textContent = `${language === 'en' ? 'Walk x1.5' : 'Yürüyüş x1,5'} · ${timer}`;
+      }
+    }
+    if (this.elements['customer-count']) this.elements['customer-count'].textContent = String(state.customers.length);
+    if (this.elements['worker-count']) this.elements['worker-count'].textContent = String(state.workers.length);
     let shelfTotal = 0;
     for (const [id, stock] of Object.entries(state.stock)) if (id.startsWith('shelf:')) shelfTotal += Object.values(stock.items).reduce((a, b) => a + b, 0);
-    document.getElementById('shelf-count').textContent = String(shelfTotal);
+    if (this.elements['shelf-count']) this.elements['shelf-count'].textContent = String(shelfTotal);
     const reviews = state.stats.customersSatisfied + state.stats.customersUnhappy;
     const satisfaction = reviews ? Math.round(state.stats.customersSatisfied / reviews * 100) : null;
-    document.getElementById('mood-count').textContent = satisfaction === null ? '—' : `${satisfaction}%`;
-    document.getElementById('business-toggle-score').textContent = satisfaction === null ? '—' : `${satisfaction}%`;
+    if (this.elements['mood-count']) this.elements['mood-count'].textContent = satisfaction === null ? '—' : `${satisfaction}%`;
+    if (this.elements['business-toggle-score']) this.elements['business-toggle-score'].textContent = satisfaction === null ? '—' : `${satisfaction}%`;
     const order = state.activeOrder;
-    const orderCard = document.getElementById('order-card');
-    orderCard.classList.toggle('hidden', !order);
+    const orderCard = this.elements['order-card'];
+    if (orderCard) orderCard.classList.toggle('hidden', !order);
     if (order) {
       const held = orderProgress(state);
       const itemName = language === 'en' ? this.#itemNameEnglish(order.item, ITEMS[order.item].name) : ITEMS[order.item].name;
-      document.getElementById('order-item').innerHTML = `${assetIconMarkup(ITEMS[order.item].icon, 28)} ${itemName} × ${order.quantity}`;
-      document.getElementById('order-reward').textContent = `+$${order.reward}`;
-      document.getElementById('order-progress').textContent = `${held} / ${order.quantity}`;
-      document.getElementById('order-progress-fill').style.width = `${held / order.quantity * 100}%`;
-      document.getElementById('btn-deliver-order').disabled = held < order.quantity;
-      document.getElementById('order-bonus-progress').textContent = language === 'en'
-        ? `${state.ordersCompleted % 3}/3 toward a $20 decor voucher`
-        : `$20 dekor kuponuna ${state.ordersCompleted % 3}/3`;
+      if (this.elements['order-item']) this.elements['order-item'].innerHTML = `${assetIconMarkup(ITEMS[order.item].icon, 28)} ${itemName} × ${order.quantity}`;
+      if (this.elements['order-reward']) this.elements['order-reward'].textContent = `+$${order.reward}`;
+      if (this.elements['order-progress']) this.elements['order-progress'].textContent = `${held} / ${order.quantity}`;
+      if (this.elements['order-progress-fill']) this.elements['order-progress-fill'].style.width = `${held / order.quantity * 100}%`;
+      if (this.elements['btn-deliver-order']) this.elements['btn-deliver-order'].disabled = held < order.quantity;
+      if (this.elements['order-bonus-progress']) {
+        this.elements['order-bonus-progress'].textContent = language === 'en'
+          ? `${state.ordersCompleted % 3}/3 toward a $20 decor voucher`
+          : `$20 dekor kuponuna ${state.ordersCompleted % 3}/3`;
+      }
     }
     const score = decorScore(state);
     const bonus = decorBonus(state);
-    document.getElementById('decor-score').textContent = `${score} · +${(bonus * 100).toFixed(1)}%`;
+    if (this.elements['decor-score']) this.elements['decor-score'].textContent = `${score} · +${(bonus * 100).toFixed(1)}%`;
     this.renderDecorations(state);
-    document.getElementById('quest-text').textContent = this.#questText(state, language);
-    document.getElementById('progress-count').textContent = `${state.completedUpgrades.length} / ${UPGRADES.length}`;
-    document.getElementById('progress-fill').style.width = `${Math.min(100, state.completedUpgrades.length / UPGRADES.length * 100)}%`;
-    const actionButton = document.getElementById('btn-interact');
-    const actionLabel = document.getElementById('action-label');
-    actionButton.disabled = !action || action.actionable === false;
-    actionLabel.textContent = action ? this.#actionText(action, state) : (language === 'en' ? 'Move closer to a station' : 'Bir istasyona yaklaş');
-    document.getElementById('upgrade-count').textContent = String(this.app.getAvailableUpgrades().length);
+    if (this.elements['quest-text']) this.elements['quest-text'].textContent = this.#questText(state, language);
+    if (this.elements['progress-count']) this.elements['progress-count'].textContent = `${state.completedUpgrades.length} / ${UPGRADES.length}`;
+    if (this.elements['progress-fill']) this.elements['progress-fill'].style.width = `${Math.min(100, state.completedUpgrades.length / UPGRADES.length * 100)}%`;
+    const actionButton = this.elements['btn-interact'];
+    const actionLabel = this.elements['action-label'];
+    if (actionButton) actionButton.disabled = !action || action.actionable === false;
+    if (actionLabel) actionLabel.textContent = action ? this.#actionText(action, state) : (language === 'en' ? 'Move closer to a station' : 'Bir istasyona yaklaş');
+    if (this.elements['upgrade-count']) this.elements['upgrade-count'].textContent = String(this.app.getAvailableUpgrades().length);
     this.renderAdOffers(state, action);
     this.#syncSettings(state);
     const signature = `${state.revision}:${balance}:${this.app.getAvailableUpgrades().map((upgrade) => upgrade.id).join(',')}:${state.completedUpgrades.join(',')}:${state.workers.map((worker) => worker.type).join(',')}:${Object.keys(state.layout ?? {}).length}:${Object.keys(state.selfRegisters ?? {}).length}`;
