@@ -10,6 +10,8 @@ import { DECORATIONS } from '../domain/decorCatalog.js';
 import { decorationPrice, nextOrder } from '../domain/orders.js';
 import { machineProductionSeconds, machineSpeedMultiplier, machineUpgradeCost, percentGain, staffSpeedMultiplier, staffUpgradeCost } from '../domain/progression.js';
 import { PLAYER_CHARACTERS, PLAYER_CHARACTER_IDS } from '../domain/characters.js';
+import { STAFF_FACILITIES, STAFF_LAND_PRICE } from '../domain/catalog.js';
+import { generateStaffCandidates, normalizeWorkerWelfare } from '../domain/staff.js';
 
 function clone(value) {
   return structuredClone(value);
@@ -97,11 +99,11 @@ export class GameApplication {
     this.#refreshUpgrades(this.state);
     const needsUnlockRefresh = previousAvailableUpgrades !== this.state.availableUpgrades.join(',');
     const cashierPosition = { x: STATIONS.register.x, z: STATIONS.register.z - 1.75 };
-    const movedCashier = this.state.workers.some((worker) => worker.type === 'cashier'
+    const movedCashier = this.state.workers.some((worker) => worker.type === 'cashier' && !worker.break
       && (worker.x !== cashierPosition.x || worker.z !== cashierPosition.z));
     if (movedCashier) {
       for (const worker of this.state.workers) {
-        if (worker.type === 'cashier') Object.assign(worker, cashierPosition, { facing: 0 });
+        if (worker.type === 'cashier' && !worker.break) Object.assign(worker, cashierPosition, { facing: 0 });
       }
     }
     this.recovered = loaded.recovered;
@@ -557,7 +559,7 @@ export class GameApplication {
       draft.layout[id] = { ...existing, x: snappedX, z: snappedZ };
       if (id === 'register') {
         for (const worker of draft.workers) {
-          if (worker.type === 'cashier') { worker.x = snappedX; worker.z = snappedZ - 1.75; }
+          if (worker.type === 'cashier' && !worker.break) { worker.x = snappedX; worker.z = snappedZ - 1.75; }
         }
       }
       this.#stageNextPendingShelf(draft);
@@ -646,6 +648,52 @@ export class GameApplication {
 
   hireExtraStaff(role) {
     return this.watchRewardedAd('staff-hire', { role });
+  }
+
+  openStaffCandidates(role) {
+    if (!STAFF_HIRES.some(hire => hire.upgradeId === role)
+      || !this.state.availableUpgrades.includes(role) && !this.state.completedUpgrades.includes(role)) return { ok: false, reason: 'locked' };
+    if (this.state.staffCandidates[role]?.length === 3) return { ok: true, candidates: clone(this.state.staffCandidates[role]) };
+    const result = this.#command(`staff-candidates:${role}:${this.state.revision + 1}`, draft => ({ ok: true,
+      candidates: generateStaffCandidates(draft, role) }));
+    return result.ok ? { ...result, candidates: clone(result.candidates) } : result;
+  }
+
+  hireStaffCandidate(role, candidateId) {
+    return this.#command(`staff-candidate:${candidateId}`, draft => {
+      const hire = STAFF_HIRES.find(entry => entry.upgradeId === role);
+      const candidate = draft.staffCandidates[role]?.find(entry => entry.id === candidateId);
+      if (!hire || !candidate || !draft.availableUpgrades.includes(role) && !draft.completedUpgrades.includes(role)) return { ok: false, reason: 'invalid-candidate' };
+      if (draft.economy.balanceAtoms < candidate.hireCostAtoms) return { ok: false, reason: 'insufficient-funds' };
+      new EconomyLedger(draft.economy).debit(`hire:${candidate.id}`, candidate.hireCostAtoms / MONEY_ATOMS, `staff-hire:${role}`);
+      for (const type of hire.staffTypes) this.#hire(draft, type, candidate);
+      if (!draft.completedUpgrades.includes(role)) draft.completedUpgrades.push(role);
+      draft.unlocked[role] = true;
+      delete draft.staffCandidates[role];
+      return { ok: true, message: `${candidate.name} ekibe katıldı.` };
+    });
+  }
+
+  clearStaffLand() {
+    return this.#command('staff-land-clearing', draft => {
+      if (draft.staffLandCleared) return { ok: false, reason: 'already-cleared' };
+      if (draft.economy.balanceAtoms < STAFF_LAND_PRICE * MONEY_ATOMS) return { ok: false, reason: 'insufficient-funds' };
+      new EconomyLedger(draft.economy).debit('staff-land-clearing', STAFF_LAND_PRICE, 'staff-land');
+      draft.staffLandCleared = true;
+      return { ok: true, message: 'Kuzey arsası personel tesislerine açıldı.' };
+    });
+  }
+
+  buildStaffFacility(id) {
+    return this.#command(`staff-facility:${id}`, draft => {
+      const facility = STAFF_FACILITIES[id];
+      if (!facility || !draft.staffLandCleared || draft.staffFacilities[id]) return { ok: false, reason: 'facility-unavailable' };
+      if (draft.economy.balanceAtoms < facility.price * MONEY_ATOMS) return { ok: false, reason: 'insufficient-funds' };
+      new EconomyLedger(draft.economy).debit(`staff-facility:${id}`, facility.price, `staff-facility:${id}`);
+      draft.staffFacilities[id] = { id };
+      draft.layout[`staff-${id}`] = { x: facility.x, z: facility.z, rotation: 0 };
+      return { ok: true, message: `${facility.title} inşa edildi.` };
+    });
   }
 
   getAvailableUpgrades() {
@@ -871,17 +919,18 @@ export class GameApplication {
     return true;
   }
 
-  #hire(state, type) {
+  #hire(state, type, candidate = null) {
     const positions = {
       cashier: [STATIONS.register.x, STATIONS.register.z - 1.75], harvester: [-10, 7], factoryFeeder: [-10, 0],
       caretaker: [-18, 0], chefWaiter: [-30, 0], waiter: [-35, 0],
     };
     const [x, z] = positions[type] ?? [-8, 0];
-    state.workers.push({
+    state.workers.push(normalizeWorkerWelfare({
       id: `worker-${state.nextEntityId++}`, type, x, z, facing: 0, unlocked: true,
       upgradeLevel: 0, speedModifier: 1, salaryDebtAtoms: 0, salaryDueDay: null,
       waitingForSalary: false, task: null,
-    });
+      ...(candidate ? { name: candidate.name, archetypeId: candidate.archetypeId, salaryAtoms: candidate.salaryAtoms } : {}),
+    }));
   }
 
   #refreshUpgrades(state) {
@@ -968,7 +1017,7 @@ export class GameApplication {
       }
       if (!dayStarted) continue;
 
-      const salaryAtoms = staffDailySalaryAtoms(worker.type);
+      const salaryAtoms = worker.salaryAtoms ?? staffDailySalaryAtoms(worker.type);
       if (!salaryAtoms) continue;
       if (state.economy.balanceAtoms < salaryAtoms) {
         worker.salaryDebtAtoms = salaryAtoms;

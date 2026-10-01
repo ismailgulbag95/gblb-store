@@ -1,5 +1,6 @@
 import { ITEMS, RECIPES, SHELVES, STATIONS } from './catalog.js';
-import { getDecorationDimensions, getMarketCollisionBoxes, getShelfLocations, getStationDimensions, stationPosition } from './layout.js';
+import { getDecorationDimensions, getMarketCollisionBoxes, getShelfLocations, getStationDimensions, stationPosition, getStaffFacilityAccess, getStaffFacilityCollisionBoxes } from './layout.js';
+import { chooseStaffFacility, tickWorkerNeeds, workerWorkSpeed, recoverWorker } from './staff.js';
 import { EconomyLedger } from './ledger.js';
 import { decorBonus, decorScore } from './decorCatalog.js';
 import { FARM_CAPACITY, ensureFarmState, removeFarmReady, syncFarmHarvest } from './farm.js';
@@ -468,7 +469,7 @@ function getWorkerObstacles(state, environmentObstacles) {
     minZ: wall.min.z,
     maxZ: wall.max.z,
   }));
-  const boxes = [...getMarketCollisionBoxes(state), ...walls];
+  const boxes = [...getMarketCollisionBoxes(state), ...getStaffFacilityCollisionBoxes(state), ...walls];
   const stations = { ...STATIONS, ...(state.customStations ?? {}) };
   for (const [id, station] of Object.entries(stations)) {
     const active = station.kind === 'machine' ? Boolean(state.machines?.[id])
@@ -701,7 +702,12 @@ function workerTick(state, environmentObstacles) {
   const obstacles = getWorkerObstacles(state, environmentObstacles);
   const obstacleSignature = workerObstacleSignature(obstacles);
   for (const [workerIndex, worker] of state.workers.entries()) {
+    tickWorkerNeeds(worker, Boolean(worker.task || worker.type === 'cashier'
+      && state.customers.some(customer => ['queueing', 'paying'].includes(customer.phase) && !customer.registerId?.startsWith('selfRegister'))
+      || worker.type === 'chefWaiter' && Object.entries(state.machines).some(([id, machine]) =>
+        ['burgerKitchen', 'pizzaKitchen'].includes(id) && machine.blocked === false)));
     if (worker.waitingForSalary) {
+      worker.break = null;
       if (worker.task?.phase === 'to-source') {
         cancelReservation(state, worker.task.reservationId);
         worker.task = null;
@@ -710,6 +716,46 @@ function workerTick(state, environmentObstacles) {
       if (worker.task) clearWorkerRoute(worker.task);
       moveWorkerToWaitingArea(worker, workerWaitingPosition(workerIndex), obstacles, obstacleSignature);
       continue;
+    }
+    // A carrier finishes its reservation before taking a break. Unpicked jobs can be safely released.
+    if (!worker.break && worker.task?.phase !== 'to-target' && (worker.breakCooldownUntil ?? 0) <= state.tick) {
+      const facility = chooseStaffFacility(state, worker);
+      if (facility) {
+        if (worker.task) { cancelReservation(state, worker.task.reservationId); worker.task = null; }
+        const occupiedSlots = new Set(state.workers.filter(other => other.break?.facilityId === facility.id
+          && other.break.phase !== 'returning').map(other => other.break.slot ?? 0));
+        const slot = occupiedSlots.has(0) ? 1 : 0;
+        worker.break = { facilityId: facility.id, phase: 'to-facility', ticks: 0, slot,
+          returnTo: { x: worker.x, z: worker.z } };
+        durable = true;
+      }
+    }
+    if (worker.break) {
+      const rest = worker.break;
+      const access = getStaffFacilityAccess(state, rest.facilityId, rest.slot ?? 0);
+      if (!access) { worker.break = null; worker.breakCooldownUntil = state.tick + 80; durable = true; }
+      else if (rest.phase === 'resting') {
+        worker.facing = 0;
+        if (recoverWorker(worker, rest.facilityId)) {
+          rest.phase = 'returning'; clearWorkerRoute(rest); durable = true;
+        }
+        continue;
+      } else {
+        const register = stationPosition(state, 'register');
+        const home = worker.type === 'cashier' ? { x: register.x, z: register.z - 1.75 } : rest.returnTo;
+        const target = rest.phase === 'returning' ? home : access;
+        if (!rest.route || rest.routeObstacles !== obstacleSignature || rest.routeTarget?.x !== target.x || rest.routeTarget?.z !== target.z) {
+          rest.route = findWorkerRoute(worker, target, obstacles); rest.routeIndex = 0;
+          rest.routeTarget = { ...target }; rest.routeObstacles = obstacleSignature;
+        }
+        if (!rest.route.length) { worker.break = null; worker.breakCooldownUntil = state.tick + 80; durable = true; }
+        else if (moveWorkerAlongRoute(worker, rest, 0.34 * workerWorkSpeed(worker))) {
+          if (rest.phase === 'returning') { worker.break = null; worker.breakCooldownUntil = state.tick + 100; }
+          else { rest.phase = 'resting'; rest.ticks = 0; worker.facing = 0; }
+          durable = true;
+        }
+        continue;
+      }
     }
     if (prioritizeShelfRestock(state, worker)) {
       durable = true;
@@ -729,8 +775,7 @@ function workerTick(state, environmentObstacles) {
       task.routeTarget = { x: target.x, z: target.z };
       task.routeObstacles = obstacleSignature;
     }
-    const speedModifier = Math.min(1.2, Math.max(1, Number.isFinite(worker.speedModifier)
-      ? worker.speedModifier : staffSpeedMultiplier(worker.upgradeLevel ?? 0)));
+    const speedModifier = workerWorkSpeed(worker);
     if (!task.route.length || !moveWorkerAlongRoute(worker, task, 0.34 * speedModifier)) continue;
     if (task.phase === 'to-source') {
       const picked = pickUpReservedStock(state, task.reservationId, task.carrier);
@@ -1530,7 +1575,7 @@ function customerTick(state, events) {
       customer.facing = Math.atan2(reg.x - customer.x, reg.z - customer.z);
       const isSelfCheckout = reg.isSelfCheckout;
       const cashier = isSelfCheckout
-        || state.workers.some((worker) => worker.type === 'cashier')
+        || state.workers.some((worker) => worker.type === 'cashier' && !worker.break && !worker.waitingForSalary)
         || Math.hypot(state.player.x - registerQueuePosition(reg, -1.1).x,
           state.player.z - registerQueuePosition(reg, -1.1).z) <= 1.8;
       if (customer.queueIndex === 0 && cashier) {
@@ -1544,7 +1589,8 @@ function customerTick(state, events) {
           durable = true;
         }
       }
-      const payThreshold = isSelfCheckout ? 7 : (state.workers.some((worker) => worker.type === 'cashier') ? 5 : 14);
+      const activeCashier = state.workers.find(worker => worker.type === 'cashier' && !worker.break && !worker.waitingForSalary);
+      const payThreshold = isSelfCheckout ? 7 : activeCashier ? 5 / workerWorkSpeed(activeCashier) : 14;
       if (customer.payTicks >= payThreshold) {
         const ledger = new EconomyLedger(state.economy);
         const soldItems = [...customer.basket];

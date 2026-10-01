@@ -7,7 +7,7 @@ import { getStaffFacilityAccess, getStaffFacilityCollisionBoxes, ZONES } from '.
 import { advanceSimulation } from '../src/domain/simulation.js';
 import { GameApplication } from '../src/application/GameApplication.js';
 import { SaveService } from '../src/infrastructure/SaveService.js';
-import { reserveStock, pickUpReservedStock, quantityAt } from '../src/domain/inventory.js';
+import { reserveStock, pickUpReservedStock, quantityAt, makeLocation } from '../src/domain/inventory.js';
 
 class MemoryStorage {
   values = new Map();
@@ -16,7 +16,7 @@ class MemoryStorage {
   removeItem(key) { this.values.delete(key); }
 }
 const worker = (overrides = {}) => normalizeWorkerWelfare({ id: 'worker-1', type: 'harvester', x: -10, z: 7, task: null, ...overrides });
-const tick = (state, count) => { for (let i = 0; i < count; i++) advanceSimulation(state); };
+const tick = (state, count) => { for (let i = 0; i < count; i++) { advanceSimulation(state); state.tick++; } };
 const openFacilities = (state, ids = ['wc', 'rest', 'kitchen']) => {
   state.staffLandCleared = true;
   for (const id of ids) state.staffFacilities[id] = { id };
@@ -69,7 +69,7 @@ test('facilities require cleared land and exist inside the north layout with saf
   assert.equal(chooseStaffFacility(state, worker({ energy: 5 })).id, 'rest');
   assert.equal(chooseStaffFacility(state, worker({ energy: 100, comfort: 0 })).id, 'wc');
   assert.equal(chooseStaffFacility(state, worker({ energy: 100, hunger: 0 })).id, 'kitchen');
-  state.workers = [worker({ break: { facilityId: 'wc', phase: 'resting' } })];
+  state.workers = [worker({ id: 'worker-2', break: { facilityId: 'wc', phase: 'resting', returnTo: { x: 0, z: 0 } } })];
   assert.notEqual(chooseStaffFacility(state, worker({ comfort: 0 }))?.id, 'wc');
 });
 
@@ -79,7 +79,7 @@ test('exhaustion without facilities continues delivering stock and never locks a
   state.stock['farm:TOMATO'].items.TOMATO = 10;
   state.workers = [worker({ energy: 0 })];
   tick(state, 350);
-  assert.ok(quantityAt(state, 'shelf:TOMATO', 'TOMATO') > 0);
+  assert.ok(state.stockTransactions.some(transaction => transaction.to === 'shelf:TOMATO' && transaction.id.startsWith('worker-delivery:')));
   assert.equal(state.workers[0].break, null);
 });
 
@@ -90,14 +90,16 @@ test('a worker finishes a carried reservation before resting and returns to work
   const task = { reservationId: 'welfare-delivery', from: 'farm:TOMATO', to: 'shelf:TOMATO', item: 'TOMATO', quantity: 1,
     carrier: 'worker:worker-1', phase: 'to-target' };
   assert.equal(reserveStock(state, task).ok, true);
+  makeLocation(state.stock, task.carrier, 2);
   assert.equal(pickUpReservedStock(state, task.reservationId, task.carrier).ok, true);
   state.workers = [worker({ x: 1, z: 2, energy: 5, task })];
   let delivered = false, rested = false, returned = false;
   for (let i = 0; i < 550; i++) {
     advanceSimulation(state);
+    state.tick++;
     const employee = state.workers[0];
     if (employee.break) {
-      assert.equal(quantityAt(state, task.carrier, 'TOMATO'), 0);
+      assert.equal(quantityAt(state.stock, task.carrier, 'TOMATO'), 0);
       assert.equal(state.reservations[task.reservationId], undefined);
       delivered = true;
     }
@@ -116,6 +118,53 @@ test('an unreachable or removed facility releases its break without losing stock
   tick(state, 2);
   assert.equal(state.workers[0].break, null);
   assert.ok(workerWorkSpeed(state.workers[0]) > 0);
+});
+
+test('blocked facility access cancels an unpicked job and releases its reservation', () => {
+  const state = createInitialState();
+  state.farms = {};
+  openFacilities(state, ['rest']);
+  const task = { reservationId: 'blocked-rest', from: 'farm:TOMATO', to: 'shelf:TOMATO', item: 'TOMATO', quantity: 1,
+    carrier: 'worker:worker-1', phase: 'to-source' };
+  state.stock['farm:TOMATO'].items.TOMATO = 1;
+  assert.equal(reserveStock(state, task).ok, true);
+  state.workers = [worker({ energy: 5, task })];
+  advanceSimulation(state, [{ min: { x: 2, z: -14 }, max: { x: 8, z: -10 } }]);
+  assert.equal(state.reservations[task.reservationId], undefined);
+  assert.equal(state.workers[0].break, null);
+  assert.ok(state.workers[0].breakCooldownUntil > state.tick);
+  assert.equal(quantityAt(state.stock, 'farm:TOMATO', 'TOMATO'), 1);
+});
+
+test('serving a paying customer drains cashier energy and excludes self checkout', () => {
+  const state = createInitialState();
+  state.workers = [worker({ type: 'cashier', x: 5, z: -6, energy: 60 })];
+  state.customers = [{ id: 'paying-customer', kind: 'shopper', phase: 'paying', registerId: 'register', x: 5, z: -2,
+    shoppingList: ['TOMATO'], basket: ['TOMATO'], payTicks: 0 }];
+  makeLocation(state.stock, 'customer:paying-customer', 4);
+  state.stock['customer:paying-customer'].items.TOMATO = 1;
+  advanceSimulation(state);
+  assert.ok(state.workers[0].energy < 60);
+  state.workers[0].energy = 60;
+  state.customers = [];
+  advanceSimulation(state);
+  assert.ok(state.workers[0].energy > 60);
+});
+
+test('saved occupied slots and returning cashier phases survive hydration without teleporting', () => {
+  const state = createInitialState();
+  openFacilities(state);
+  state.workers = [worker({ type: 'cashier', x: 4.35, z: -12.4, energy: 85,
+    break: { facilityId: 'rest', phase: 'returning', returnTo: { x: 5, z: -5.75 }, slot: 1, ticks: 10 } })];
+  state.layout['staff-rest'] = { x: 5.5, z: -15, rotation: 0 };
+  const storage = new MemoryStorage();
+  new SaveService(storage).commit(state, 'returning-fixture');
+  const app = new GameApplication(new SaveService(storage));
+  assert.equal(app.state.workers[0].x, 4.35);
+  assert.equal(app.state.workers[0].break.phase, 'returning');
+  assert.equal(app.state.workers[0].break.slot, 1);
+  assert.equal(app.state.layout['staff-rest'].x, 5.5);
+  assert.deepEqual(app.state.workers[0].break.returnTo, { x: 5, z: -5.75 });
 });
 
 test('legacy saves retain stock, worker salary and task while gaining neutral welfare fields', () => {
@@ -158,4 +207,23 @@ test('paid selection stores traits and personal wages once; facilities debit onc
   const restored = new GameApplication(new SaveService(storage));
   assert.equal(restored.state.workers[0].salaryAtoms, candidate.salaryAtoms);
   assert.ok(restored.state.staffFacilities.rest);
+  restored.state.tick = 2999;
+  const beforePayroll = restored.state.economy.balanceAtoms;
+  restored.tick();
+  assert.equal(restored.state.economy.balanceAtoms, beforePayroll - candidate.salaryAtoms);
+});
+
+test('chef and waiter selection applies a single hiring fee and individual wages to both workers', () => {
+  const app = new GameApplication(new SaveService(new MemoryStorage()), 28);
+  app.state.availableUpgrades.push('chefWaiter');
+  app.state.economy.balanceAtoms = 10000 * MONEY_ATOMS;
+  const candidate = app.openStaffCandidates('chefWaiter').candidates[0];
+  const balance = app.state.economy.balanceAtoms;
+  assert.equal(app.hireStaffCandidate('chefWaiter', candidate.id).ok, true);
+  assert.equal(app.state.economy.balanceAtoms, balance - candidate.hireCostAtoms);
+  assert.deepEqual(app.state.workers.map(worker => worker.type), ['chefWaiter', 'waiter']);
+  for (const employee of app.state.workers) {
+    assert.equal(employee.salaryAtoms, candidate.salaryAtoms);
+    assert.equal(employee.archetypeId, candidate.archetypeId);
+  }
 });

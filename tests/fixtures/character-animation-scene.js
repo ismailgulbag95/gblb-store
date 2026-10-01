@@ -6,6 +6,7 @@ import { makeLocation, reserveStock } from '../../src/domain/inventory.js';
 
 // Disposable fixture: never loads or writes the player's saved game.
 const mode = new URLSearchParams(location.search).get('mode') ?? 'shop';
+const captureTick = Number(new URLSearchParams(location.search).get('captureTick')) || 0;
 const state = createInitialState(91);
 state.farms = {};
 state.stock['farm:TOMATO'].items.TOMATO = 8;
@@ -114,6 +115,7 @@ function frame(now) {
     accumulator += dt;
     while (accumulator >= 0.1) { state.tick++; state.customerSpawnTicks = 0; advanceSimulation(state); accumulator -= 0.1; }
     render(dt);
+    if (captureTick > 0 && state.tick >= captureTick) running = false;
   }
   requestAnimationFrame(frame);
 }

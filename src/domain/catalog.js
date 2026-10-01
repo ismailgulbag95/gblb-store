@@ -118,6 +118,29 @@ export const STAFF_HIRES = Object.freeze([
   { upgradeId: 'chefWaiter', staffTypes: ['chefWaiter', 'waiter'], effect: 'Restoran mutfağını ve masa servisini otomatikleştirir.', unlock: 'Restoran müşterisinden bahşiş alınca açılır.' },
 ]);
 
+export const STAFF_ARCHETYPES = Object.freeze({
+  diligent: { title: 'Çalışkan', titleEn: 'Diligent', speed: 1.25, salary: 1.3, drain: 1, hire: 1,
+    breakAt: 20, effect: '+%25 hız / +%30 maaş', effectEn: '+25% speed / +30% salary' },
+  lazy: { title: 'Rahatına düşkün', titleEn: 'Easygoing', speed: 1, salary: 0.85, drain: 1.15, hire: 0.9,
+    breakAt: 35, effect: '-%15 maaş / daha sık mola', effectEn: '-15% salary / more frequent breaks' },
+  meticulous: { title: 'Titiz', titleEn: 'Meticulous', speed: 1, salary: 1, drain: 0.7, hire: 1.4,
+    breakAt: 20, effect: '-%30 enerji kaybı / +%40 işe alım ücreti', effectEn: '-30% energy drain / +40% hiring fee' },
+  sociable: { title: 'Sosyal', titleEn: 'Sociable', speed: 1, salary: 1.1, drain: 1, hire: 0.85,
+    breakAt: 25, effect: '-%15 işe alım ücreti / +%10 maaş', effectEn: '-15% hiring fee / +10% salary' },
+  resilient: { title: 'Dayanıklı', titleEn: 'Resilient', speed: 0.9, salary: 1, drain: 0.6, hire: 1.1,
+    breakAt: 15, effect: '-%40 enerji kaybı / -%10 hız', effectEn: '-40% energy drain / -10% speed' },
+});
+
+export const STAFF_LAND_PRICE = 500;
+export const STAFF_FACILITIES = Object.freeze({
+  wc: { id: 'wc', title: 'Personel WC', titleEn: 'Staff WC', price: 220, x: 0, z: -15,
+    width: 3.2, depth: 4, capacity: 1, effect: 'Hızlı rahatlama', effectEn: 'Quick relief' },
+  rest: { id: 'rest', title: 'Dinlenme alanı', titleEn: 'Staff lounge', price: 400, x: 5, z: -15,
+    width: 3.2, depth: 4, capacity: 2, effect: 'Enerji yenileme', effectEn: 'Energy recovery' },
+  kitchen: { id: 'kitchen', title: 'Personel mutfağı', titleEn: 'Staff kitchen', price: 350, x: 10, z: -15,
+    width: 3.2, depth: 4, capacity: 2, effect: 'Açlık ve moral yenileme', effectEn: 'Hunger and morale recovery' },
+});
+
 export const FARM_AD_UPGRADE_IDS = Object.freeze(UPGRADES
   .filter((upgrade) => upgrade.id.endsWith('Farm2') && STATIONS[upgrade.id]?.kind === 'farm'
     && upgrade.unlocks.includes(upgrade.id))

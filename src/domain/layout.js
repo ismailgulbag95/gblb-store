@@ -1,4 +1,4 @@
-import { SHELVES, STATIONS } from './catalog.js';
+import { SHELVES, STATIONS, STAFF_FACILITIES } from './catalog.js';
 import { STAFF_WAITING_AREA } from './dayCycle.js';
 
 export const GRID_SIZE = 0.5;
@@ -8,6 +8,7 @@ export const ZONES = {
   farm: { minX: -25.5, maxX: -4.5, minZ: -8.5, maxZ: 8.5 },
   market: { minX: -3.5, maxX: 13.5, minZ: -8.5, maxZ: 8.5 },
   restaurant: { minX: -47.5, maxX: -26.5, minZ: -8.5, maxZ: 8.5 },
+  staff: { minX: -3.5, maxX: 13.5, minZ: -20, maxZ: -9 },
 };
 
 export const SHELF_STAGING_AREA = Object.freeze({
@@ -106,6 +107,10 @@ export function resolveStationBaseId(id) {
 }
 
 export function getStationDimensions(id, rotation = 0) {
+  if (id.startsWith('staff-') && STAFF_FACILITIES[id.slice(6)]) {
+    const facility = STAFF_FACILITIES[id.slice(6)];
+    return { width: facility.width, depth: facility.depth };
+  }
   const baseId = resolveStationBaseId(id);
   const base = STATION_FOOTPRINTS[id] ?? STATION_FOOTPRINTS[baseId] ?? DEFAULT_STATION_FOOTPRINT;
   const isRotated90 = Math.round(rotation / (Math.PI / 2)) % 2 !== 0;
@@ -123,6 +128,7 @@ export function getDecorationZone(type) {
 }
 
 export function stationZone(id) {
+  if (id.startsWith('staff-')) return 'staff';
   const baseId = id.split('_')[0];
   if (baseId === 'register' || baseId === 'selfRegister' || STATIONS[baseId]?.kind === 'shelf' || baseId.endsWith('Shelf')) return 'market';
   if (baseId.startsWith('table') || baseId.endsWith('Kitchen')) return 'restaurant';
@@ -130,6 +136,7 @@ export function stationZone(id) {
 }
 
 export function stationPosition(state, id) {
+  if (id.startsWith('staff-')) return state.layout?.[id] ?? STAFF_FACILITIES[id.slice(6)];
   if (state.pendingShelfIds?.includes(id) && !state.layout?.[id]) return null;
   return state.layout?.[id] ?? state.customStations?.[id] ?? STATIONS[id];
 }
@@ -179,6 +186,7 @@ export function syncCatalogLayout(state) {
 }
 
 export function isStationUnlocked(state, id) {
+  if (id.startsWith('staff-')) return Boolean(state.staffLandCleared && state.staffFacilities?.[id.slice(6)]);
   if (state.customStations?.[id]) return true;
   if (id.startsWith('selfRegister')) return true;
   const baseId = resolveStationBaseId(id);
@@ -196,6 +204,25 @@ export function isStationUnlocked(state, id) {
   if (station.kind === 'coop') return Boolean(state.coops?.coop);
   if (station.kind === 'table') return Boolean(state.diningTables?.[id] || state.unlocked?.restaurant);
   return true;
+}
+
+export function getStaffFacilityCollisionBoxes(state) {
+  if (!state.staffLandCleared) return [];
+  return Object.keys(state.staffFacilities ?? {}).filter(id => STAFF_FACILITIES[id]).map(id => {
+    const facility = STAFF_FACILITIES[id];
+    const point = stationPosition(state, `staff-${id}`);
+    return { id: `staff-${id}`, minX: point.x - facility.width / 2, maxX: point.x + facility.width / 2,
+      minZ: point.z - facility.depth / 2, maxZ: point.z + facility.depth / 2 };
+  });
+}
+
+export function getStaffFacilityAccess(state, id, slot = 0) {
+  const facility = STAFF_FACILITIES[id];
+  if (!facility || !state.staffLandCleared || !state.staffFacilities?.[id]) return null;
+  const point = stationPosition(state, `staff-${id}`);
+  // Recovery spots are on the south porch, outside the blocked building footprint.
+  return { x: point.x + (facility.capacity > 1 ? (slot % 2 ? 0.65 : -0.65) : 0),
+    z: point.z + facility.depth / 2 + 0.6 };
 }
 
 export function canPlaceStation(state, id, x, z, rotation = undefined) {

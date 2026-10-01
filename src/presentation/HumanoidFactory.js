@@ -828,6 +828,31 @@ export function createWorkerMesh(type, itemFactory) {
   body.wrists[1].add(terminal);
   body.propObjects.terminal = terminal;
 
+  const mug = new THREE.Group();
+  const mugMaterial = new THREE.MeshStandardMaterial({ color: 0xf1eee3, roughness: 0.65 });
+  const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.046, 0.04, 0.08, 10), mugMaterial);
+  const handle = new THREE.Mesh(new THREE.TorusGeometry(0.025, 0.007, 5, 9), mugMaterial);
+  handle.position.x = 0.045;
+  mug.add(cup, handle);
+  mug.position.set(0, -0.02, 0.06);
+  mug.visible = false;
+  body.wrists[1].add(mug);
+  body.propObjects.breakMug = mug;
+
+  const energyGroup = new THREE.Group();
+  energyGroup.name = 'worker-energy';
+  energyGroup.position.y = 1.55;
+  const energyBack = new THREE.Mesh(new THREE.PlaneGeometry(0.56, 0.085),
+    new THREE.MeshBasicMaterial({ color: 0x253b40, depthTest: false, toneMapped: false }));
+  const energyFill = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.045),
+    new THREE.MeshBasicMaterial({ color: 0x72c75c, depthTest: false, toneMapped: false }));
+  energyBack.renderOrder = 10;
+  energyFill.renderOrder = 11;
+  energyFill.position.z = 0.002;
+  energyGroup.add(energyBack, energyFill);
+  group.add(energyGroup);
+  const energyBar = { group: energyGroup, fill: energyFill, rotation: new THREE.Quaternion() };
+
   // Dedicated handheld cargo mesh
   let cargo = null;
   if (itemFactory && itemFactory.getItemGeometry) {
@@ -841,6 +866,7 @@ export function createWorkerMesh(type, itemFactory) {
   return {
     group,
     cargo,
+    energyBar,
     legs: body.legs,
     arms: body.arms,
     elbows: body.elbows,
@@ -854,6 +880,19 @@ export function createWorkerMesh(type, itemFactory) {
     actionTimer: 0,
     actionState: 'idle'
   };
+}
+
+export function updateWorkerEnergyBar(actor, worker, cameraQuaternion) {
+  const bar = actor.energyBar;
+  if (!bar) return;
+  const fraction = THREE.MathUtils.clamp(Number.isFinite(worker.energy) ? worker.energy : 100, 0, 100) / 100;
+  bar.fill.scale.x = fraction;
+  bar.fill.position.x = -0.25 + 0.25 * fraction;
+  bar.fill.material.color.setHex(fraction <= 0.2 ? 0xef5350 : fraction <= 0.5 ? 0xf0ba4a : 0x72c75c);
+  if (cameraQuaternion) {
+    actor.group.getWorldQuaternion(bar.rotation);
+    bar.group.quaternion.copy(bar.rotation.invert()).multiply(cameraQuaternion);
+  }
 }
 
 /**

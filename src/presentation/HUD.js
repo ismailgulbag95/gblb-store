@@ -1,4 +1,4 @@
-import { FARM_AD_UPGRADE_IDS, ITEMS, MONEY_ATOMS, RECIPES, SHELVES, STAFF, STAFF_HIRES, STATIONS, UPGRADES, staffDailySalaryAtoms } from '../domain/catalog.js';
+import { FARM_AD_UPGRADE_IDS, ITEMS, MONEY_ATOMS, RECIPES, SHELVES, STAFF, STAFF_ARCHETYPES, STAFF_FACILITIES, STAFF_HIRES, STAFF_LAND_PRICE, STATIONS, UPGRADES, staffDailySalaryAtoms } from '../domain/catalog.js';
 import { DECORATIONS, decorBonus, decorScore } from '../domain/decorCatalog.js';
 import { decorationPrice, orderProgress } from '../domain/orders.js';
 import { machineProductionSeconds, machineSpeedMultiplier, machineUpgradeCost, percentGain, staffSpeedMultiplier, staffUpgradeCost } from '../domain/progression.js';
@@ -37,12 +37,25 @@ const EN = {
   },
 };
 
+const escapeMarkup = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]);
+const staffNeed = (value) => Math.round(Math.min(100, Math.max(0, Number.isFinite(value) ? value : 100)));
+const staffMoney = (atoms, english) => (atoms / MONEY_ATOMS).toLocaleString(english ? 'en-US' : 'tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+function staffBreakText(worker, english) {
+  const phase = worker.break?.phase;
+  if (phase === 'resting') return english ? 'Resting' : 'Dinleniyor';
+  if (phase === 'to-facility') return english ? 'Heading to facility' : 'Tesise gidiyor';
+  if (phase === 'returning') return english ? 'Returning to work' : 'İşe dönüyor';
+  if (staffNeed(worker.energy) <= 20) return english ? 'Tired · slower pace' : 'Yorgun · yavaş çalışıyor';
+  return english ? 'On duty' : 'Görevde';
+}
+
 export class HUD {
   constructor(app, input, onModalChange = () => {}) {
     this.app = app;
     this.input = input;
     this.onModalChange = onModalChange;
-    this.modals = ['expansion-modal', 'settings-modal', 'inventory-modal', 'decor-modal', 'recovery-modal', 'bonus-offer-modal'];
+    this.modals = ['expansion-modal', 'staff-candidates-modal', 'settings-modal', 'inventory-modal', 'decor-modal', 'recovery-modal', 'bonus-offer-modal'];
     this.lastUpgradeSignature = '';
     this.lastInventorySignature = '';
     this.lastLanguage = null;
@@ -65,7 +78,7 @@ export class HUD {
       'order-ad-offer', 'order-ad-copy', 'btn-order-ad', 'machine-ad-offer', 'machine-ad-copy', 'btn-machine-ad',
       'decor-shop-score', 'decor-score-caption', 'decor-list',
       'setting-sound', 'setting-haptics', 'setting-autopickup',
-      'upgrade-list', 'staff-list', 'inventory-list'
+      'upgrade-list', 'staff-list', 'staff-candidate-list', 'staff-candidate-title', 'staff-candidate-intro', 'staff-candidate-eyebrow', 'inventory-list'
     ];
     for (const id of ids) {
       this.elements[id] = document.getElementById(id);
@@ -182,6 +195,22 @@ export class HUD {
     document.getElementById('setting-autopickup').addEventListener('change', (event) => this.app.setSetting('autoPickup', event.target.checked));
     document.querySelectorAll('[data-debug]').forEach((button) => button.addEventListener('click', () => this.#debug(button.dataset.debug)));
     document.getElementById('expansion-modal').addEventListener('click', (event) => {
+      const candidatesButton = event.target.closest('[data-staff-candidates]');
+      if (candidatesButton) {
+        this.openStaffCandidates(candidatesButton.dataset.staffCandidates);
+        return;
+      }
+      const facilityButton = event.target.closest('[data-staff-facility]');
+      const landButton = event.target.closest('[data-staff-land]');
+      if (facilityButton || landButton) {
+        const result = facilityButton ? this.app.buildStaffFacility(facilityButton.dataset.staffFacility) : this.app.clearStaffLand();
+        const english = this.app.getState().settings.language === 'en';
+        if (!result.ok) this.toast(result.reason === 'insufficient-funds'
+          ? (english ? 'Insufficient funds.' : 'Bakiye yetersiz.')
+          : (english ? 'Clear the north land before construction.' : 'İnşaattan önce kuzey arsasını aç.'), 'error');
+        this.render(this.app.getState(), this.app.getNearbyAction(), true);
+        return;
+      }
       const adButton = event.target.closest('[data-ad-accept]');
       if (adButton) {
         this.#watchAd(adButton.dataset.adAccept, this.#adPayload(adButton), adButton);
@@ -207,6 +236,19 @@ export class HUD {
       const result = this.app.buyUpgrade(button.dataset.buyUpgrade);
       if (result.ok) this.render(this.app.getState(), this.app.getNearbyAction(), true);
       else this.toast(result.reason === 'locked' ? 'Bu geliştirme henüz açılmadı.' : 'Bakiye yetersiz.', 'error');
+    });
+    document.getElementById('staff-candidates-modal').addEventListener('click', (event) => {
+      const button = event.target.closest('[data-hire-candidate]');
+      if (!button || button.disabled) return;
+      const result = this.app.hireStaffCandidate(button.dataset.candidateRole, button.dataset.hireCandidate);
+      if (result.ok) this.close('staff-candidates-modal');
+      else {
+        const english = this.app.getState().settings.language === 'en';
+        this.toast(result.reason === 'insufficient-funds'
+          ? (english ? 'Insufficient funds.' : 'Bakiye yetersiz.')
+          : (english ? 'This candidate is no longer available.' : 'Bu aday artık mevcut değil.'), 'error');
+        this.renderStaffCandidates(this.app.getState(), button.dataset.candidateRole);
+      }
     });
     document.querySelectorAll('[data-upgrade-tab]').forEach((button) => button.addEventListener('click', () => this.#selectUpgradeTab(button.dataset.upgradeTab)));
     window.addEventListener('keydown', (event) => {
@@ -344,6 +386,16 @@ export class HUD {
     if (id === 'settings-modal') this.#syncSettings(this.app.getState());
   }
 
+  openStaffCandidates(role) {
+    const result = this.app.openStaffCandidates(role);
+    if (!result.ok) {
+      this.toast(this.app.getState().settings.language === 'en' ? 'This profession is not unlocked yet.' : 'Bu meslek henüz açılmadı.', 'error');
+      return;
+    }
+    this.renderStaffCandidates(this.app.getState(), role);
+    this.open('staff-candidates-modal');
+  }
+
   openBonusOffer(offer) {
     if (!offer || !['walk-speed', 'bag-capacity', 'character-unlock'].includes(offer.type)) return;
     this.currentBonusOffer = offer;
@@ -381,6 +433,11 @@ export class HUD {
   }
 
   close(id) {
+    if (id === 'staff-candidates-modal') {
+      this.open('expansion-modal');
+      this.#selectUpgradeTab('staff');
+      return;
+    }
     if (id === 'bonus-offer-modal' && this.currentBonusOffer
       && this.app.getState().ads.pending?.placement !== 'bonus-offer') {
       this.app.dismissBonusOffer(this.currentBonusOffer.id);
@@ -512,6 +569,7 @@ export class HUD {
       this.renderUpgrades(state);
       this.renderStaff(state);
     }
+    this.updateStaffNeeds(state);
     if (force) this.renderInventory(state, true);
   }
 
@@ -789,48 +847,90 @@ export class HUD {
       const unlock = state.settings.language === 'en' ? EN.staffUnlock[hire.upgradeId] : hire.unlock;
       const subtitle = hired ? (state.settings.language === 'en' ? `On staff · ${hiredCount || hire.staffTypes.length}` : `Ekibinde · ${hiredCount || hire.staffTypes.length} kişi`)
         : unlocked ? effect : unlock;
-      const payload = { role: hire.upgradeId };
-      const ready = canHire && this.app.canOfferRewardedAd('staff-hire', payload);
-      if (ready) this.app.markRewardedOfferShown('staff-hire', payload);
-      const disabledText = !canHire ? (english ? 'Locked' : 'Kilitli')
-        : !this.app.isRewardedAdReady('staff-hire') ? (english ? 'AdMob setup pending' : 'AdMob bağlantısı bekleniyor')
-          : (english ? 'Rewarded ad not ready' : 'Reklam şu anda hazır değil');
-      const simulated = this.app.isRewardedAdSimulated();
       const salaryAtoms = staffDailySalaryAtoms(hire.staffTypes[0]);
-      const salary = (salaryAtoms / MONEY_ATOMS).toLocaleString(english ? 'en-US' : 'tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      const salary = staffMoney(salaryAtoms, english);
       const salaryText = english
-        ? `Salary $${salary}/day${hire.staffTypes.length > 1 ? ' per person' : ''}`
-        : `Maaş $${salary}/gün${hire.staffTypes.length > 1 ? ' kişi başı' : ''}`;
-      const hireAction = simulated
-        ? (english ? 'Wait 3 sec · ' : '3 sn bekle · ') + (hire.staffTypes.length > 1
-          ? (english ? 'Hire chef + waiter' : 'Şef + garson al')
-          : (english ? 'Hire' : 'İşe al'))
-        : hire.staffTypes.length > 1
-        ? (english ? (hired ? 'Watch ad · Add chef + waiter' : 'Watch ad · Hire chef + waiter')
-          : (hired ? 'Reklam izle · Şef + garson ekle' : 'Reklam izle · Şef + garson al'))
-        : (english ? (hired ? 'Watch ad · +1 hire' : 'Watch ad · Hire')
-          : (hired ? 'Reklam izle · +1 al' : 'Reklam izle · İşe al'));
-      const button = ready
-        ? `<button class="buy-button ad-reward-button" data-ad-accept="staff-hire" data-ad-role="${hire.upgradeId}">${hireAction}</button>`
-        : `<button class="buy-button" disabled>${disabledText}</button>`;
+        ? `Base salary $${salary}/day${hire.staffTypes.length > 1 ? ' per person' : ''} · varies by candidate`
+        : `Temel maaş $${salary}/gün${hire.staffTypes.length > 1 ? ' kişi başı' : ''} · adaya göre değişir`;
+      const button = `<button class="buy-button" data-staff-candidates="${hire.upgradeId}" ${canHire ? '' : 'disabled'}>${canHire ? (english ? 'View 3 candidates' : '3 adayı gör') : (english ? 'Locked' : 'Kilitli')}</button>`;
       return `<article class="upgrade-card staff-card${hired ? ' hired' : ''}"><div class="upgrade-icon">${assetIconMarkup(STAFF[hire.staffTypes[0]]?.icon ?? 'workerAvatar', 50)}</div><div class="upgrade-copy"><strong>${english ? englishTitle : title}</strong><small>${subtitle}</small><small>${salaryText}</small></div>${button}</article>`;
     }).join('');
     const staffUpgrades = state.workers.map((worker) => {
       const level = worker.upgradeLevel ?? 0;
       const cost = staffUpgradeCost(worker.type === 'waiter' ? 'chefWaiter' : worker.type, level);
-      const affordable = state.economy.balanceAtoms >= cost * 10_000;
-      const currentSpeed = 3.4 * staffSpeedMultiplier(level);
-      const nextSpeed = 3.4 * staffSpeedMultiplier(level + 1);
+      const affordable = state.economy.balanceAtoms >= cost * MONEY_ATOMS;
+      const archetype = STAFF_ARCHETYPES[worker.archetypeId];
+      const currentSpeed = 3.4 * staffSpeedMultiplier(level) * (archetype?.speed ?? 1);
+      const nextSpeed = 3.4 * staffSpeedMultiplier(level + 1) * (archetype?.speed ?? 1);
       const gain = percentGain(currentSpeed, nextSpeed);
       const title = english ? ({ cashier: 'Cashier', harvester: 'Harvester', factoryFeeder: 'Factory feeder', caretaker: 'Farm caretaker', chefWaiter: 'Chef', waiter: 'Waiter' })[worker.type] : (STAFF[worker.type]?.title ?? (worker.type === 'waiter' ? 'Garson' : worker.type));
       const number = (value) => value.toLocaleString(english ? 'en-US' : 'tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-      const salaryAtoms = staffDailySalaryAtoms(worker.type);
+      const salaryAtoms = worker.salaryAtoms ?? staffDailySalaryAtoms(worker.type);
       const salaryStatus = worker.waitingForSalary
         ? (english ? `Waiting for salary · $${number((worker.salaryDebtAtoms ?? 0) / MONEY_ATOMS)} due` : `Maaş bekliyor · $${number((worker.salaryDebtAtoms ?? 0) / MONEY_ATOMS)} ödenmemiş`)
         : (english ? `Salary $${number(salaryAtoms / MONEY_ATOMS)}/day` : `Maaş $${number(salaryAtoms / MONEY_ATOMS)}/gün`);
-      return `<article class="upgrade-card staff-upgrade-card${worker.waitingForSalary ? ' salary-waiting' : ''}"><div class="upgrade-icon">${assetIconMarkup(STAFF[worker.type]?.icon ?? 'workerAvatar', 50)}</div><div class="upgrade-copy"><strong>${title} · ${worker.id}</strong><small>${english ? `Level ${level + 1} · speed ${number(currentSpeed)} → ${number(nextSpeed)} units/s · +${gain.toFixed(2)}%` : `Seviye ${level + 1} · hız ${number(currentSpeed)} → ${number(nextSpeed)} birim/sn · +%${gain.toFixed(2)}`}</small><small>${salaryStatus}</small></div><button class="buy-button" data-upgrade-staff="${worker.id}" ${affordable ? '' : 'disabled'}>${english ? 'Upgrade' : 'Geliştir'} · $${cost}</button></article>`;
+      const id = escapeMarkup(worker.id);
+      const energy = staffNeed(worker.energy);
+      const traits = archetype ? (english ? archetype.titleEn : archetype.title) : (english ? 'Experienced staff' : 'Mevcut personel');
+      return `<article class="upgrade-card staff-upgrade-card${worker.waitingForSalary ? ' salary-waiting' : ''}"><div class="upgrade-icon">${assetIconMarkup(STAFF[worker.type]?.icon ?? 'workerAvatar', 50)}</div><div class="upgrade-copy"><strong>${escapeMarkup(worker.name ?? title)} · ${escapeMarkup(title)}</strong><small>${escapeMarkup(traits)} · ${english ? `Level ${level + 1} · base speed ${number(currentSpeed)} → ${number(nextSpeed)} units/s · +${gain.toFixed(2)}%` : `Seviye ${level + 1} · temel hız ${number(currentSpeed)} → ${number(nextSpeed)} birim/sn · +%${gain.toFixed(2)}`}</small><small>${salaryStatus}</small><div class="staff-energy"><span data-worker-energy-label="${id}">${english ? 'Energy' : 'Enerji'} ${energy}/100</span><progress data-worker-energy="${id}" max="100" value="${energy}" aria-label="${english ? 'Energy' : 'Enerji'}" ${energy <= 20 ? 'class="low-energy"' : ''}></progress></div><small data-worker-break="${id}">${staffBreakText(worker, english)}</small><small data-worker-needs="${id}">${this.staffNeedsText(worker, english)}</small></div><button class="buy-button" data-upgrade-staff="${id}" ${affordable ? '' : 'disabled'}>${english ? 'Upgrade' : 'Geliştir'} · $${cost}</button></article>`;
     }).join('');
-    list.innerHTML = `<h2 class="upgrade-section-title">${english ? 'Hire new staff' : 'Yeni personel al'}</h2>${hireCards}${staffUpgrades ? `<h2 class="upgrade-section-title">${english ? 'Individual staff upgrades' : 'Personel bazlı geliştirme'}</h2>${staffUpgrades}` : ''}`;
+    const landReady = !state.staffLandCleared && state.economy.balanceAtoms >= STAFF_LAND_PRICE * MONEY_ATOMS;
+    const landCard = `<article class="upgrade-card staff-card"><div class="upgrade-icon">${assetIconMarkup('farm', 50)}</div><div class="upgrade-copy"><strong>${english ? 'North staff land' : 'Kuzey personel arsası'}</strong><small>${english ? 'Clear the land behind the market for staff facilities.' : 'Marketin arkasındaki alanı personel tesislerine aç.'}</small></div><button class="buy-button" data-staff-land ${landReady ? '' : 'disabled'}>${state.staffLandCleared ? (english ? 'Land cleared' : 'Arsa açıldı') : `${english ? 'Clear land' : 'Arsayı aç'} · $${STAFF_LAND_PRICE}`}</button></article>`;
+    const facilities = Object.values(STAFF_FACILITIES).map((facility) => {
+      const built = Boolean(state.staffFacilities?.[facility.id]);
+      const ready = state.staffLandCleared && !built && state.economy.balanceAtoms >= facility.price * MONEY_ATOMS;
+      const label = built ? (english ? 'Built' : 'İnşa edildi') : !state.staffLandCleared ? (english ? 'Clear land first' : 'Önce arsayı aç') : `${english ? 'Build' : 'İnşa et'} · $${facility.price}`;
+      return `<article class="upgrade-card staff-card${built ? ' hired' : ''}"><div class="upgrade-icon">${assetIconMarkup(facility.id === 'kitchen' ? 'chef' : 'staff', 50)}</div><div class="upgrade-copy"><strong>${english ? facility.titleEn : facility.title}</strong><small>${english ? facility.effectEn : facility.effect}</small><small>${english ? 'Capacity' : 'Kapasite'}: ${facility.capacity}</small></div><button class="buy-button" data-staff-facility="${facility.id}" ${ready ? '' : 'disabled'}>${label}</button></article>`;
+    }).join('');
+    list.innerHTML = `<h2 class="upgrade-section-title">${english ? 'Hire new staff' : 'Yeni personel al'}</h2>${hireCards}${staffUpgrades ? `<h2 class="upgrade-section-title">${english ? 'Your team' : 'Ekibin'}</h2>${staffUpgrades}` : ''}<h2 class="upgrade-section-title">${english ? 'North staff facilities' : 'Kuzey personel tesisleri'}</h2><p class="staff-facility-note">${english ? 'Tired staff work more slowly without facilities. Facilities restore their needs during breaks.' : 'Tesisler yokken yorgun personel daha yavaş çalışır. Tesislerde mola vererek ihtiyaçlarını yeniler.'}</p>${landCard}${facilities}`;
+  }
+
+  staffNeedsText(worker, english) {
+    return english ? `Fullness ${staffNeed(worker.hunger)} · morale ${staffNeed(worker.morale)} · comfort ${staffNeed(worker.comfort)}`
+      : `Tokluk ${staffNeed(worker.hunger)} · moral ${staffNeed(worker.morale)} · rahatlık ${staffNeed(worker.comfort)}`;
+  }
+
+  updateStaffNeeds(state) {
+    const list = this.elements['staff-list'];
+    if (!list?.querySelectorAll) return;
+    const workers = new Map(state.workers.map((worker) => [String(worker.id), worker]));
+    const english = state.settings.language === 'en';
+    for (const progress of list.querySelectorAll('[data-worker-energy]')) {
+      const worker = workers.get(progress.dataset.workerEnergy);
+      if (!worker) continue;
+      progress.value = staffNeed(worker.energy);
+      progress.classList.toggle('low-energy', progress.value <= 20);
+    }
+    for (const label of list.querySelectorAll('[data-worker-energy-label]')) {
+      const worker = workers.get(label.dataset.workerEnergyLabel);
+      if (worker) label.textContent = `${english ? 'Energy' : 'Enerji'} ${staffNeed(worker.energy)}/100`;
+    }
+    for (const label of list.querySelectorAll('[data-worker-break]')) {
+      const worker = workers.get(label.dataset.workerBreak);
+      if (worker) label.textContent = staffBreakText(worker, english);
+    }
+    for (const label of list.querySelectorAll('[data-worker-needs]')) {
+      const worker = workers.get(label.dataset.workerNeeds);
+      if (worker) label.textContent = this.staffNeedsText(worker, english);
+    }
+  }
+
+  renderStaffCandidates(state, role) {
+    const list = this.elements['staff-candidate-list'];
+    if (!list) return;
+    const english = state.settings.language === 'en';
+    const hire = STAFF_HIRES.find((entry) => entry.upgradeId === role);
+    const bundle = (hire?.staffTypes.length ?? 1) > 1;
+    if (this.elements['staff-candidate-eyebrow']) this.elements['staff-candidate-eyebrow'].textContent = english ? 'STAFF' : 'PERSONEL';
+    if (this.elements['staff-candidate-title']) this.elements['staff-candidate-title'].textContent = english ? 'Choose your staff' : 'Personelini seç';
+    if (this.elements['staff-candidate-intro']) this.elements['staff-candidate-intro'].textContent = bundle
+      ? (english ? 'Choose a chef and waiter team. The hiring fee covers both; salary is per person. Closing keeps the same candidates.' : 'Şef ve garson ekibini seç. İşe alım ücreti ikisini kapsar; maaş kişi başıdır. Kapatınca adaylar değişmez.')
+      : (english ? 'Compare three candidates. Payment is taken only when you hire. Closing keeps the same candidates.' : 'Üç adayı karşılaştır. Yalnızca işe alınca ödeme yapılır. Kapatınca adaylar değişmez.');
+    list.innerHTML = (state.staffCandidates?.[role] ?? []).map((candidate) => {
+      const archetype = STAFF_ARCHETYPES[candidate.archetypeId];
+      const affordable = state.economy.balanceAtoms >= candidate.hireCostAtoms;
+      return `<article class="staff-candidate-card"><div class="staff-candidate-heading">${assetIconMarkup(STAFF[hire?.staffTypes[0]]?.icon ?? 'workerAvatar', 44)}<div><h2>${escapeMarkup(candidate.name)}</h2><strong>${escapeMarkup(english ? archetype?.titleEn : archetype?.title)}</strong></div></div><p>${escapeMarkup(english ? archetype?.effectEn : archetype?.effect)}</p><div class="staff-candidate-costs"><span>${english ? 'Daily salary' : 'Günlük maaş'}${bundle ? (english ? ' / person' : ' / kişi') : ''}<strong>$${staffMoney(candidate.salaryAtoms, english)}</strong></span><span>${english ? 'Hiring fee' : 'İşe alım ücreti'}<strong>$${staffMoney(candidate.hireCostAtoms, english)}</strong></span></div><button class="buy-button" data-hire-candidate="${escapeMarkup(candidate.id)}" data-candidate-role="${escapeMarkup(role)}" ${affordable ? '' : 'disabled'}>${affordable ? (english ? 'Hire' : 'İşe al') : (english ? 'Insufficient funds' : 'Bakiye yetersiz')}</button></article>`;
+    }).join('');
   }
 
   #upgradeNameEnglish(id, fallback) {

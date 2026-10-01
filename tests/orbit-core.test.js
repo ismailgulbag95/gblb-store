@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { GameApplication } from '../src/application/GameApplication.js';
 import { advanceSimulation, findCustomerMarketRoute, routeCustomerToShelf } from '../src/domain/simulation.js';
-import { createInitialState, hydrateState } from '../src/domain/state.js';
+import { createInitialState, hydrateState, SAVE_VERSION } from '../src/domain/state.js';
 import { createFarmState } from '../src/domain/farm.js';
 import {
   canTransfer,
@@ -43,7 +43,7 @@ test('older v2 saves migrate customer and order fields without losing inventory'
   old.customers.push({ id: 'customer-90', kind: 'shopper', x: 5, z: 5, phase: 'leaving',
     shoppingList: ['TOMATO'], basket: [], demand: 'TOMATO' });
   const migrated = hydrateState(old);
-  assert.equal(migrated.saveVersion, 9);
+  assert.equal(migrated.saveVersion, SAVE_VERSION);
   assert.equal(migrated.stock.player.items.TOMATO, 2);
   assert.equal(migrated.customers[0].checkoutWaitTicks, 0);
   assert.equal(migrated.ordersCompleted, 0);
@@ -55,7 +55,7 @@ test('v6 saves migrate to the bonus-offer defaults without losing player capacit
   delete old.bonusOffers;
   const migrated = hydrateState(old);
 
-  assert.equal(migrated.saveVersion, 9);
+  assert.equal(migrated.saveVersion, SAVE_VERSION);
   assert.deepEqual(migrated.bonusOffers, {
     activePlayMs: 0,
     nextOfferAtActiveMs: 180_000,
@@ -189,7 +189,7 @@ test('legacy farm saves retain ripe quantity and upgrade to independent timers',
   delete legacy.farms.tomatoFarm.plants;
 
   const migrated = hydrateState(legacy);
-  assert.equal(migrated.saveVersion, 9);
+  assert.equal(migrated.saveVersion, SAVE_VERSION);
   assert.equal(migrated.farms.tomatoFarm.plants.length, 4);
   assert.equal(migrated.farms.tomatoFarm.plants.filter((plant) => plant.ready).length, 3);
   assert.equal(migrated.stock['farm:TOMATO'].items.TOMATO, 3);
@@ -210,7 +210,7 @@ test('version four farm timers migrate to one evenly phased cycle without losing
 
   const migrated = hydrateState(legacy);
   const plants = migrated.farms.tomatoFarm.plants;
-  assert.equal(migrated.saveVersion, 9);
+  assert.equal(migrated.saveVersion, SAVE_VERSION);
   assert.equal(migrated.farms.tomatoFarm.readyCount, 1);
   assert.equal(migrated.stock['farm:TOMATO'].items.TOMATO, 1);
   assert.deepEqual(plants.map((plant) => plant.cycleTicks), [45, 45, 45, 45]);
@@ -919,7 +919,7 @@ test('legacy furniture save migration removes dynamic assets, their stock, and i
   assert.equal(state.diningTables.legacyTable, undefined);
   assert.equal(state.customers.some((customer) => customer.id === 'legacy-diner'), false);
   assert.deepEqual(state.layout, { tomatoFarm: { x: -10, z: 5 } });
-  assert.equal(state.saveVersion, 9);
+  assert.equal(state.saveVersion, SAVE_VERSION);
 });
 
 test('AdMob browser adapter remains not ready until a native bridge is supplied', async () => {

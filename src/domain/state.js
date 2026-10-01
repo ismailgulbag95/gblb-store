@@ -1,10 +1,11 @@
-import { ITEMS, SHELVES, STATIONS } from './catalog.js';
+import { ITEMS, SHELVES, STATIONS, STAFF_FACILITIES, STAFF_HIRES } from './catalog.js';
+import { normalizeWorkerWelfare } from './staff.js';
 import { createFarmState, ensureFarmState, syncFarmHarvest } from './farm.js';
 import { canPlaceDecoration } from './layout.js';
 import { machineSpeedMultiplier, staffSpeedMultiplier } from './progression.js';
 import { PLAYER_CHARACTER_IDS } from './characters.js';
 
-export const SAVE_VERSION = 9;
+export const SAVE_VERSION = 10;
 
 function emptyStock(capacity) {
   return { capacity, items: {}, reserved: {}, reservedCapacity: 0 };
@@ -72,6 +73,9 @@ export function createInitialState(seed = 0x51f15e) {
     diningTables: {},
     customers: [],
     workers: [],
+    staffLandCleared: false,
+    staffFacilities: {},
+    staffCandidates: {},
     nextEntityId: 1,
     unlocked: { tomatoFarm: true, register: true, tomatoShelf: true },
     availableUpgrades: ['tomatoFarm2'],
@@ -234,13 +238,14 @@ function removeLegacyFurniture(candidate) {
   }
 
   state.customStations = {};
-  state.layout = Object.fromEntries(Object.entries(state.layout ?? {}).filter(([id]) => Boolean(STATIONS[id])));
+  state.layout = Object.fromEntries(Object.entries(state.layout ?? {}).filter(([id]) => Boolean(STATIONS[id])
+    || id.startsWith('staff-') && state.staffLandCleared && state.staffFacilities?.[id.slice(6)]));
   return state;
 }
 
 export function hydrateState(candidate) {
   if (!candidate || typeof candidate !== 'object') throw new Error('Kayıt boş veya bozuk.');
-  if (![2, 3, 4, 5, 6, 7, 8, SAVE_VERSION].includes(candidate.saveVersion)) throw new Error(`Bu kayıt sürümü desteklenmiyor (${candidate.saveVersion ?? 'bilinmiyor'}).`);
+  if (![2, 3, 4, 5, 6, 7, 8, 9, SAVE_VERSION].includes(candidate.saveVersion)) throw new Error(`Bu kayıt sürümü desteklenmiyor (${candidate.saveVersion ?? 'bilinmiyor'}).`);
   candidate = removeLegacyFurniture(candidate);
   const initial = createInitialState(candidate.rng);
   const hydrated = { ...initial, ...candidate };
@@ -303,9 +308,18 @@ export function hydrateState(candidate) {
     }];
   }));
   hydrated.customStations = { ...(candidate.customStations ?? {}) };
+  hydrated.staffLandCleared = candidate.staffLandCleared === true;
+  hydrated.staffFacilities = hydrated.staffLandCleared ? Object.fromEntries(Object.keys(candidate.staffFacilities ?? {})
+    .filter(id => STAFF_FACILITIES[id]).map(id => [id, { id }])) : {};
+  hydrated.staffCandidates = Object.fromEntries(STAFF_HIRES.map(hire => [hire.upgradeId,
+    (Array.isArray(candidate.staffCandidates?.[hire.upgradeId]) ? candidate.staffCandidates[hire.upgradeId] : [])
+      .filter(entry => entry && typeof entry.id === 'string' && typeof entry.name === 'string'
+        && entry.role === hire.upgradeId && normalizeWorkerWelfare({ type: hire.staffTypes[0], archetypeId: entry.archetypeId }).archetypeId
+        && Number.isSafeInteger(entry.salaryAtoms) && entry.salaryAtoms > 0
+        && Number.isSafeInteger(entry.hireCostAtoms) && entry.hireCostAtoms > 0).slice(0, 3)]));
   hydrated.selfRegisters = { ...(candidate.selfRegisters ?? {}) };
   hydrated.layout = Object.fromEntries(Object.entries(candidate.layout ?? {}).filter(([id, point]) =>
-    (STATIONS[id] || candidate.customStations?.[id] || candidate.selfRegisters?.[id] || id.includes('_') || id.startsWith('selfRegister') || id.startsWith('custom_')) && Number.isFinite(point?.x) && Number.isFinite(point?.z)));
+    (STATIONS[id] || hydrated.staffFacilities[id.slice(6)] && id.startsWith('staff-') || candidate.customStations?.[id] || candidate.selfRegisters?.[id] || id.includes('_') || id.startsWith('selfRegister') || id.startsWith('custom_')) && Number.isFinite(point?.x) && Number.isFinite(point?.z)));
   hydrated.pendingShelfIds = [...new Set((Array.isArray(candidate.pendingShelfIds) ? candidate.pendingShelfIds : [])
     .filter((id) => STATIONS[id]?.kind === 'shelf' && !hydrated.layout[id]
       && Array.isArray(hydrated.unlockedProducts) && hydrated.unlockedProducts.includes(STATIONS[id].item)))];
@@ -378,7 +392,7 @@ export function hydrateState(candidate) {
   });
   hydrated.farms = Object.fromEntries(Object.entries(hydrated.farms).map(([id, farm]) => [id,
     ensureFarmState({ ...farm }, hydrated.tick, id)]));
-  hydrated.workers = hydrated.workers.map((worker) => ({
+  hydrated.workers = hydrated.workers.map((worker) => normalizeWorkerWelfare({
     ...worker,
     unlocked: true,
     upgradeLevel: Number.isSafeInteger(worker.upgradeLevel) && worker.upgradeLevel >= 0 ? worker.upgradeLevel : 0,

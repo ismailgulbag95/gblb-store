@@ -123,8 +123,13 @@ export class CharacterAnimator {
     const time = this.clock + this.offset;
     const moving = distance > 0.0001;
     const wave = Math.sin(a.walkCycle);
-    const sitting = ['waiting-meal', 'eating', 'ready-tip'].includes(this.entity.phase)
-      && (!this.action || this.action.type === 'receive');
+    const onBreak = this.kind === 'worker' && this.entity.break?.phase === 'resting'
+      && !this.action && !moving && this.path.length === 0;
+    const sitting = (['waiting-meal', 'eating', 'ready-tip'].includes(this.entity.phase)
+      && (!this.action || this.action.type === 'receive'))
+      || onBreak && this.entity.break.facilityId === 'rest';
+    const fatigue = this.kind === 'worker' && !onBreak
+      ? clamp((20 - (this.entity.energy ?? 100)) / 20, 0, 1) : 0;
     let facing = moving ? this.travelFacing : this.entity.facing ?? 0;
     if (this.action) {
       const point = this.action.target.point;
@@ -137,7 +142,7 @@ export class CharacterAnimator {
     a.group.rotation.x = THREE.MathUtils.lerp(a.group.rotation.x, 0, blend);
     a.group.rotation.z = THREE.MathUtils.lerp(a.group.rotation.z, 0, blend);
     a.group.position.y = THREE.MathUtils.lerp(a.group.position.y, sitting ? 0.11 : 0, blend);
-    a.torso.rotation.x = THREE.MathUtils.lerp(a.torso.rotation.x, this.action ? 0.16 : 0, blend);
+    a.torso.rotation.x = THREE.MathUtils.lerp(a.torso.rotation.x, this.action ? 0.16 : fatigue * 0.07, blend);
     a.torso.position.z = THREE.MathUtils.lerp(a.torso.position.z, this.action ? 0.08 : 0, blend);
     for (let i = 0; i < 2; i++) {
       const sign = i ? -1 : 1;
@@ -162,10 +167,14 @@ export class CharacterAnimator {
       a.elbows[i].rotation.z = THREE.MathUtils.lerp(a.elbows[i].rotation.z, 0, blend);
       a.wrists[i].rotation.set(0, 0, Math.sin(time * 1.3) * 0.018);
     }
-    a.head.rotation.x = THREE.MathUtils.lerp(a.head.rotation.x, sitting ? 0.14 : 0.02, blend);
+    a.head.rotation.x = THREE.MathUtils.lerp(a.head.rotation.x, sitting ? 0.14 : 0.02 + fatigue * 0.09, blend);
     a.head.rotation.y = THREE.MathUtils.lerp(a.head.rotation.y, Math.sin(time * 0.7) * 0.055, blend);
     a.head.rotation.z = THREE.MathUtils.lerp(a.head.rotation.z, 0, blend);
-    if (this.kind === 'worker' && this.context.paying && !this.action && !moving) {
+    if (onBreak && this.entity.break.facilityId === 'kitchen') {
+      a.arms[1].rotation.x = THREE.MathUtils.lerp(a.arms[1].rotation.x, -0.74, blend);
+      a.elbows[1].rotation.x = THREE.MathUtils.lerp(a.elbows[1].rotation.x, -1.25, blend);
+    }
+    if (this.kind === 'worker' && this.context.paying && !this.entity.break && !this.action && !moving) {
       a.arms[1].rotation.x = THREE.MathUtils.lerp(a.arms[1].rotation.x, -0.6, blend);
       a.elbows[1].rotation.x = -0.45;
       a.head.rotation.x = 0.12;
@@ -341,6 +350,11 @@ export class CharacterAnimator {
 
   syncEquipment() {
     const a = this.actor;
+    if (a.propObjects.breakMug) {
+      a.propObjects.breakMug.visible = this.kind === 'worker'
+        && this.entity.break?.phase === 'resting' && this.entity.break.facilityId === 'kitchen'
+        && !this.action && this.path.length === 0;
+    }
     if (a.propObjects.box) {
       a.propObjects.box.visible = this.kind === 'worker'
         && (Boolean(Object.values(this.context.items ?? {}).some((n) => n > 0))

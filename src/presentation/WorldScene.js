@@ -6,6 +6,7 @@ import { Engine } from '../core/Engine.js';
 import { MarketGrid } from '../environment/MarketGrid.js';
 import { ITEMS, RECIPES, SHELVES, STATIONS } from '../domain/catalog.js';
 import { gameDaylight } from '../domain/dayCycle.js';
+import { workerWorkSpeed } from '../domain/staff.js';
 import { CharacterFactory } from './CharacterFactory.js';
 import { animateCoopChicken, createChickenCoopModel } from './ChickenCoopModel.js';
 import { createFarmBuildModel } from './FarmBuildModel.js';
@@ -20,7 +21,7 @@ import { Item3DFactory } from './Item3DFactory.js';
 import { createRegisterModel } from './RegisterModel.js';
 import { createShelfModel } from './ShelfModel.js';
 import { buildDecorationModel } from './DecorationModel.js';
-import { createWorkerMesh, createCustomerMesh } from './HumanoidFactory.js';
+import { createWorkerMesh, createCustomerMesh, updateWorkerEnergyBar } from './HumanoidFactory.js';
 import { createDiningTableModel } from './DiningTableModel.js';
 import { CharacterAnimator } from './CharacterAnimator.js';
 
@@ -1028,6 +1029,7 @@ export class WorldScene {
     const time = this.clock.elapsedTime;
     this.lighting.updateDaylight(gameDaylight, state.tick, THREE);
     this.environment.setRestaurantUnlocked(state.unlocked?.restaurant);
+    this.environment.syncStaffFacilities(state);
     this.environment.update(frameDelta, time);
     const wasMoving = Math.hypot(state.player.x - this.playerMesh.position.x, state.player.z - this.playerMesh.position.z) > 0.001;
     if (this.playerCharacter.type !== state.player.character) {
@@ -1408,10 +1410,11 @@ export class WorldScene {
       actor.animator ??= new CharacterAnimator(actor, this.itemFactory, 'worker');
       actor.animator.update(worker, state.paused ? 0 : frameDelta, {
         items: state.stock['worker:' + worker.id]?.items ?? {},
-        speed: state.speedMultiplier,
+        speed: state.speedMultiplier * workerWorkSpeed(worker),
         resolveTarget: (cue) => this.#animationTarget(cue, state, actor),
         paying: worker.type === 'cashier' && state.customers.some((customer) => customer.phase === 'paying'),
       });
+      updateWorkerEnergyBar(actor, worker, this.engine.camera.quaternion);
     });
 
     for (const marker of this.upgradeMarkers.values()) {

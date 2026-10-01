@@ -3,6 +3,8 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
 import { GAME_CONFIG } from '../config/GameConfig.js';
 import { SHELF_STAGING_AREA } from '../domain/layout.js';
 import { EnvironmentProps } from './EnvironmentProps.js';
+import { STAFF_FACILITIES } from '../domain/catalog.js';
+import { createStaffFacilityModel, disposeStaffFacilityModel } from '../presentation/StaffFacilityModel.js';
 
 export class MarketGrid {
   constructor(scene) {
@@ -10,6 +12,9 @@ export class MarketGrid {
     this.obstacles = []; // array of { min: {x, z}, max: {x, z} }
     this.restaurantGates = [];
     this.restaurantUnlocked = false;
+    this.staffFacilities = new Map();
+    this.staffLand = null;
+    this.staffPlotTrees = [];
     this.props = new EnvironmentProps(scene);
     this.buildEnvironment();
   }
@@ -207,9 +212,9 @@ export class MarketGrid {
     // 14. Lush Trees & Forest Perimeter
     this.props.createOakTree(-52, 4, 1.3);
     this.props.createOakTree(-51, -6, 1.2);
-    this.props.createOakTree(-3.5, -15, 1.1);
-    this.props.createOakTree(2, -14, 1.2);
-    this.props.createOakTree(12, -14, 1.0);
+    this.staffPlotTrees.push(this.props.createOakTree(-3.5, -15, 1.1));
+    this.staffPlotTrees.push(this.props.createOakTree(2, -14, 1.2));
+    this.staffPlotTrees.push(this.props.createOakTree(12, -14, 1.0));
     this.props.createPineTree(30, -5, 1.1);
     this.props.createPineTree(30, 4, 1.2);
     this.props.createPineTree(-37, -10, 1.2);
@@ -1021,6 +1026,57 @@ export class MarketGrid {
 
   getObstacles() {
     return this.obstacles;
+  }
+
+  syncStaffFacilities(state) {
+    const cleared = Boolean(state.staffLandCleared);
+    for (const tree of this.staffPlotTrees) tree.visible = !cleared;
+    if (cleared && !this.staffLand) {
+      this.staffLand = new THREE.Group();
+      this.staffLand.name = 'staff-north-land';
+      const floor = new THREE.Mesh(new THREE.PlaneGeometry(17, 11),
+        new THREE.MeshStandardMaterial({ color: 0xb9c89e, roughness: 0.9 }));
+      floor.rotation.x = -Math.PI / 2;
+      floor.position.set(5, 0.01, -14.5);
+      floor.receiveShadow = true;
+      this.staffLand.add(floor);
+      const path = new THREE.Mesh(new THREE.PlaneGeometry(17, 1.7),
+        new THREE.MeshStandardMaterial({ color: 0xe0ddcc, roughness: 0.85 }));
+      path.rotation.x = -Math.PI / 2;
+      path.position.set(5, 0.025, -11);
+      path.receiveShadow = true;
+      this.staffLand.add(path);
+      this.scene.add(this.staffLand);
+    } else if (!cleared && this.staffLand) {
+      disposeStaffFacilityModel(this.staffLand);
+      this.staffLand = null;
+    }
+    for (const [id, model] of this.staffFacilities) {
+      if (cleared && state.staffFacilities?.[id] && STAFF_FACILITIES[id]) continue;
+      disposeStaffFacilityModel(model);
+      this.staffFacilities.delete(id);
+      const index = this.obstacles.findIndex((box) => box.staffFacilityId === id);
+      if (index >= 0) this.obstacles.splice(index, 1);
+    }
+    if (!cleared) return;
+    for (const id of Object.keys(state.staffFacilities ?? {})) {
+      const definition = STAFF_FACILITIES[id];
+      if (!definition) continue;
+      let model = this.staffFacilities.get(id);
+      if (!model) {
+        model = createStaffFacilityModel(definition);
+        this.staffFacilities.set(id, model);
+        this.scene.add(model);
+        this.obstacles.push({ staffFacilityId: id, min: {}, max: {} });
+      }
+      const position = state.layout?.[`staff-${id}`] ?? definition;
+      model.position.set(position.x, 0, position.z);
+      const obstacle = this.obstacles.find((box) => box.staffFacilityId === id);
+      obstacle.min.x = position.x - definition.width / 2;
+      obstacle.max.x = position.x + definition.width / 2;
+      obstacle.min.z = position.z - definition.depth / 2;
+      obstacle.max.z = position.z + definition.depth / 2;
+    }
   }
 
   update(delta, time) {
