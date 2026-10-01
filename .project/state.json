@@ -1,6 +1,6 @@
 {
   "schema_version": 3,
-  "revision": 90,
+  "revision": 93,
   "project": {
     "id": "gblb-store-3d",
     "name": "GBLB Store 3D Procedural World Transformation",
@@ -3496,6 +3496,251 @@
         }
       },
       "support_snapshot": null
+    },
+    {
+      "acceptance": [
+        "Beş arketipten üç aday, kişisel maaş ve ücretli seçim; v9 kayıtları güvenle v10 olarak yüklenir.",
+        "Enerji ve ihtiyaçlar gerçek görevlerde azalır; tesislere mola ve işe dönüş, rezervasyon ve yumuşak tükenme modeliyle işler.",
+        "Kuzey arsa ve WC, dinlenme alanı, mutfak satın alımı, layout ve prosedürel 3D/HUD gösterimi çalışır.",
+        "Hedefli assert testleri, npm test, Vite derlemesi ve somut görsel/performance kontrolleri kayıt altına alınır."
+      ],
+      "evidence": [
+        {
+          "note": "Beş arketip, kalıcı üç aday, kişisel ücret; satır yüzde100/dal yüzde86.25 kapsam.",
+          "path": "src/domain/staff.js",
+          "reviewer": "agent",
+          "criterion": 0,
+          "sha256": "ce91e4c55eb3ac577ae57e3eb4cf279d99df98b7f689e3de342bcd1440e33412"
+        },
+        {
+          "note": "SAVE_VERSION10; eski sürüm2–9 kaydı, stok, maaş, tesis layout ve mola slotu korunur.",
+          "path": "src/domain/state.js",
+          "reviewer": "agent",
+          "criterion": 0,
+          "sha256": "986746ee88d3b301f8de9e209c059b1975f46814710dddb8a9159f157867f162"
+        },
+        {
+          "note": "Enerji çalışma durumunda azalır; ödeme alan kasiyer düzeltildi. Rezervasyonlu teslim moladan önce biter; kapasite, erişim iptali, yumuşak tükenme ve işe dönüş.",
+          "path": "src/domain/simulation.js",
+          "reviewer": "agent",
+          "criterion": 1,
+          "sha256": "95ec7cb2cdae37013af25e9fd53467a54915971b63ce96720f6a53ba9fa34f97"
+        },
+        {
+          "note": "İşe alım/arsa/tesis komutları tek ledger işlemiyle kaydolur; kişisel günlük maaşlar tahsil edilir.",
+          "path": "src/application/GameApplication.js",
+          "reviewer": "agent",
+          "criterion": 1,
+          "sha256": "1336a6153396a579437257830ebc09a30580a20c329c17606fecafdb865aab72"
+        },
+        {
+          "note": "Kuzeyde z-9..-20 plot, temizlenen ağaçlar, tesis ve çarpışma senkronizasyonu.",
+          "path": "src/environment/MarketGrid.js",
+          "reviewer": "agent",
+          "criterion": 2,
+          "sha256": "51e1cdb7b565255e282a2bf63bc09448bb1716bac3803de31fdba9ac71fd0204"
+        },
+        {
+          "note": "Prosedürel WC/lounge/kitchen. Kullanım giriş erişim noktasında temsil edilir; iç mekâna yürüyüş yok.",
+          "path": "src/presentation/StaffFacilityModel.js",
+          "reviewer": "agent",
+          "criterion": 2,
+          "sha256": "21b9201ab9b303e64bad0ee35fe53e4010240eee0b5fc868ce57fd09e6006580"
+        },
+        {
+          "note": "Üç aday dialogu, canlı ihtiyaçlar, arketip/kişisel ücret ve tesis satın alım UI.",
+          "path": "src/presentation/HUD.js",
+          "reviewer": "agent",
+          "criterion": 2,
+          "sha256": "3ea17edfda4c4452137f3ec751d0c155f5129237ba21f53f7b12c7e1d8ead91e"
+        },
+        {
+          "note": "12 domain/app/save/ürün rezervasyonu hedefli test.",
+          "path": "tests/staff-welfare.test.js",
+          "reviewer": "agent",
+          "criterion": 3,
+          "sha256": "263497fbbd423c2efabf015c5a78d3d65b2d729dd18bbc380485efb2a0c6280e"
+        },
+        {
+          "note": "9 aday, satın alım ve modal/duraklatma testi.",
+          "path": "tests/staff-hud.test.js",
+          "reviewer": "agent",
+          "criterion": 3,
+          "sha256": "f1afd6e056825d28d2a3651059612c293ab9b820721155367b6d484831d37141"
+        },
+        {
+          "note": "6 model kaynak temizliği, ihtiyaç barı, gerçek mola pozu testi.",
+          "path": "tests/staff-facilities-visual.test.js",
+          "reviewer": "agent",
+          "criterion": 3,
+          "sha256": "57a99251ef79f0c17baa81803d1205fc93dbae57bd474988cbd7dfa0c8b80bf1"
+        },
+        {
+          "note": "123/123 test, Vite build başarılı; görsel/UI ve CPU/GPU ölçümleri. Genel proje check eski kanıt hashleri nedeniyle okfalse; kullanıcı kabulü verilmedi.",
+          "path": "tests/fixtures/staff-welfare-verification.md",
+          "reviewer": "agent",
+          "criterion": 3,
+          "sha256": "849392e7a1e7673ab41a3c93666fe22d1e074d154ec154609bad83afac33ce6b"
+        },
+        {
+          "note": "İzole tarayıcı QA sahnesinde üç kuzey tesis ve kullanım pozları.",
+          "path": "tests/fixtures/staff-welfare-visual.jpg",
+          "reviewer": "agent",
+          "criterion": 3,
+          "sha256": "46af9829464024734fcf5dc633562dfee59bef37e3b13148f1764158748b15a3"
+        }
+      ],
+      "input_ids": [
+        "mod-supermarket"
+      ],
+      "status": "review",
+      "title": "Personel adayları, yorulma ve kuzey sosyal tesisleri",
+      "object_ids": [
+        "mod-supermarket"
+      ],
+      "id": "T-STAFF-WELFARE-FACILITIES",
+      "output_ids": [],
+      "decision_ids": [],
+      "depends_on": [],
+      "input_snapshot": {
+        "sha256": "a6a1bb7cdb8ba0e58c63a3ff82f4d67657b31fda76d2b52c1decbc20cce2c673",
+        "manifest": {
+          "graph": {
+            "inputs": [
+              "mod-supermarket"
+            ],
+            "objects": [
+              {
+                "id": "mod-supermarket",
+                "type": "scene_module",
+                "properties": {
+                  "name": "Supermarket Interior",
+                  "description": "Cilalı fayans zemin, manav stantları, gondol reyonlar, içecek dolapları, kasa konveyör hattı",
+                  "phase": 1
+                }
+              }
+            ],
+            "object_types": [
+              {
+                "id": "scene_module",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "required": true,
+                    "enum": null
+                  },
+                  "description": {
+                    "type": "string",
+                    "required": true,
+                    "enum": null
+                  },
+                  "phase": {
+                    "type": "integer",
+                    "required": true,
+                    "enum": null
+                  }
+                }
+              }
+            ],
+            "relation_types": [
+              {
+                "id": "contains",
+                "from_type": "scene_module",
+                "to_type": "procedural_asset",
+                "from_min": 0,
+                "from_max": null,
+                "to_min": 0,
+                "to_max": null,
+                "impact": "forward"
+              }
+            ],
+            "relations": [],
+            "files": []
+          },
+          "producer_generations": {},
+          "contract": {
+            "input_fields": {},
+            "acceptance_rules": [],
+            "support_groups": []
+          }
+        }
+      },
+      "generation": 0,
+      "review_reasons": [],
+      "run_snapshot": {
+        "sha256": "a6a1bb7cdb8ba0e58c63a3ff82f4d67657b31fda76d2b52c1decbc20cce2c673",
+        "manifest": {
+          "graph": {
+            "inputs": [
+              "mod-supermarket"
+            ],
+            "objects": [
+              {
+                "id": "mod-supermarket",
+                "type": "scene_module",
+                "properties": {
+                  "name": "Supermarket Interior",
+                  "description": "Cilalı fayans zemin, manav stantları, gondol reyonlar, içecek dolapları, kasa konveyör hattı",
+                  "phase": 1
+                }
+              }
+            ],
+            "object_types": [
+              {
+                "id": "scene_module",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "required": true,
+                    "enum": null
+                  },
+                  "description": {
+                    "type": "string",
+                    "required": true,
+                    "enum": null
+                  },
+                  "phase": {
+                    "type": "integer",
+                    "required": true,
+                    "enum": null
+                  }
+                }
+              }
+            ],
+            "relation_types": [
+              {
+                "id": "contains",
+                "from_type": "scene_module",
+                "to_type": "procedural_asset",
+                "from_min": 0,
+                "from_max": null,
+                "to_min": 0,
+                "to_max": null,
+                "impact": "forward"
+              }
+            ],
+            "relations": [],
+            "files": []
+          },
+          "producer_generations": {},
+          "contract": {
+            "input_fields": {},
+            "acceptance_rules": [],
+            "support_groups": []
+          }
+        }
+      },
+      "output_snapshot": {
+        "sha256": "5be4e3c99f05c10c081b279674e4a4da11ce339c86efcd152c698e0f08b68054",
+        "manifest": {
+          "inputs": [],
+          "objects": [],
+          "object_types": [],
+          "relation_types": [],
+          "relations": [],
+          "files": []
+        }
+      }
     }
   ],
   "decisions": [],
@@ -31741,6 +31986,548 @@
                 }
               },
               "support_snapshot": null
+            }
+          }
+        ]
+      }
+    },
+    {
+      "revision": 91,
+      "action": "extend_model",
+      "actor": "agent",
+      "reason": "Kullanıcının personel arketipleri, enerji döngüsü ve kuzey tesisleri isteği",
+      "change": {
+        "objects": [],
+        "relations": [],
+        "tasks": [
+          {
+            "acceptance": [
+              "Beş arketipten üç aday, kişisel maaş ve ücretli seçim; v9 kayıtları güvenle v10 olarak yüklenir.",
+              "Enerji ve ihtiyaçlar gerçek görevlerde azalır; tesislere mola ve işe dönüş, rezervasyon ve yumuşak tükenme modeliyle işler.",
+              "Kuzey arsa ve WC, dinlenme alanı, mutfak satın alımı, layout ve prosedürel 3D/HUD gösterimi çalışır.",
+              "Hedefli assert testleri, npm test, Vite derlemesi ve somut görsel/performance kontrolleri kayıt altına alınır."
+            ],
+            "evidence": [],
+            "input_ids": [
+              "mod-supermarket"
+            ],
+            "status": "todo",
+            "title": "Personel adayları, yorulma ve kuzey sosyal tesisleri",
+            "object_ids": [
+              "mod-supermarket"
+            ],
+            "id": "T-STAFF-WELFARE-FACILITIES",
+            "output_ids": [],
+            "decision_ids": [],
+            "depends_on": [],
+            "input_snapshot": null,
+            "generation": 0,
+            "review_reasons": []
+          }
+        ],
+        "impact": {
+          "changed_objects": [],
+          "changed_relations": [],
+          "affected_objects": [],
+          "paths": {},
+          "affected_tasks": []
+        },
+        "task_changes": [
+          {
+            "task_id": "T-STAFF-WELFARE-FACILITIES",
+            "before": null,
+            "after": {
+              "acceptance": [
+                "Beş arketipten üç aday, kişisel maaş ve ücretli seçim; v9 kayıtları güvenle v10 olarak yüklenir.",
+                "Enerji ve ihtiyaçlar gerçek görevlerde azalır; tesislere mola ve işe dönüş, rezervasyon ve yumuşak tükenme modeliyle işler.",
+                "Kuzey arsa ve WC, dinlenme alanı, mutfak satın alımı, layout ve prosedürel 3D/HUD gösterimi çalışır.",
+                "Hedefli assert testleri, npm test, Vite derlemesi ve somut görsel/performance kontrolleri kayıt altına alınır."
+              ],
+              "evidence": [],
+              "input_ids": [
+                "mod-supermarket"
+              ],
+              "status": "todo",
+              "title": "Personel adayları, yorulma ve kuzey sosyal tesisleri",
+              "object_ids": [
+                "mod-supermarket"
+              ],
+              "id": "T-STAFF-WELFARE-FACILITIES",
+              "output_ids": [],
+              "decision_ids": [],
+              "depends_on": [],
+              "input_snapshot": null,
+              "generation": 0,
+              "review_reasons": []
+            }
+          }
+        ]
+      }
+    },
+    {
+      "revision": 92,
+      "action": "start_task",
+      "actor": "agent",
+      "reason": "Personel sistemi uygulama ve doğrulama çalışması",
+      "change": {
+        "task_changes": [
+          {
+            "task_id": "T-STAFF-WELFARE-FACILITIES",
+            "before": {
+              "acceptance": [
+                "Beş arketipten üç aday, kişisel maaş ve ücretli seçim; v9 kayıtları güvenle v10 olarak yüklenir.",
+                "Enerji ve ihtiyaçlar gerçek görevlerde azalır; tesislere mola ve işe dönüş, rezervasyon ve yumuşak tükenme modeliyle işler.",
+                "Kuzey arsa ve WC, dinlenme alanı, mutfak satın alımı, layout ve prosedürel 3D/HUD gösterimi çalışır.",
+                "Hedefli assert testleri, npm test, Vite derlemesi ve somut görsel/performance kontrolleri kayıt altına alınır."
+              ],
+              "evidence": [],
+              "input_ids": [
+                "mod-supermarket"
+              ],
+              "status": "todo",
+              "title": "Personel adayları, yorulma ve kuzey sosyal tesisleri",
+              "object_ids": [
+                "mod-supermarket"
+              ],
+              "id": "T-STAFF-WELFARE-FACILITIES",
+              "output_ids": [],
+              "decision_ids": [],
+              "depends_on": [],
+              "input_snapshot": null,
+              "generation": 0,
+              "review_reasons": []
+            },
+            "after": {
+              "acceptance": [
+                "Beş arketipten üç aday, kişisel maaş ve ücretli seçim; v9 kayıtları güvenle v10 olarak yüklenir.",
+                "Enerji ve ihtiyaçlar gerçek görevlerde azalır; tesislere mola ve işe dönüş, rezervasyon ve yumuşak tükenme modeliyle işler.",
+                "Kuzey arsa ve WC, dinlenme alanı, mutfak satın alımı, layout ve prosedürel 3D/HUD gösterimi çalışır.",
+                "Hedefli assert testleri, npm test, Vite derlemesi ve somut görsel/performance kontrolleri kayıt altına alınır."
+              ],
+              "evidence": [],
+              "input_ids": [
+                "mod-supermarket"
+              ],
+              "status": "doing",
+              "title": "Personel adayları, yorulma ve kuzey sosyal tesisleri",
+              "object_ids": [
+                "mod-supermarket"
+              ],
+              "id": "T-STAFF-WELFARE-FACILITIES",
+              "output_ids": [],
+              "decision_ids": [],
+              "depends_on": [],
+              "input_snapshot": null,
+              "generation": 0,
+              "review_reasons": [],
+              "run_snapshot": {
+                "sha256": "a6a1bb7cdb8ba0e58c63a3ff82f4d67657b31fda76d2b52c1decbc20cce2c673",
+                "manifest": {
+                  "graph": {
+                    "inputs": [
+                      "mod-supermarket"
+                    ],
+                    "objects": [
+                      {
+                        "id": "mod-supermarket",
+                        "type": "scene_module",
+                        "properties": {
+                          "name": "Supermarket Interior",
+                          "description": "Cilalı fayans zemin, manav stantları, gondol reyonlar, içecek dolapları, kasa konveyör hattı",
+                          "phase": 1
+                        }
+                      }
+                    ],
+                    "object_types": [
+                      {
+                        "id": "scene_module",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "required": true,
+                            "enum": null
+                          },
+                          "description": {
+                            "type": "string",
+                            "required": true,
+                            "enum": null
+                          },
+                          "phase": {
+                            "type": "integer",
+                            "required": true,
+                            "enum": null
+                          }
+                        }
+                      }
+                    ],
+                    "relation_types": [
+                      {
+                        "id": "contains",
+                        "from_type": "scene_module",
+                        "to_type": "procedural_asset",
+                        "from_min": 0,
+                        "from_max": null,
+                        "to_min": 0,
+                        "to_max": null,
+                        "impact": "forward"
+                      }
+                    ],
+                    "relations": [],
+                    "files": []
+                  },
+                  "producer_generations": {},
+                  "contract": {
+                    "input_fields": {},
+                    "acceptance_rules": [],
+                    "support_groups": []
+                  }
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "revision": 93,
+      "action": "submit_evidence",
+      "actor": "agent",
+      "reason": "Personel sistemi uygulandı; 123 test, derleme ve görsel kontrol kanıtları. İnsan kabulü sayılmaz.",
+      "change": {
+        "task_changes": [
+          {
+            "task_id": "T-STAFF-WELFARE-FACILITIES",
+            "before": {
+              "acceptance": [
+                "Beş arketipten üç aday, kişisel maaş ve ücretli seçim; v9 kayıtları güvenle v10 olarak yüklenir.",
+                "Enerji ve ihtiyaçlar gerçek görevlerde azalır; tesislere mola ve işe dönüş, rezervasyon ve yumuşak tükenme modeliyle işler.",
+                "Kuzey arsa ve WC, dinlenme alanı, mutfak satın alımı, layout ve prosedürel 3D/HUD gösterimi çalışır.",
+                "Hedefli assert testleri, npm test, Vite derlemesi ve somut görsel/performance kontrolleri kayıt altına alınır."
+              ],
+              "evidence": [],
+              "input_ids": [
+                "mod-supermarket"
+              ],
+              "status": "doing",
+              "title": "Personel adayları, yorulma ve kuzey sosyal tesisleri",
+              "object_ids": [
+                "mod-supermarket"
+              ],
+              "id": "T-STAFF-WELFARE-FACILITIES",
+              "output_ids": [],
+              "decision_ids": [],
+              "depends_on": [],
+              "input_snapshot": null,
+              "generation": 0,
+              "review_reasons": [],
+              "run_snapshot": {
+                "sha256": "a6a1bb7cdb8ba0e58c63a3ff82f4d67657b31fda76d2b52c1decbc20cce2c673",
+                "manifest": {
+                  "graph": {
+                    "inputs": [
+                      "mod-supermarket"
+                    ],
+                    "objects": [
+                      {
+                        "id": "mod-supermarket",
+                        "type": "scene_module",
+                        "properties": {
+                          "name": "Supermarket Interior",
+                          "description": "Cilalı fayans zemin, manav stantları, gondol reyonlar, içecek dolapları, kasa konveyör hattı",
+                          "phase": 1
+                        }
+                      }
+                    ],
+                    "object_types": [
+                      {
+                        "id": "scene_module",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "required": true,
+                            "enum": null
+                          },
+                          "description": {
+                            "type": "string",
+                            "required": true,
+                            "enum": null
+                          },
+                          "phase": {
+                            "type": "integer",
+                            "required": true,
+                            "enum": null
+                          }
+                        }
+                      }
+                    ],
+                    "relation_types": [
+                      {
+                        "id": "contains",
+                        "from_type": "scene_module",
+                        "to_type": "procedural_asset",
+                        "from_min": 0,
+                        "from_max": null,
+                        "to_min": 0,
+                        "to_max": null,
+                        "impact": "forward"
+                      }
+                    ],
+                    "relations": [],
+                    "files": []
+                  },
+                  "producer_generations": {},
+                  "contract": {
+                    "input_fields": {},
+                    "acceptance_rules": [],
+                    "support_groups": []
+                  }
+                }
+              }
+            },
+            "after": {
+              "acceptance": [
+                "Beş arketipten üç aday, kişisel maaş ve ücretli seçim; v9 kayıtları güvenle v10 olarak yüklenir.",
+                "Enerji ve ihtiyaçlar gerçek görevlerde azalır; tesislere mola ve işe dönüş, rezervasyon ve yumuşak tükenme modeliyle işler.",
+                "Kuzey arsa ve WC, dinlenme alanı, mutfak satın alımı, layout ve prosedürel 3D/HUD gösterimi çalışır.",
+                "Hedefli assert testleri, npm test, Vite derlemesi ve somut görsel/performance kontrolleri kayıt altına alınır."
+              ],
+              "evidence": [
+                {
+                  "note": "Beş arketip, kalıcı üç aday, kişisel ücret; satır yüzde100/dal yüzde86.25 kapsam.",
+                  "path": "src/domain/staff.js",
+                  "reviewer": "agent",
+                  "criterion": 0,
+                  "sha256": "ce91e4c55eb3ac577ae57e3eb4cf279d99df98b7f689e3de342bcd1440e33412"
+                },
+                {
+                  "note": "SAVE_VERSION10; eski sürüm2–9 kaydı, stok, maaş, tesis layout ve mola slotu korunur.",
+                  "path": "src/domain/state.js",
+                  "reviewer": "agent",
+                  "criterion": 0,
+                  "sha256": "986746ee88d3b301f8de9e209c059b1975f46814710dddb8a9159f157867f162"
+                },
+                {
+                  "note": "Enerji çalışma durumunda azalır; ödeme alan kasiyer düzeltildi. Rezervasyonlu teslim moladan önce biter; kapasite, erişim iptali, yumuşak tükenme ve işe dönüş.",
+                  "path": "src/domain/simulation.js",
+                  "reviewer": "agent",
+                  "criterion": 1,
+                  "sha256": "95ec7cb2cdae37013af25e9fd53467a54915971b63ce96720f6a53ba9fa34f97"
+                },
+                {
+                  "note": "İşe alım/arsa/tesis komutları tek ledger işlemiyle kaydolur; kişisel günlük maaşlar tahsil edilir.",
+                  "path": "src/application/GameApplication.js",
+                  "reviewer": "agent",
+                  "criterion": 1,
+                  "sha256": "1336a6153396a579437257830ebc09a30580a20c329c17606fecafdb865aab72"
+                },
+                {
+                  "note": "Kuzeyde z-9..-20 plot, temizlenen ağaçlar, tesis ve çarpışma senkronizasyonu.",
+                  "path": "src/environment/MarketGrid.js",
+                  "reviewer": "agent",
+                  "criterion": 2,
+                  "sha256": "51e1cdb7b565255e282a2bf63bc09448bb1716bac3803de31fdba9ac71fd0204"
+                },
+                {
+                  "note": "Prosedürel WC/lounge/kitchen. Kullanım giriş erişim noktasında temsil edilir; iç mekâna yürüyüş yok.",
+                  "path": "src/presentation/StaffFacilityModel.js",
+                  "reviewer": "agent",
+                  "criterion": 2,
+                  "sha256": "21b9201ab9b303e64bad0ee35fe53e4010240eee0b5fc868ce57fd09e6006580"
+                },
+                {
+                  "note": "Üç aday dialogu, canlı ihtiyaçlar, arketip/kişisel ücret ve tesis satın alım UI.",
+                  "path": "src/presentation/HUD.js",
+                  "reviewer": "agent",
+                  "criterion": 2,
+                  "sha256": "3ea17edfda4c4452137f3ec751d0c155f5129237ba21f53f7b12c7e1d8ead91e"
+                },
+                {
+                  "note": "12 domain/app/save/ürün rezervasyonu hedefli test.",
+                  "path": "tests/staff-welfare.test.js",
+                  "reviewer": "agent",
+                  "criterion": 3,
+                  "sha256": "263497fbbd423c2efabf015c5a78d3d65b2d729dd18bbc380485efb2a0c6280e"
+                },
+                {
+                  "note": "9 aday, satın alım ve modal/duraklatma testi.",
+                  "path": "tests/staff-hud.test.js",
+                  "reviewer": "agent",
+                  "criterion": 3,
+                  "sha256": "f1afd6e056825d28d2a3651059612c293ab9b820721155367b6d484831d37141"
+                },
+                {
+                  "note": "6 model kaynak temizliği, ihtiyaç barı, gerçek mola pozu testi.",
+                  "path": "tests/staff-facilities-visual.test.js",
+                  "reviewer": "agent",
+                  "criterion": 3,
+                  "sha256": "57a99251ef79f0c17baa81803d1205fc93dbae57bd474988cbd7dfa0c8b80bf1"
+                },
+                {
+                  "note": "123/123 test, Vite build başarılı; görsel/UI ve CPU/GPU ölçümleri. Genel proje check eski kanıt hashleri nedeniyle okfalse; kullanıcı kabulü verilmedi.",
+                  "path": "tests/fixtures/staff-welfare-verification.md",
+                  "reviewer": "agent",
+                  "criterion": 3,
+                  "sha256": "849392e7a1e7673ab41a3c93666fe22d1e074d154ec154609bad83afac33ce6b"
+                },
+                {
+                  "note": "İzole tarayıcı QA sahnesinde üç kuzey tesis ve kullanım pozları.",
+                  "path": "tests/fixtures/staff-welfare-visual.jpg",
+                  "reviewer": "agent",
+                  "criterion": 3,
+                  "sha256": "46af9829464024734fcf5dc633562dfee59bef37e3b13148f1764158748b15a3"
+                }
+              ],
+              "input_ids": [
+                "mod-supermarket"
+              ],
+              "status": "review",
+              "title": "Personel adayları, yorulma ve kuzey sosyal tesisleri",
+              "object_ids": [
+                "mod-supermarket"
+              ],
+              "id": "T-STAFF-WELFARE-FACILITIES",
+              "output_ids": [],
+              "decision_ids": [],
+              "depends_on": [],
+              "input_snapshot": {
+                "sha256": "a6a1bb7cdb8ba0e58c63a3ff82f4d67657b31fda76d2b52c1decbc20cce2c673",
+                "manifest": {
+                  "graph": {
+                    "inputs": [
+                      "mod-supermarket"
+                    ],
+                    "objects": [
+                      {
+                        "id": "mod-supermarket",
+                        "type": "scene_module",
+                        "properties": {
+                          "name": "Supermarket Interior",
+                          "description": "Cilalı fayans zemin, manav stantları, gondol reyonlar, içecek dolapları, kasa konveyör hattı",
+                          "phase": 1
+                        }
+                      }
+                    ],
+                    "object_types": [
+                      {
+                        "id": "scene_module",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "required": true,
+                            "enum": null
+                          },
+                          "description": {
+                            "type": "string",
+                            "required": true,
+                            "enum": null
+                          },
+                          "phase": {
+                            "type": "integer",
+                            "required": true,
+                            "enum": null
+                          }
+                        }
+                      }
+                    ],
+                    "relation_types": [
+                      {
+                        "id": "contains",
+                        "from_type": "scene_module",
+                        "to_type": "procedural_asset",
+                        "from_min": 0,
+                        "from_max": null,
+                        "to_min": 0,
+                        "to_max": null,
+                        "impact": "forward"
+                      }
+                    ],
+                    "relations": [],
+                    "files": []
+                  },
+                  "producer_generations": {},
+                  "contract": {
+                    "input_fields": {},
+                    "acceptance_rules": [],
+                    "support_groups": []
+                  }
+                }
+              },
+              "generation": 0,
+              "review_reasons": [],
+              "run_snapshot": {
+                "sha256": "a6a1bb7cdb8ba0e58c63a3ff82f4d67657b31fda76d2b52c1decbc20cce2c673",
+                "manifest": {
+                  "graph": {
+                    "inputs": [
+                      "mod-supermarket"
+                    ],
+                    "objects": [
+                      {
+                        "id": "mod-supermarket",
+                        "type": "scene_module",
+                        "properties": {
+                          "name": "Supermarket Interior",
+                          "description": "Cilalı fayans zemin, manav stantları, gondol reyonlar, içecek dolapları, kasa konveyör hattı",
+                          "phase": 1
+                        }
+                      }
+                    ],
+                    "object_types": [
+                      {
+                        "id": "scene_module",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "required": true,
+                            "enum": null
+                          },
+                          "description": {
+                            "type": "string",
+                            "required": true,
+                            "enum": null
+                          },
+                          "phase": {
+                            "type": "integer",
+                            "required": true,
+                            "enum": null
+                          }
+                        }
+                      }
+                    ],
+                    "relation_types": [
+                      {
+                        "id": "contains",
+                        "from_type": "scene_module",
+                        "to_type": "procedural_asset",
+                        "from_min": 0,
+                        "from_max": null,
+                        "to_min": 0,
+                        "to_max": null,
+                        "impact": "forward"
+                      }
+                    ],
+                    "relations": [],
+                    "files": []
+                  },
+                  "producer_generations": {},
+                  "contract": {
+                    "input_fields": {},
+                    "acceptance_rules": [],
+                    "support_groups": []
+                  }
+                }
+              },
+              "output_snapshot": {
+                "sha256": "5be4e3c99f05c10c081b279674e4a4da11ce339c86efcd152c698e0f08b68054",
+                "manifest": {
+                  "inputs": [],
+                  "objects": [],
+                  "object_types": [],
+                  "relation_types": [],
+                  "relations": [],
+                  "files": []
+                }
+              }
             }
           }
         ]

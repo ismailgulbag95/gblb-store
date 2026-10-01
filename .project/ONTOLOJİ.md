@@ -1,6 +1,6 @@
 # GBLB Store 3D Procedural World Transformation — Ontoloji
 
-Revizyon: 90. Canlı görünüm için `ontology` komutunu çalıştır.
+Revizyon: 93. Canlı görünüm için `ontology` komutunu çalıştır.
 
 ## Türler ve özellikler
 
@@ -44,7 +44,7 @@ Revizyon: 90. Canlı görünüm için `ontology` komutunu çalıştır.
 - **Faz 1: Market İç Mekanı** (`ms-phase1`, milestone): {"phase_number": 1, "verdict": "completed"}; durum: current; üretici: T-PHASE-1
 - **10 Personel Mesleği Kadrosu** (`asset-staff-roster`, procedural_asset): {"category": "character", "file_ref": "src/presentation/HumanoidFactory.js", "name": "10 Staff Professions Roster"}; durum: current; üretici: T-PHASE-6
 - **20+ Zengin Müşteri Arketipi** (`asset-customer-archetypes`, procedural_asset): {"category": "character", "file_ref": "src/presentation/HumanoidFactory.js", "name": "20+ Diverse Customer Archetypes"}; durum: current; üretici: T-PHASE-6
-- **Neobrutalism UI Bileşen Sistemi** (`asset-neobrutalism-ui`, procedural_asset): {"category": "utility", "file_ref": "src/style.css", "name": "Neobrutalism Design System & Components"}; durum: current; üretici: T-NEOBRUTALISM-UI
+- **Neobrutalism UI Bileşen Sistemi** (`asset-neobrutalism-ui`, procedural_asset): {"category": "utility", "file_ref": "src/style.css", "name": "Neobrutalism Design System & Components"}; durum: needs_review; üretici: T-NEOBRUTALISM-UI
 - **9 Prosedürel Üretim İstasyonu** (`asset-production-stations`, procedural_asset): {"category": "farm", "file_ref": "src/presentation/ProductionBuildModel.js", "name": "9 Procedural Production Stations & Living Animations"}; durum: needs_review; üretici: T-PRODUCTION-STATIONS-REDESIGN
 - **Tarla Yatakları ve Sebze Parselleri** (`asset-farm-fields`, procedural_asset): {"category": "farm", "file_ref": "src/presentation/FarmBuildModel.js", "name": "Procedural Farm Fields & Vegetable Plots"}; durum: needs_review; üretici: T-FARM-ASSETS-ANIMATIONS-REDESIGN
 - **Tavuk Kümesi ve Yaşayan Tavuklar** (`asset-chicken-coop`, procedural_asset): {"category": "farm", "file_ref": "src/presentation/ChickenCoopModel.js", "name": "Chicken Coop & Living Chickens"}; durum: needs_review; üretici: T-FARM-ASSETS-ANIMATIONS-REDESIGN
@@ -122,12 +122,13 @@ Oklar kayıtlı ilişki yönüdür; değişiklik etkisinin yönü üstte ayrıca
 - **T-PHASE-4 — Faz 4: Tarım ve Üretim Çiftliği Bölgesi**: girdiler [mod-farm-production], çıktılar [], durum done.
 - **T-PHASE-5 — Faz 5: Arka Alan, Depo ve Lojistik Tesisleri**: girdiler [mod-logistics-backend], çıktılar [], durum done.
 - **T-PHASE-6 — Faz 6: 10 Personel Mesleği ve 20+ Zengin Müşteri Tipi**: girdiler [mod-supermarket], çıktılar [asset-staff-roster, asset-customer-archetypes], durum done.
-- **T-NEOBRUTALISM-UI — Kullanıcı Arayüzünün Neobrutalism Bileşen Mimarisine Dönüştürülmesi**: girdiler [mod-supermarket], çıktılar [asset-neobrutalism-ui], durum done.
-- **T-NEOBRUTALISM-ICONS-LOGOS — İkon, Logo ve Simgelerin Neobrutalist SVG Sistemine Dönüştürülmesi ve Emojilerin Temizlenmesi**: girdiler [mod-supermarket], çıktılar [], durum done.
+- **T-NEOBRUTALISM-UI — Kullanıcı Arayüzünün Neobrutalism Bileşen Mimarisine Dönüştürülmesi**: girdiler [mod-supermarket], çıktılar [asset-neobrutalism-ui], durum needs_review.
+- **T-NEOBRUTALISM-ICONS-LOGOS — İkon, Logo ve Simgelerin Neobrutalist SVG Sistemine Dönüştürülmesi ve Emojilerin Temizlenmesi**: girdiler [mod-supermarket], çıktılar [], durum needs_review.
 - **T-NEOBRUTALISM-STATION-BADGES — İstasyon ve Üretim Etiketlerinin Neobrutalist Kompakt İkonlu Göstergelere Dönüştürülmesi**: girdiler [mod-supermarket], çıktılar [], durum needs_review.
 - **T-PRODUCTION-STATIONS-REDESIGN — 9 Üretim İstasyonunun Referans Görsele Göre Yeniden Tasarlanması ve Sinematik Hareketli Animasyonlarının Eklenmesi**: girdiler [mod-farm-production], çıktılar [asset-production-stations], durum needs_review.
 - **T-FARM-ASSETS-ANIMATIONS-REDESIGN — Tarla Yatakları, Meyve Bahçesi, Tavuk Kümesi ve Ahır Detaylarının Referansa Göre Yenilenmesi ve Canlı Animasyonları**: girdiler [mod-farm-production], çıktılar [asset-farm-fields, asset-chicken-coop, asset-barn-silo-paddock], durum needs_review.
 - **T-SUPERMARKET-FIXTURES-REDESIGN — Market Demirbaşlarının Referans Görsele Göre Yeniden Tasarlanması (Manav, Gondol, Soğuk Dolap, Pastane, Kasa, Restoran)**: girdiler [mod-supermarket], çıktılar [asset-produce-shelf-redesign, asset-gondola-shelf-redesign, asset-beverage-cooler-redesign, asset-bakery-counter-redesign, asset-checkout-counter-redesign, asset-restaurant-furniture-redesign], durum done.
-- **T-CHARACTERS-ANIMATIONS-LIVING-WORLD — Personel ve Müşteri Varlıklarının Referans Görsele Göre Geliştirilmesi, Özgün Poz ve Sinematik Hareket Animasyonlarının Uygulanması**: girdiler [mod-supermarket], çıktılar [asset-staff-animations-redesign, asset-customer-animations-redesign], durum review.
+- **T-CHARACTERS-ANIMATIONS-LIVING-WORLD — Personel ve Müşteri Varlıklarının Referans Görsele Göre Geliştirilmesi, Özgün Poz ve Sinematik Hareket Animasyonlarının Uygulanması**: girdiler [mod-supermarket], çıktılar [asset-staff-animations-redesign, asset-customer-animations-redesign], durum needs_review.
+- **T-STAFF-WELFARE-FACILITIES — Personel adayları, yorulma ve kuzey sosyal tesisleri**: girdiler [mod-supermarket], çıktılar [], durum review.
 
 Etki yeniden inceleme ihtiyacıdır; nesnenin yanlış olduğu hükmü değildir.

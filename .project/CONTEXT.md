@@ -1,6 +1,6 @@
 # GBLB Store 3D Procedural World Transformation — proje bağlamı
 
-Revision: 90 · Yetkili kaynak: .project/state.json
+Revision: 93 · Yetkili kaynak: .project/state.json
 
 Bu görünüm türetilmiştir. Güncel kanıt kontrolü için context komutunu çalıştır.
 
@@ -169,7 +169,7 @@ Türler ve bağlantı kuralları: `ontology` komutu / `ONTOLOJİ.md`.
   - Ürettiği nesneler: asset-staff-roster, asset-customer-archetypes
   - Etkin önkoşullar: T-PHASE-1
   - Kabul güncelliği: güncel · tamamlanma sayısı: 1
-- T-NEOBRUTALISM-UI [done] Kullanıcı Arayüzünün Neobrutalism Bileşen Mimarisine Dönüştürülmesi (kayıt: done)
+- T-NEOBRUTALISM-UI [needs_review] Kullanıcı Arayüzünün Neobrutalism Bileşen Mimarisine Dönüştürülmesi (kayıt: done)
   - Ölçüt: Tüm HUD kartları, pill'leri, butonları ve modalleri ekmas/neobrutalism-components standartlarına uygun katı siyah kenarlıklar ve sıfır bulanıklıklı sert ofset gölgelerle yapılandırıldı.
   - Ölçüt: Butonlar, sekmeler ve tıklanabilir bileşenlerde aşağı-sağa ötelenen (translate) ve gölgesi sıfırlanan mekanik dokunsal basma fiziği sağlandı.
   - Ölçüt: Yüksek kontrastlı doygun renk paleti, retro tipografi, kalın kbd ve rozetler ile tüm arayüz neobrutalist stile kavuşturuldu.
@@ -177,8 +177,11 @@ Türler ve bağlantı kuralları: `ontology` komutu / `ONTOLOJİ.md`.
   - Girdiler: mod-supermarket
   - Ürettiği nesneler: asset-neobrutalism-ui
   - Etkin önkoşullar: T-PHASE-1
-  - Kabul güncelliği: güncel · tamamlanma sayısı: 2
-- T-NEOBRUTALISM-ICONS-LOGOS [done] İkon, Logo ve Simgelerin Neobrutalist SVG Sistemine Dönüştürülmesi ve Emojilerin Temizlenmesi (kayıt: done)
+  - Kabul güncelliği: yeniden inceleme gerekli · tamamlanma sayısı: 2
+  - Kontrol: stale evidence: src/style.css
+  - Kontrol: stale evidence: src/style.css
+  - Kontrol: stale evidence: src/style.css
+- T-NEOBRUTALISM-ICONS-LOGOS [needs_review] İkon, Logo ve Simgelerin Neobrutalist SVG Sistemine Dönüştürülmesi ve Emojilerin Temizlenmesi (kayıt: done)
   - Ölçüt: Tüm arayüzdeki unicode semboller ve emojiler (▦, ⌃, ⌄, ↻, ✕, ×, ›) temizlenerek yerlerine kalın hatlı neobrutalist SVG simgeleri yerleştirildi.
   - Ölçüt: Market logosu kalın siyah konturlar, sert 2D gölge ve doygun blok renklerle neobrutalist SVG vektörüne dönüştürüldü.
   - Ölçüt: Tüm HUD, envanter, istasyon ve navigasyon ikonları için 2.5px katı siyah çizgili, geometrik ve renk vurgulu neobrutalist SVG koleksiyonu uygulandı.
@@ -186,7 +189,9 @@ Türler ve bağlantı kuralları: `ontology` komutu / `ONTOLOJİ.md`.
   - Girdiler: mod-supermarket
   - Ürettiği nesneler: yok
   - Etkin önkoşullar: T-NEOBRUTALISM-UI
-  - Kabul güncelliği: güncel · tamamlanma sayısı: 1
+  - Kabul güncelliği: yeniden inceleme gerekli · tamamlanma sayısı: 1
+  - Kontrol: stale evidence: index.html
+  - Kontrol: dependency T-NEOBRUTALISM-UI: needs_review
 - T-NEOBRUTALISM-STATION-BADGES [needs_review] İstasyon ve Üretim Etiketlerinin Neobrutalist Kompakt İkonlu Göstergelere Dönüştürülmesi (kayıt: done)
   - Ölçüt: İstasyon etiketlerinin boyutu %50 küçültüldü; kalın siyah kontur, krem zemin, 2D sert gölge ve binaya bağlanan dikey ok/gövde eklendi.
   - Ölçüt: MALZEME GEREK yerine turuncu/kırmızı ünlem rozeti ve eksik malzeme ikonu ile adet gösterimi (örn. ! 🍅 ×2) uygulandı.
@@ -199,6 +204,7 @@ Türler ve bağlantı kuralları: `ontology` komutu / `ONTOLOJİ.md`.
   - Kontrol: stale evidence: src/presentation/WorldScene.js
   - Kontrol: stale evidence: src/presentation/WorldScene.js
   - Kontrol: stale evidence: src/presentation/WorldScene.js
+  - Kontrol: dependency T-NEOBRUTALISM-ICONS-LOGOS: needs_review
 - T-PRODUCTION-STATIONS-REDESIGN [needs_review] 9 Üretim İstasyonunun Referans Görsele Göre Yeniden Tasarlanması ve Sinematik Hareketli Animasyonlarının Eklenmesi (kayıt: done)
   - Ölçüt: Referans görseldeki 9 üretim istasyonu (Salça Kazanı, Meyve Sıkacağı, Patlamış Mısır Makinesi, Yem Değirmeni, Taş Fırın, Un Değirmeni, Pastane Tezgâhı, Burger Mutfağı, Pizza Fırını) detaylı prosedürel Three.js modelleri olarak yeniden inşa edildi.
   - Ölçüt: Tüm istasyonlara yaşayan ve sinematik animasyonlar (fıkırdayan salça ve kapak titreşimi, pistonlu meyve sıkacağı presi, patlayan mısırlar, dönen değirmen taşları ve dişliler, fırın alev titreşimleri, cızırdayan burger köfteleri) entegre edildi.
@@ -228,7 +234,7 @@ Türler ve bağlantı kuralları: `ontology` komutu / `ONTOLOJİ.md`.
   - Ürettiği nesneler: asset-produce-shelf-redesign, asset-gondola-shelf-redesign, asset-beverage-cooler-redesign, asset-bakery-counter-redesign, asset-checkout-counter-redesign, asset-restaurant-furniture-redesign
   - Etkin önkoşullar: yok
   - Kabul güncelliği: güncel · tamamlanma sayısı: 1
-- T-CHARACTERS-ANIMATIONS-LIVING-WORLD [review] Personel ve Müşteri Varlıklarının Referans Görsele Göre Geliştirilmesi, Özgün Poz ve Sinematik Hareket Animasyonlarının Uygulanması (kayıt: review)
+- T-CHARACTERS-ANIMATIONS-LIVING-WORLD [needs_review] Personel ve Müşteri Varlıklarının Referans Görsele Göre Geliştirilmesi, Özgün Poz ve Sinematik Hareket Animasyonlarının Uygulanması (kayıt: review)
   - Ölçüt: Personel meslekleri (Kasiyer, Reyon Görevlisi, Aşçı, Depocu, Temizlikçi, Güvenlik, Bahçıvan, Müdür, Kasap, Fırıncı, Garson, Teknisyen) referans görseldeki üniforma, şapka ve aksesuarlarıyla Three.js ile modellendi ve mesleğe özel animasyonlar (kutu taşıma, raf düzenleme, paspasla temizlik, tava/yemek hazırlama, anahtarla onarım, barkod okutma, tepsi taşıma) entegre edildi.
   - Ölçüt: Müşteri arketipleri (Alışveriş arabalı, sepetli, çocuk, yaşlı, anne-çocuk, genç kadın, aile babası, turist, öğrenci, ofis çalışanı, hamile, influencer, sporcu) zengin aksesuarlarıyla modellendi ve referanstaki 5 temel poz (yürüme, sepet taşıma, araba sürme, raftan ürün inceleme ve raftan sepete ürün alma) ile restoran yeme/oturma animasyonları uygulandı.
   - Ölçüt: Tüm karakter animasyonları WorldScene render döngüsüne entegre edildi; yaşayan ve canlı bir market-çiftlik dünyası sağlandı; tüm testler (74+) ve Vite derlemesi hatasız doğrulandı.
@@ -237,23 +243,47 @@ Türler ve bağlantı kuralları: `ontology` komutu / `ONTOLOJİ.md`.
   - Ürettiği nesneler: asset-staff-animations-redesign, asset-customer-animations-redesign
   - Etkin önkoşullar: yok
   - Kabul güncelliği: yeniden inceleme gerekli · tamamlanma sayısı: 1
+  - Kontrol: stale evidence: src/presentation/HumanoidFactory.js
+  - Kontrol: stale evidence: src/presentation/CharacterAnimator.js
+  - Kontrol: stale evidence: src/presentation/WorldScene.js
+- T-STAFF-WELFARE-FACILITIES [review] Personel adayları, yorulma ve kuzey sosyal tesisleri (kayıt: review)
+  - Ölçüt: Beş arketipten üç aday, kişisel maaş ve ücretli seçim; v9 kayıtları güvenle v10 olarak yüklenir.
+  - Ölçüt: Enerji ve ihtiyaçlar gerçek görevlerde azalır; tesislere mola ve işe dönüş, rezervasyon ve yumuşak tükenme modeliyle işler.
+  - Ölçüt: Kuzey arsa ve WC, dinlenme alanı, mutfak satın alımı, layout ve prosedürel 3D/HUD gösterimi çalışır.
+  - Ölçüt: Hedefli assert testleri, npm test, Vite derlemesi ve somut görsel/performance kontrolleri kayıt altına alınır.
+  - İlgili nesneler: mod-supermarket
+  - Girdiler: mod-supermarket
+  - Ürettiği nesneler: yok
+  - Etkin önkoşullar: yok
+  - Kabul güncelliği: henüz doğrulanmadı · tamamlanma sayısı: 0
 
 ## Çalışılabilir görevler
 
-T-CHARACTERS-ANIMATIONS-LIVING-WORLD
+T-STAFF-WELFARE-FACILITIES
 
 ## Uyarılar
 
+- T-NEOBRUTALISM-UI: stale evidence: src/style.css
+- T-NEOBRUTALISM-UI: stale evidence: src/style.css
+- T-NEOBRUTALISM-UI: stale evidence: src/style.css
+- T-NEOBRUTALISM-ICONS-LOGOS: stale evidence: index.html
+- T-NEOBRUTALISM-ICONS-LOGOS: dependency T-NEOBRUTALISM-UI: needs_review
 - T-NEOBRUTALISM-STATION-BADGES: stale evidence: src/presentation/WorldScene.js
 - T-NEOBRUTALISM-STATION-BADGES: stale evidence: src/presentation/WorldScene.js
 - T-NEOBRUTALISM-STATION-BADGES: stale evidence: src/presentation/WorldScene.js
+- T-NEOBRUTALISM-STATION-BADGES: dependency T-NEOBRUTALISM-ICONS-LOGOS: needs_review
 - T-PRODUCTION-STATIONS-REDESIGN: stale evidence: src/presentation/WorldScene.js
 - T-FARM-ASSETS-ANIMATIONS-REDESIGN: stale evidence: src/presentation/WorldScene.js
+- T-CHARACTERS-ANIMATIONS-LIVING-WORLD: stale evidence: src/presentation/HumanoidFactory.js
+- T-CHARACTERS-ANIMATIONS-LIVING-WORLD: stale evidence: src/presentation/CharacterAnimator.js
+- T-CHARACTERS-ANIMATIONS-LIVING-WORLD: stale evidence: src/presentation/WorldScene.js
 
 ## Onarım işlemleri
 
 Bunlar öneridir; gerekçeyi değerlendir, actor ekle ve güncel revision ile uygula.
-- reopen_task → T-NEOBRUTALISM-STATION-BADGES: Recorded completion needs review: stale evidence: src/presentation/WorldScene.js; stale evidence: src/presentation/WorldScene.js; stale evidence: src/presentation/WorldScene.js
+- reopen_task → T-NEOBRUTALISM-UI: Recorded completion needs review: stale evidence: src/style.css; stale evidence: src/style.css; stale evidence: src/style.css
+- reopen_task → T-NEOBRUTALISM-ICONS-LOGOS: Recorded completion needs review: stale evidence: index.html; dependency T-NEOBRUTALISM-UI: needs_review
+- reopen_task → T-NEOBRUTALISM-STATION-BADGES: Recorded completion needs review: stale evidence: src/presentation/WorldScene.js; stale evidence: src/presentation/WorldScene.js; stale evidence: src/presentation/WorldScene.js; dependency T-NEOBRUTALISM-ICONS-LOGOS: needs_review
 - reopen_task → T-PRODUCTION-STATIONS-REDESIGN: Recorded completion needs review: stale evidence: src/presentation/WorldScene.js
 - reopen_task → T-FARM-ASSETS-ANIMATIONS-REDESIGN: Recorded completion needs review: stale evidence: src/presentation/WorldScene.js
 
