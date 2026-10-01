@@ -1,6 +1,6 @@
 # GBLB Store 3D Procedural World Transformation — proje bağlamı
 
-Revision: 87 · Yetkili kaynak: .project/state.json
+Revision: 90 · Yetkili kaynak: .project/state.json
 
 Bu görünüm türetilmiştir. Güncel kanıt kontrolü için context komutunu çalıştır.
 
@@ -228,7 +228,7 @@ Türler ve bağlantı kuralları: `ontology` komutu / `ONTOLOJİ.md`.
   - Ürettiği nesneler: asset-produce-shelf-redesign, asset-gondola-shelf-redesign, asset-beverage-cooler-redesign, asset-bakery-counter-redesign, asset-checkout-counter-redesign, asset-restaurant-furniture-redesign
   - Etkin önkoşullar: yok
   - Kabul güncelliği: güncel · tamamlanma sayısı: 1
-- T-CHARACTERS-ANIMATIONS-LIVING-WORLD [done] Personel ve Müşteri Varlıklarının Referans Görsele Göre Geliştirilmesi, Özgün Poz ve Sinematik Hareket Animasyonlarının Uygulanması (kayıt: done)
+- T-CHARACTERS-ANIMATIONS-LIVING-WORLD [review] Personel ve Müşteri Varlıklarının Referans Görsele Göre Geliştirilmesi, Özgün Poz ve Sinematik Hareket Animasyonlarının Uygulanması (kayıt: review)
   - Ölçüt: Personel meslekleri (Kasiyer, Reyon Görevlisi, Aşçı, Depocu, Temizlikçi, Güvenlik, Bahçıvan, Müdür, Kasap, Fırıncı, Garson, Teknisyen) referans görseldeki üniforma, şapka ve aksesuarlarıyla Three.js ile modellendi ve mesleğe özel animasyonlar (kutu taşıma, raf düzenleme, paspasla temizlik, tava/yemek hazırlama, anahtarla onarım, barkod okutma, tepsi taşıma) entegre edildi.
   - Ölçüt: Müşteri arketipleri (Alışveriş arabalı, sepetli, çocuk, yaşlı, anne-çocuk, genç kadın, aile babası, turist, öğrenci, ofis çalışanı, hamile, influencer, sporcu) zengin aksesuarlarıyla modellendi ve referanstaki 5 temel poz (yürüme, sepet taşıma, araba sürme, raftan ürün inceleme ve raftan sepete ürün alma) ile restoran yeme/oturma animasyonları uygulandı.
   - Ölçüt: Tüm karakter animasyonları WorldScene render döngüsüne entegre edildi; yaşayan ve canlı bir market-çiftlik dünyası sağlandı; tüm testler (74+) ve Vite derlemesi hatasız doğrulandı.
@@ -236,11 +236,11 @@ Türler ve bağlantı kuralları: `ontology` komutu / `ONTOLOJİ.md`.
   - Girdiler: mod-supermarket
   - Ürettiği nesneler: asset-staff-animations-redesign, asset-customer-animations-redesign
   - Etkin önkoşullar: yok
-  - Kabul güncelliği: güncel · tamamlanma sayısı: 1
+  - Kabul güncelliği: yeniden inceleme gerekli · tamamlanma sayısı: 1
 
 ## Çalışılabilir görevler
 
-Şu anda çalışılabilir görev yok.
+T-CHARACTERS-ANIMATIONS-LIVING-WORLD
 
 ## Uyarılar
 

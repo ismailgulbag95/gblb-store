@@ -1,6 +1,6 @@
 {
   "schema_version": 3,
-  "revision": 87,
+  "revision": 90,
   "project": {
     "id": "gblb-store-3d",
     "name": "GBLB Store 3D Procedural World Transformation",
@@ -3224,7 +3224,7 @@
     {
       "id": "T-CHARACTERS-ANIMATIONS-LIVING-WORLD",
       "title": "Personel ve Müşteri Varlıklarının Referans Görsele Göre Geliştirilmesi, Özgün Poz ve Sinematik Hareket Animasyonlarının Uygulanması",
-      "status": "done",
+      "status": "review",
       "object_ids": [
         "mod-supermarket",
         "asset-staff-animations-redesign",
@@ -3246,25 +3246,39 @@
       ],
       "evidence": [
         {
-          "path": "src/presentation/HumanoidFactory.js",
           "criterion": 0,
-          "note": "Personel meslekleri (Kasiyer, Reyon Görevlisi, Aşçı, Depocu, Temizlikçi, Güvenlik, Bahçıvan, Müdür, Kasap, Fırıncı, Garson, Teknisyen) referans görseldeki üniforma, şapka ve aksesuarlarıyla Three.js ile modellendi ve mesleğe özel animasyonlar entegre edildi.",
-          "reviewer": "agent",
-          "sha256": "faca18d9c49afe6bf0bc25be35c83b413501dccdcc80d611f022973f4ef849f7"
-        },
-        {
           "path": "src/presentation/HumanoidFactory.js",
-          "criterion": 1,
-          "note": "Müşteri arketipleri (Alışveriş arabalı, sepetli, çocuk, yaşlı, anne-çocuk, genç kadın, aile babası, turist, öğrenci, ofis çalışanı, hamile, influencer, sporcu) zengin aksesuarlarıyla modellendi ve referanstaki 5 temel poz ile restoran yeme/oturma animasyonları uygulandı.",
           "reviewer": "agent",
-          "sha256": "faca18d9c49afe6bf0bc25be35c83b413501dccdcc80d611f022973f4ef849f7"
+          "note": "Mevcut prosedürel modellere dirsek, bilek, diz, üst gövde pivotları ve terminal eklendi. Personel kaynak/teslim makbuzlarını izleyen taşıma, raf düzenleme, alt raf tarama ve servis hareketleri eklendi; sürekli görev dışı el hareketleri kaldırıldı. Genel çarpışma çözümü ve yüz rig desteği yok.",
+          "sha256": "458696b5729eee1d9e51b814707438ce66a4a4645a39cc49686916e4eb656cb5"
         },
         {
-          "path": "src/presentation/WorldScene.js",
-          "criterion": 2,
-          "note": "Tüm karakter animasyonları WorldScene render döngüsüne entegre edildi; yaşayan ve canlı bir market-çiftlik dünyası sağlandı; tüm testler (74+) ve Vite derlemesi hatasız doğrulandı.",
+          "criterion": 1,
+          "path": "src/presentation/CharacterAnimator.js",
           "reviewer": "agent",
-          "sha256": "22a2340184436a03a84c750d2563988c356d47af9082283e6fde6eca591210f3"
+          "note": "Gerçek mesafeye bağlı yürüyüş, duruş/dönüş, sepete ve araba tutamağına bağlı eller; sonlanan düşünme, çene jesti, raftan alma, inceleme, sepete bırakma ve teslim alma. Mevcut AI iade kararı içermediği için iade oyun kuralı eklenmedi.",
+          "sha256": "ab2943056a1837ce62c177174f697fb091b1416c5bb4450c9a4c37d66e7b08e2"
+        },
+        {
+          "criterion": 2,
+          "path": "tests/character-animation.test.js",
+          "reviewer": "agent",
+          "note": "21 yeni hedefli animasyon/stok/durum/iptal testi; npm test toplam 96/96 geçti. Aktif animasyon modülü satır yüzde 92.42, dal yüzde 85.96, fonksiyon yüzde 96.30 kapsamında doğrulandı.",
+          "sha256": "f7a1c1dbc057b06cfe46931537a589e314e447f300fd6b7cd529791af45ff8be"
+        },
+        {
+          "criterion": 2,
+          "path": "tests/fixtures/character-animation-verification.md",
+          "reviewer": "agent",
+          "note": "npm run build başarılı. 40 karakter CPU medyan 0.601 ms, p95 1.820 ms; açık/kuyrukta eylem kalmadı. Alışveriş sahnesi ve inceleme aşaması açıldı, fakat panel örtüşmesi ve sonraki CDP zaman aşımı nedeniyle tüm görsel temaslar, personel/kalabalık döngüleri ve GPU performans karşılaştırması doğrulanamadı. Kullanıcı kabulü değildir.",
+          "sha256": "6589caeb9ba5249a13787767568fa4312648a50359a3d82430d602eb13af6b5a"
+        },
+        {
+          "criterion": 2,
+          "path": "src/presentation/WorldScene.js",
+          "reviewer": "agent",
+          "note": "Tek animasyon sahibi, stok konumuna bağlı ürün hedefleri, teslim hedefi gizleme, aynı ürünü personelden önce almama ve karakter kaldırma temizliği sahneye bağlandı.",
+          "sha256": "d5619d7028a8b76583dc306176d6542ff4a9f0e2f20969336991b81c4b463be7"
         }
       ],
       "input_snapshot": {
@@ -3480,7 +3494,8 @@
           ],
           "files": []
         }
-      }
+      },
+      "support_snapshot": null
     }
   ],
   "decisions": [],
@@ -30770,6 +30785,962 @@
                   "files": []
                 }
               }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "revision": 88,
+      "action": "reopen_task",
+      "actor": "agent",
+      "reason": "Müşteri ve personel animasyonlarının davranış/stok bağlantısı düzeltildi; yeni kod ve kısmi görsel kontrol kanıtları yeniden incelemeye sunulacak. Test başarısı kullanıcı kabulü değildir.",
+      "change": {
+        "task_changes": [
+          {
+            "task_id": "T-CHARACTERS-ANIMATIONS-LIVING-WORLD",
+            "before": {
+              "id": "T-CHARACTERS-ANIMATIONS-LIVING-WORLD",
+              "title": "Personel ve Müşteri Varlıklarının Referans Görsele Göre Geliştirilmesi, Özgün Poz ve Sinematik Hareket Animasyonlarının Uygulanması",
+              "status": "done",
+              "object_ids": [
+                "mod-supermarket",
+                "asset-staff-animations-redesign",
+                "asset-customer-animations-redesign"
+              ],
+              "input_ids": [
+                "mod-supermarket"
+              ],
+              "output_ids": [
+                "asset-staff-animations-redesign",
+                "asset-customer-animations-redesign"
+              ],
+              "depends_on": [],
+              "decision_ids": [],
+              "acceptance": [
+                "Personel meslekleri (Kasiyer, Reyon Görevlisi, Aşçı, Depocu, Temizlikçi, Güvenlik, Bahçıvan, Müdür, Kasap, Fırıncı, Garson, Teknisyen) referans görseldeki üniforma, şapka ve aksesuarlarıyla Three.js ile modellendi ve mesleğe özel animasyonlar (kutu taşıma, raf düzenleme, paspasla temizlik, tava/yemek hazırlama, anahtarla onarım, barkod okutma, tepsi taşıma) entegre edildi.",
+                "Müşteri arketipleri (Alışveriş arabalı, sepetli, çocuk, yaşlı, anne-çocuk, genç kadın, aile babası, turist, öğrenci, ofis çalışanı, hamile, influencer, sporcu) zengin aksesuarlarıyla modellendi ve referanstaki 5 temel poz (yürüme, sepet taşıma, araba sürme, raftan ürün inceleme ve raftan sepete ürün alma) ile restoran yeme/oturma animasyonları uygulandı.",
+                "Tüm karakter animasyonları WorldScene render döngüsüne entegre edildi; yaşayan ve canlı bir market-çiftlik dünyası sağlandı; tüm testler (74+) ve Vite derlemesi hatasız doğrulandı."
+              ],
+              "evidence": [
+                {
+                  "path": "src/presentation/HumanoidFactory.js",
+                  "criterion": 0,
+                  "note": "Personel meslekleri (Kasiyer, Reyon Görevlisi, Aşçı, Depocu, Temizlikçi, Güvenlik, Bahçıvan, Müdür, Kasap, Fırıncı, Garson, Teknisyen) referans görseldeki üniforma, şapka ve aksesuarlarıyla Three.js ile modellendi ve mesleğe özel animasyonlar entegre edildi.",
+                  "reviewer": "agent",
+                  "sha256": "faca18d9c49afe6bf0bc25be35c83b413501dccdcc80d611f022973f4ef849f7"
+                },
+                {
+                  "path": "src/presentation/HumanoidFactory.js",
+                  "criterion": 1,
+                  "note": "Müşteri arketipleri (Alışveriş arabalı, sepetli, çocuk, yaşlı, anne-çocuk, genç kadın, aile babası, turist, öğrenci, ofis çalışanı, hamile, influencer, sporcu) zengin aksesuarlarıyla modellendi ve referanstaki 5 temel poz ile restoran yeme/oturma animasyonları uygulandı.",
+                  "reviewer": "agent",
+                  "sha256": "faca18d9c49afe6bf0bc25be35c83b413501dccdcc80d611f022973f4ef849f7"
+                },
+                {
+                  "path": "src/presentation/WorldScene.js",
+                  "criterion": 2,
+                  "note": "Tüm karakter animasyonları WorldScene render döngüsüne entegre edildi; yaşayan ve canlı bir market-çiftlik dünyası sağlandı; tüm testler (74+) ve Vite derlemesi hatasız doğrulandı.",
+                  "reviewer": "agent",
+                  "sha256": "22a2340184436a03a84c750d2563988c356d47af9082283e6fde6eca591210f3"
+                }
+              ],
+              "input_snapshot": {
+                "sha256": "a6a1bb7cdb8ba0e58c63a3ff82f4d67657b31fda76d2b52c1decbc20cce2c673",
+                "manifest": {
+                  "graph": {
+                    "inputs": [
+                      "mod-supermarket"
+                    ],
+                    "objects": [
+                      {
+                        "id": "mod-supermarket",
+                        "type": "scene_module",
+                        "properties": {
+                          "name": "Supermarket Interior",
+                          "description": "Cilalı fayans zemin, manav stantları, gondol reyonlar, içecek dolapları, kasa konveyör hattı",
+                          "phase": 1
+                        }
+                      }
+                    ],
+                    "object_types": [
+                      {
+                        "id": "scene_module",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "required": true,
+                            "enum": null
+                          },
+                          "description": {
+                            "type": "string",
+                            "required": true,
+                            "enum": null
+                          },
+                          "phase": {
+                            "type": "integer",
+                            "required": true,
+                            "enum": null
+                          }
+                        }
+                      }
+                    ],
+                    "relation_types": [
+                      {
+                        "id": "contains",
+                        "from_type": "scene_module",
+                        "to_type": "procedural_asset",
+                        "from_min": 0,
+                        "from_max": null,
+                        "to_min": 0,
+                        "to_max": null,
+                        "impact": "forward"
+                      }
+                    ],
+                    "relations": [],
+                    "files": []
+                  },
+                  "producer_generations": {},
+                  "contract": {
+                    "input_fields": {},
+                    "acceptance_rules": [],
+                    "support_groups": []
+                  }
+                }
+              },
+              "generation": 1,
+              "review_reasons": [],
+              "run_snapshot": {
+                "sha256": "a6a1bb7cdb8ba0e58c63a3ff82f4d67657b31fda76d2b52c1decbc20cce2c673",
+                "manifest": {
+                  "graph": {
+                    "inputs": [
+                      "mod-supermarket"
+                    ],
+                    "objects": [
+                      {
+                        "id": "mod-supermarket",
+                        "type": "scene_module",
+                        "properties": {
+                          "name": "Supermarket Interior",
+                          "description": "Cilalı fayans zemin, manav stantları, gondol reyonlar, içecek dolapları, kasa konveyör hattı",
+                          "phase": 1
+                        }
+                      }
+                    ],
+                    "object_types": [
+                      {
+                        "id": "scene_module",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "required": true,
+                            "enum": null
+                          },
+                          "description": {
+                            "type": "string",
+                            "required": true,
+                            "enum": null
+                          },
+                          "phase": {
+                            "type": "integer",
+                            "required": true,
+                            "enum": null
+                          }
+                        }
+                      }
+                    ],
+                    "relation_types": [
+                      {
+                        "id": "contains",
+                        "from_type": "scene_module",
+                        "to_type": "procedural_asset",
+                        "from_min": 0,
+                        "from_max": null,
+                        "to_min": 0,
+                        "to_max": null,
+                        "impact": "forward"
+                      }
+                    ],
+                    "relations": [],
+                    "files": []
+                  },
+                  "producer_generations": {},
+                  "contract": {
+                    "input_fields": {},
+                    "acceptance_rules": [],
+                    "support_groups": []
+                  }
+                }
+              },
+              "output_snapshot": {
+                "sha256": "4da4123ca19c2d9295082c3e8db0c3714f52e468d2b10e889869205c9b8fedaa",
+                "manifest": {
+                  "inputs": [
+                    "asset-customer-animations-redesign",
+                    "asset-staff-animations-redesign"
+                  ],
+                  "objects": [
+                    {
+                      "id": "asset-customer-animations-redesign",
+                      "type": "procedural_asset",
+                      "properties": {
+                        "name": "Müşteri Arketipleri ve Alışveriş Pozları",
+                        "category": "character",
+                        "file_ref": "src/presentation/HumanoidFactory.js"
+                      }
+                    },
+                    {
+                      "id": "asset-staff-animations-redesign",
+                      "type": "procedural_asset",
+                      "properties": {
+                        "name": "Personel Meslekleri ve Yaşayan İş Pozları",
+                        "category": "character",
+                        "file_ref": "src/presentation/HumanoidFactory.js"
+                      }
+                    }
+                  ],
+                  "object_types": [
+                    {
+                      "id": "procedural_asset",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "required": true,
+                          "enum": null
+                        },
+                        "category": {
+                          "type": "string",
+                          "required": true,
+                          "enum": [
+                            "interior",
+                            "exterior",
+                            "vehicle",
+                            "character",
+                            "logistics",
+                            "farm",
+                            "utility"
+                          ]
+                        },
+                        "file_ref": {
+                          "type": "string",
+                          "required": true,
+                          "enum": null
+                        }
+                      }
+                    }
+                  ],
+                  "relation_types": [
+                    {
+                      "id": "contains",
+                      "from_type": "scene_module",
+                      "to_type": "procedural_asset",
+                      "from_min": 0,
+                      "from_max": null,
+                      "to_min": 0,
+                      "to_max": null,
+                      "impact": "forward"
+                    }
+                  ],
+                  "relations": [
+                    {
+                      "id": "rel-sup-cust-anim",
+                      "from": "mod-supermarket",
+                      "type": "contains",
+                      "to": "asset-customer-animations-redesign"
+                    },
+                    {
+                      "id": "rel-sup-staff-anim",
+                      "from": "mod-supermarket",
+                      "type": "contains",
+                      "to": "asset-staff-animations-redesign"
+                    }
+                  ],
+                  "files": []
+                }
+              }
+            },
+            "after": {
+              "id": "T-CHARACTERS-ANIMATIONS-LIVING-WORLD",
+              "title": "Personel ve Müşteri Varlıklarının Referans Görsele Göre Geliştirilmesi, Özgün Poz ve Sinematik Hareket Animasyonlarının Uygulanması",
+              "status": "todo",
+              "object_ids": [
+                "mod-supermarket",
+                "asset-staff-animations-redesign",
+                "asset-customer-animations-redesign"
+              ],
+              "input_ids": [
+                "mod-supermarket"
+              ],
+              "output_ids": [
+                "asset-staff-animations-redesign",
+                "asset-customer-animations-redesign"
+              ],
+              "depends_on": [],
+              "decision_ids": [],
+              "acceptance": [
+                "Personel meslekleri (Kasiyer, Reyon Görevlisi, Aşçı, Depocu, Temizlikçi, Güvenlik, Bahçıvan, Müdür, Kasap, Fırıncı, Garson, Teknisyen) referans görseldeki üniforma, şapka ve aksesuarlarıyla Three.js ile modellendi ve mesleğe özel animasyonlar (kutu taşıma, raf düzenleme, paspasla temizlik, tava/yemek hazırlama, anahtarla onarım, barkod okutma, tepsi taşıma) entegre edildi.",
+                "Müşteri arketipleri (Alışveriş arabalı, sepetli, çocuk, yaşlı, anne-çocuk, genç kadın, aile babası, turist, öğrenci, ofis çalışanı, hamile, influencer, sporcu) zengin aksesuarlarıyla modellendi ve referanstaki 5 temel poz (yürüme, sepet taşıma, araba sürme, raftan ürün inceleme ve raftan sepete ürün alma) ile restoran yeme/oturma animasyonları uygulandı.",
+                "Tüm karakter animasyonları WorldScene render döngüsüne entegre edildi; yaşayan ve canlı bir market-çiftlik dünyası sağlandı; tüm testler (74+) ve Vite derlemesi hatasız doğrulandı."
+              ],
+              "evidence": [],
+              "input_snapshot": null,
+              "generation": 1,
+              "review_reasons": [
+                "task reopened"
+              ],
+              "run_snapshot": {
+                "sha256": "a6a1bb7cdb8ba0e58c63a3ff82f4d67657b31fda76d2b52c1decbc20cce2c673",
+                "manifest": {
+                  "graph": {
+                    "inputs": [
+                      "mod-supermarket"
+                    ],
+                    "objects": [
+                      {
+                        "id": "mod-supermarket",
+                        "type": "scene_module",
+                        "properties": {
+                          "name": "Supermarket Interior",
+                          "description": "Cilalı fayans zemin, manav stantları, gondol reyonlar, içecek dolapları, kasa konveyör hattı",
+                          "phase": 1
+                        }
+                      }
+                    ],
+                    "object_types": [
+                      {
+                        "id": "scene_module",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "required": true,
+                            "enum": null
+                          },
+                          "description": {
+                            "type": "string",
+                            "required": true,
+                            "enum": null
+                          },
+                          "phase": {
+                            "type": "integer",
+                            "required": true,
+                            "enum": null
+                          }
+                        }
+                      }
+                    ],
+                    "relation_types": [
+                      {
+                        "id": "contains",
+                        "from_type": "scene_module",
+                        "to_type": "procedural_asset",
+                        "from_min": 0,
+                        "from_max": null,
+                        "to_min": 0,
+                        "to_max": null,
+                        "impact": "forward"
+                      }
+                    ],
+                    "relations": [],
+                    "files": []
+                  },
+                  "producer_generations": {},
+                  "contract": {
+                    "input_fields": {},
+                    "acceptance_rules": [],
+                    "support_groups": []
+                  }
+                }
+              },
+              "output_snapshot": null,
+              "support_snapshot": null
+            }
+          }
+        ]
+      }
+    },
+    {
+      "revision": 89,
+      "action": "start_task",
+      "actor": "agent",
+      "reason": "Uygulanan animasyon düzeltmeleri ve mevcut doğrulama kanıtları için yeniden inceleme girdisi alınıyor.",
+      "change": {
+        "task_changes": [
+          {
+            "task_id": "T-CHARACTERS-ANIMATIONS-LIVING-WORLD",
+            "before": {
+              "id": "T-CHARACTERS-ANIMATIONS-LIVING-WORLD",
+              "title": "Personel ve Müşteri Varlıklarının Referans Görsele Göre Geliştirilmesi, Özgün Poz ve Sinematik Hareket Animasyonlarının Uygulanması",
+              "status": "todo",
+              "object_ids": [
+                "mod-supermarket",
+                "asset-staff-animations-redesign",
+                "asset-customer-animations-redesign"
+              ],
+              "input_ids": [
+                "mod-supermarket"
+              ],
+              "output_ids": [
+                "asset-staff-animations-redesign",
+                "asset-customer-animations-redesign"
+              ],
+              "depends_on": [],
+              "decision_ids": [],
+              "acceptance": [
+                "Personel meslekleri (Kasiyer, Reyon Görevlisi, Aşçı, Depocu, Temizlikçi, Güvenlik, Bahçıvan, Müdür, Kasap, Fırıncı, Garson, Teknisyen) referans görseldeki üniforma, şapka ve aksesuarlarıyla Three.js ile modellendi ve mesleğe özel animasyonlar (kutu taşıma, raf düzenleme, paspasla temizlik, tava/yemek hazırlama, anahtarla onarım, barkod okutma, tepsi taşıma) entegre edildi.",
+                "Müşteri arketipleri (Alışveriş arabalı, sepetli, çocuk, yaşlı, anne-çocuk, genç kadın, aile babası, turist, öğrenci, ofis çalışanı, hamile, influencer, sporcu) zengin aksesuarlarıyla modellendi ve referanstaki 5 temel poz (yürüme, sepet taşıma, araba sürme, raftan ürün inceleme ve raftan sepete ürün alma) ile restoran yeme/oturma animasyonları uygulandı.",
+                "Tüm karakter animasyonları WorldScene render döngüsüne entegre edildi; yaşayan ve canlı bir market-çiftlik dünyası sağlandı; tüm testler (74+) ve Vite derlemesi hatasız doğrulandı."
+              ],
+              "evidence": [],
+              "input_snapshot": null,
+              "generation": 1,
+              "review_reasons": [
+                "task reopened"
+              ],
+              "run_snapshot": {
+                "sha256": "a6a1bb7cdb8ba0e58c63a3ff82f4d67657b31fda76d2b52c1decbc20cce2c673",
+                "manifest": {
+                  "graph": {
+                    "inputs": [
+                      "mod-supermarket"
+                    ],
+                    "objects": [
+                      {
+                        "id": "mod-supermarket",
+                        "type": "scene_module",
+                        "properties": {
+                          "name": "Supermarket Interior",
+                          "description": "Cilalı fayans zemin, manav stantları, gondol reyonlar, içecek dolapları, kasa konveyör hattı",
+                          "phase": 1
+                        }
+                      }
+                    ],
+                    "object_types": [
+                      {
+                        "id": "scene_module",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "required": true,
+                            "enum": null
+                          },
+                          "description": {
+                            "type": "string",
+                            "required": true,
+                            "enum": null
+                          },
+                          "phase": {
+                            "type": "integer",
+                            "required": true,
+                            "enum": null
+                          }
+                        }
+                      }
+                    ],
+                    "relation_types": [
+                      {
+                        "id": "contains",
+                        "from_type": "scene_module",
+                        "to_type": "procedural_asset",
+                        "from_min": 0,
+                        "from_max": null,
+                        "to_min": 0,
+                        "to_max": null,
+                        "impact": "forward"
+                      }
+                    ],
+                    "relations": [],
+                    "files": []
+                  },
+                  "producer_generations": {},
+                  "contract": {
+                    "input_fields": {},
+                    "acceptance_rules": [],
+                    "support_groups": []
+                  }
+                }
+              },
+              "output_snapshot": null,
+              "support_snapshot": null
+            },
+            "after": {
+              "id": "T-CHARACTERS-ANIMATIONS-LIVING-WORLD",
+              "title": "Personel ve Müşteri Varlıklarının Referans Görsele Göre Geliştirilmesi, Özgün Poz ve Sinematik Hareket Animasyonlarının Uygulanması",
+              "status": "doing",
+              "object_ids": [
+                "mod-supermarket",
+                "asset-staff-animations-redesign",
+                "asset-customer-animations-redesign"
+              ],
+              "input_ids": [
+                "mod-supermarket"
+              ],
+              "output_ids": [
+                "asset-staff-animations-redesign",
+                "asset-customer-animations-redesign"
+              ],
+              "depends_on": [],
+              "decision_ids": [],
+              "acceptance": [
+                "Personel meslekleri (Kasiyer, Reyon Görevlisi, Aşçı, Depocu, Temizlikçi, Güvenlik, Bahçıvan, Müdür, Kasap, Fırıncı, Garson, Teknisyen) referans görseldeki üniforma, şapka ve aksesuarlarıyla Three.js ile modellendi ve mesleğe özel animasyonlar (kutu taşıma, raf düzenleme, paspasla temizlik, tava/yemek hazırlama, anahtarla onarım, barkod okutma, tepsi taşıma) entegre edildi.",
+                "Müşteri arketipleri (Alışveriş arabalı, sepetli, çocuk, yaşlı, anne-çocuk, genç kadın, aile babası, turist, öğrenci, ofis çalışanı, hamile, influencer, sporcu) zengin aksesuarlarıyla modellendi ve referanstaki 5 temel poz (yürüme, sepet taşıma, araba sürme, raftan ürün inceleme ve raftan sepete ürün alma) ile restoran yeme/oturma animasyonları uygulandı.",
+                "Tüm karakter animasyonları WorldScene render döngüsüne entegre edildi; yaşayan ve canlı bir market-çiftlik dünyası sağlandı; tüm testler (74+) ve Vite derlemesi hatasız doğrulandı."
+              ],
+              "evidence": [],
+              "input_snapshot": null,
+              "generation": 1,
+              "review_reasons": [
+                "task reopened"
+              ],
+              "run_snapshot": {
+                "sha256": "a6a1bb7cdb8ba0e58c63a3ff82f4d67657b31fda76d2b52c1decbc20cce2c673",
+                "manifest": {
+                  "graph": {
+                    "inputs": [
+                      "mod-supermarket"
+                    ],
+                    "objects": [
+                      {
+                        "id": "mod-supermarket",
+                        "type": "scene_module",
+                        "properties": {
+                          "name": "Supermarket Interior",
+                          "description": "Cilalı fayans zemin, manav stantları, gondol reyonlar, içecek dolapları, kasa konveyör hattı",
+                          "phase": 1
+                        }
+                      }
+                    ],
+                    "object_types": [
+                      {
+                        "id": "scene_module",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "required": true,
+                            "enum": null
+                          },
+                          "description": {
+                            "type": "string",
+                            "required": true,
+                            "enum": null
+                          },
+                          "phase": {
+                            "type": "integer",
+                            "required": true,
+                            "enum": null
+                          }
+                        }
+                      }
+                    ],
+                    "relation_types": [
+                      {
+                        "id": "contains",
+                        "from_type": "scene_module",
+                        "to_type": "procedural_asset",
+                        "from_min": 0,
+                        "from_max": null,
+                        "to_min": 0,
+                        "to_max": null,
+                        "impact": "forward"
+                      }
+                    ],
+                    "relations": [],
+                    "files": []
+                  },
+                  "producer_generations": {},
+                  "contract": {
+                    "input_fields": {},
+                    "acceptance_rules": [],
+                    "support_groups": []
+                  }
+                }
+              },
+              "output_snapshot": null,
+              "support_snapshot": null
+            }
+          }
+        ]
+      }
+    },
+    {
+      "revision": 90,
+      "action": "submit_evidence",
+      "actor": "agent",
+      "reason": "Animasyon değişiklikleri uygulandı, 96 test ve build geçti. Görsel doğrulama kısmi; çalışma review durumunda kalır, kullanıcı kabulü veya tam görsel onay kaydedilmez.",
+      "change": {
+        "task_changes": [
+          {
+            "task_id": "T-CHARACTERS-ANIMATIONS-LIVING-WORLD",
+            "before": {
+              "id": "T-CHARACTERS-ANIMATIONS-LIVING-WORLD",
+              "title": "Personel ve Müşteri Varlıklarının Referans Görsele Göre Geliştirilmesi, Özgün Poz ve Sinematik Hareket Animasyonlarının Uygulanması",
+              "status": "doing",
+              "object_ids": [
+                "mod-supermarket",
+                "asset-staff-animations-redesign",
+                "asset-customer-animations-redesign"
+              ],
+              "input_ids": [
+                "mod-supermarket"
+              ],
+              "output_ids": [
+                "asset-staff-animations-redesign",
+                "asset-customer-animations-redesign"
+              ],
+              "depends_on": [],
+              "decision_ids": [],
+              "acceptance": [
+                "Personel meslekleri (Kasiyer, Reyon Görevlisi, Aşçı, Depocu, Temizlikçi, Güvenlik, Bahçıvan, Müdür, Kasap, Fırıncı, Garson, Teknisyen) referans görseldeki üniforma, şapka ve aksesuarlarıyla Three.js ile modellendi ve mesleğe özel animasyonlar (kutu taşıma, raf düzenleme, paspasla temizlik, tava/yemek hazırlama, anahtarla onarım, barkod okutma, tepsi taşıma) entegre edildi.",
+                "Müşteri arketipleri (Alışveriş arabalı, sepetli, çocuk, yaşlı, anne-çocuk, genç kadın, aile babası, turist, öğrenci, ofis çalışanı, hamile, influencer, sporcu) zengin aksesuarlarıyla modellendi ve referanstaki 5 temel poz (yürüme, sepet taşıma, araba sürme, raftan ürün inceleme ve raftan sepete ürün alma) ile restoran yeme/oturma animasyonları uygulandı.",
+                "Tüm karakter animasyonları WorldScene render döngüsüne entegre edildi; yaşayan ve canlı bir market-çiftlik dünyası sağlandı; tüm testler (74+) ve Vite derlemesi hatasız doğrulandı."
+              ],
+              "evidence": [],
+              "input_snapshot": null,
+              "generation": 1,
+              "review_reasons": [
+                "task reopened"
+              ],
+              "run_snapshot": {
+                "sha256": "a6a1bb7cdb8ba0e58c63a3ff82f4d67657b31fda76d2b52c1decbc20cce2c673",
+                "manifest": {
+                  "graph": {
+                    "inputs": [
+                      "mod-supermarket"
+                    ],
+                    "objects": [
+                      {
+                        "id": "mod-supermarket",
+                        "type": "scene_module",
+                        "properties": {
+                          "name": "Supermarket Interior",
+                          "description": "Cilalı fayans zemin, manav stantları, gondol reyonlar, içecek dolapları, kasa konveyör hattı",
+                          "phase": 1
+                        }
+                      }
+                    ],
+                    "object_types": [
+                      {
+                        "id": "scene_module",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "required": true,
+                            "enum": null
+                          },
+                          "description": {
+                            "type": "string",
+                            "required": true,
+                            "enum": null
+                          },
+                          "phase": {
+                            "type": "integer",
+                            "required": true,
+                            "enum": null
+                          }
+                        }
+                      }
+                    ],
+                    "relation_types": [
+                      {
+                        "id": "contains",
+                        "from_type": "scene_module",
+                        "to_type": "procedural_asset",
+                        "from_min": 0,
+                        "from_max": null,
+                        "to_min": 0,
+                        "to_max": null,
+                        "impact": "forward"
+                      }
+                    ],
+                    "relations": [],
+                    "files": []
+                  },
+                  "producer_generations": {},
+                  "contract": {
+                    "input_fields": {},
+                    "acceptance_rules": [],
+                    "support_groups": []
+                  }
+                }
+              },
+              "output_snapshot": null,
+              "support_snapshot": null
+            },
+            "after": {
+              "id": "T-CHARACTERS-ANIMATIONS-LIVING-WORLD",
+              "title": "Personel ve Müşteri Varlıklarının Referans Görsele Göre Geliştirilmesi, Özgün Poz ve Sinematik Hareket Animasyonlarının Uygulanması",
+              "status": "review",
+              "object_ids": [
+                "mod-supermarket",
+                "asset-staff-animations-redesign",
+                "asset-customer-animations-redesign"
+              ],
+              "input_ids": [
+                "mod-supermarket"
+              ],
+              "output_ids": [
+                "asset-staff-animations-redesign",
+                "asset-customer-animations-redesign"
+              ],
+              "depends_on": [],
+              "decision_ids": [],
+              "acceptance": [
+                "Personel meslekleri (Kasiyer, Reyon Görevlisi, Aşçı, Depocu, Temizlikçi, Güvenlik, Bahçıvan, Müdür, Kasap, Fırıncı, Garson, Teknisyen) referans görseldeki üniforma, şapka ve aksesuarlarıyla Three.js ile modellendi ve mesleğe özel animasyonlar (kutu taşıma, raf düzenleme, paspasla temizlik, tava/yemek hazırlama, anahtarla onarım, barkod okutma, tepsi taşıma) entegre edildi.",
+                "Müşteri arketipleri (Alışveriş arabalı, sepetli, çocuk, yaşlı, anne-çocuk, genç kadın, aile babası, turist, öğrenci, ofis çalışanı, hamile, influencer, sporcu) zengin aksesuarlarıyla modellendi ve referanstaki 5 temel poz (yürüme, sepet taşıma, araba sürme, raftan ürün inceleme ve raftan sepete ürün alma) ile restoran yeme/oturma animasyonları uygulandı.",
+                "Tüm karakter animasyonları WorldScene render döngüsüne entegre edildi; yaşayan ve canlı bir market-çiftlik dünyası sağlandı; tüm testler (74+) ve Vite derlemesi hatasız doğrulandı."
+              ],
+              "evidence": [
+                {
+                  "criterion": 0,
+                  "path": "src/presentation/HumanoidFactory.js",
+                  "reviewer": "agent",
+                  "note": "Mevcut prosedürel modellere dirsek, bilek, diz, üst gövde pivotları ve terminal eklendi. Personel kaynak/teslim makbuzlarını izleyen taşıma, raf düzenleme, alt raf tarama ve servis hareketleri eklendi; sürekli görev dışı el hareketleri kaldırıldı. Genel çarpışma çözümü ve yüz rig desteği yok.",
+                  "sha256": "458696b5729eee1d9e51b814707438ce66a4a4645a39cc49686916e4eb656cb5"
+                },
+                {
+                  "criterion": 1,
+                  "path": "src/presentation/CharacterAnimator.js",
+                  "reviewer": "agent",
+                  "note": "Gerçek mesafeye bağlı yürüyüş, duruş/dönüş, sepete ve araba tutamağına bağlı eller; sonlanan düşünme, çene jesti, raftan alma, inceleme, sepete bırakma ve teslim alma. Mevcut AI iade kararı içermediği için iade oyun kuralı eklenmedi.",
+                  "sha256": "ab2943056a1837ce62c177174f697fb091b1416c5bb4450c9a4c37d66e7b08e2"
+                },
+                {
+                  "criterion": 2,
+                  "path": "tests/character-animation.test.js",
+                  "reviewer": "agent",
+                  "note": "21 yeni hedefli animasyon/stok/durum/iptal testi; npm test toplam 96/96 geçti. Aktif animasyon modülü satır yüzde 92.42, dal yüzde 85.96, fonksiyon yüzde 96.30 kapsamında doğrulandı.",
+                  "sha256": "f7a1c1dbc057b06cfe46931537a589e314e447f300fd6b7cd529791af45ff8be"
+                },
+                {
+                  "criterion": 2,
+                  "path": "tests/fixtures/character-animation-verification.md",
+                  "reviewer": "agent",
+                  "note": "npm run build başarılı. 40 karakter CPU medyan 0.601 ms, p95 1.820 ms; açık/kuyrukta eylem kalmadı. Alışveriş sahnesi ve inceleme aşaması açıldı, fakat panel örtüşmesi ve sonraki CDP zaman aşımı nedeniyle tüm görsel temaslar, personel/kalabalık döngüleri ve GPU performans karşılaştırması doğrulanamadı. Kullanıcı kabulü değildir.",
+                  "sha256": "6589caeb9ba5249a13787767568fa4312648a50359a3d82430d602eb13af6b5a"
+                },
+                {
+                  "criterion": 2,
+                  "path": "src/presentation/WorldScene.js",
+                  "reviewer": "agent",
+                  "note": "Tek animasyon sahibi, stok konumuna bağlı ürün hedefleri, teslim hedefi gizleme, aynı ürünü personelden önce almama ve karakter kaldırma temizliği sahneye bağlandı.",
+                  "sha256": "d5619d7028a8b76583dc306176d6542ff4a9f0e2f20969336991b81c4b463be7"
+                }
+              ],
+              "input_snapshot": {
+                "sha256": "a6a1bb7cdb8ba0e58c63a3ff82f4d67657b31fda76d2b52c1decbc20cce2c673",
+                "manifest": {
+                  "graph": {
+                    "inputs": [
+                      "mod-supermarket"
+                    ],
+                    "objects": [
+                      {
+                        "id": "mod-supermarket",
+                        "type": "scene_module",
+                        "properties": {
+                          "name": "Supermarket Interior",
+                          "description": "Cilalı fayans zemin, manav stantları, gondol reyonlar, içecek dolapları, kasa konveyör hattı",
+                          "phase": 1
+                        }
+                      }
+                    ],
+                    "object_types": [
+                      {
+                        "id": "scene_module",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "required": true,
+                            "enum": null
+                          },
+                          "description": {
+                            "type": "string",
+                            "required": true,
+                            "enum": null
+                          },
+                          "phase": {
+                            "type": "integer",
+                            "required": true,
+                            "enum": null
+                          }
+                        }
+                      }
+                    ],
+                    "relation_types": [
+                      {
+                        "id": "contains",
+                        "from_type": "scene_module",
+                        "to_type": "procedural_asset",
+                        "from_min": 0,
+                        "from_max": null,
+                        "to_min": 0,
+                        "to_max": null,
+                        "impact": "forward"
+                      }
+                    ],
+                    "relations": [],
+                    "files": []
+                  },
+                  "producer_generations": {},
+                  "contract": {
+                    "input_fields": {},
+                    "acceptance_rules": [],
+                    "support_groups": []
+                  }
+                }
+              },
+              "generation": 1,
+              "review_reasons": [],
+              "run_snapshot": {
+                "sha256": "a6a1bb7cdb8ba0e58c63a3ff82f4d67657b31fda76d2b52c1decbc20cce2c673",
+                "manifest": {
+                  "graph": {
+                    "inputs": [
+                      "mod-supermarket"
+                    ],
+                    "objects": [
+                      {
+                        "id": "mod-supermarket",
+                        "type": "scene_module",
+                        "properties": {
+                          "name": "Supermarket Interior",
+                          "description": "Cilalı fayans zemin, manav stantları, gondol reyonlar, içecek dolapları, kasa konveyör hattı",
+                          "phase": 1
+                        }
+                      }
+                    ],
+                    "object_types": [
+                      {
+                        "id": "scene_module",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "required": true,
+                            "enum": null
+                          },
+                          "description": {
+                            "type": "string",
+                            "required": true,
+                            "enum": null
+                          },
+                          "phase": {
+                            "type": "integer",
+                            "required": true,
+                            "enum": null
+                          }
+                        }
+                      }
+                    ],
+                    "relation_types": [
+                      {
+                        "id": "contains",
+                        "from_type": "scene_module",
+                        "to_type": "procedural_asset",
+                        "from_min": 0,
+                        "from_max": null,
+                        "to_min": 0,
+                        "to_max": null,
+                        "impact": "forward"
+                      }
+                    ],
+                    "relations": [],
+                    "files": []
+                  },
+                  "producer_generations": {},
+                  "contract": {
+                    "input_fields": {},
+                    "acceptance_rules": [],
+                    "support_groups": []
+                  }
+                }
+              },
+              "output_snapshot": {
+                "sha256": "4da4123ca19c2d9295082c3e8db0c3714f52e468d2b10e889869205c9b8fedaa",
+                "manifest": {
+                  "inputs": [
+                    "asset-customer-animations-redesign",
+                    "asset-staff-animations-redesign"
+                  ],
+                  "objects": [
+                    {
+                      "id": "asset-customer-animations-redesign",
+                      "type": "procedural_asset",
+                      "properties": {
+                        "name": "Müşteri Arketipleri ve Alışveriş Pozları",
+                        "category": "character",
+                        "file_ref": "src/presentation/HumanoidFactory.js"
+                      }
+                    },
+                    {
+                      "id": "asset-staff-animations-redesign",
+                      "type": "procedural_asset",
+                      "properties": {
+                        "name": "Personel Meslekleri ve Yaşayan İş Pozları",
+                        "category": "character",
+                        "file_ref": "src/presentation/HumanoidFactory.js"
+                      }
+                    }
+                  ],
+                  "object_types": [
+                    {
+                      "id": "procedural_asset",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "required": true,
+                          "enum": null
+                        },
+                        "category": {
+                          "type": "string",
+                          "required": true,
+                          "enum": [
+                            "interior",
+                            "exterior",
+                            "vehicle",
+                            "character",
+                            "logistics",
+                            "farm",
+                            "utility"
+                          ]
+                        },
+                        "file_ref": {
+                          "type": "string",
+                          "required": true,
+                          "enum": null
+                        }
+                      }
+                    }
+                  ],
+                  "relation_types": [
+                    {
+                      "id": "contains",
+                      "from_type": "scene_module",
+                      "to_type": "procedural_asset",
+                      "from_min": 0,
+                      "from_max": null,
+                      "to_min": 0,
+                      "to_max": null,
+                      "impact": "forward"
+                    }
+                  ],
+                  "relations": [
+                    {
+                      "id": "rel-sup-cust-anim",
+                      "from": "mod-supermarket",
+                      "type": "contains",
+                      "to": "asset-customer-animations-redesign"
+                    },
+                    {
+                      "id": "rel-sup-staff-anim",
+                      "from": "mod-supermarket",
+                      "type": "contains",
+                      "to": "asset-staff-animations-redesign"
+                    }
+                  ],
+                  "files": []
+                }
+              },
+              "support_snapshot": null
             }
           }
         ]

@@ -1,6 +1,6 @@
 # GBLB Store 3D Procedural World Transformation — Ontoloji
 
-Revizyon: 87. Canlı görünüm için `ontology` komutunu çalıştır.
+Revizyon: 90. Canlı görünüm için `ontology` komutunu çalıştır.
 
 ## Türler ve özellikler
 
@@ -55,8 +55,8 @@ Revizyon: 87. Canlı görünüm için `ontology` komutunu çalıştır.
 - **Fırın ve Pastane Tezgâhı** (`asset-bakery-counter-redesign`, procedural_asset): {"category": "interior", "file_ref": "src/presentation/ShelfModel.js", "name": "Fırın ve Pastane Tezgâhı"}; durum: current; üretici: T-SUPERMARKET-FIXTURES-REDESIGN
 - **Konveyör Bantlı Kasa Masası** (`asset-checkout-counter-redesign`, procedural_asset): {"category": "interior", "file_ref": "src/presentation/RegisterModel.js", "name": "Konveyör Bantlı Kasa Masası"}; durum: current; üretici: T-SUPERMARKET-FIXTURES-REDESIGN
 - **Restoran Masa ve Sandalye Takımları** (`asset-restaurant-furniture-redesign`, procedural_asset): {"category": "interior", "file_ref": "src/presentation/DiningTableModel.js", "name": "Restoran Masa ve Sandalye Takımları"}; durum: current; üretici: T-SUPERMARKET-FIXTURES-REDESIGN
-- **Personel Meslekleri ve Yaşayan İş Pozları** (`asset-staff-animations-redesign`, procedural_asset): {"category": "character", "file_ref": "src/presentation/HumanoidFactory.js", "name": "Personel Meslekleri ve Yaşayan İş Pozları"}; durum: current; üretici: T-CHARACTERS-ANIMATIONS-LIVING-WORLD
-- **Müşteri Arketipleri ve Alışveriş Pozları** (`asset-customer-animations-redesign`, procedural_asset): {"category": "character", "file_ref": "src/presentation/HumanoidFactory.js", "name": "Müşteri Arketipleri ve Alışveriş Pozları"}; durum: current; üretici: T-CHARACTERS-ANIMATIONS-LIVING-WORLD
+- **Personel Meslekleri ve Yaşayan İş Pozları** (`asset-staff-animations-redesign`, procedural_asset): {"category": "character", "file_ref": "src/presentation/HumanoidFactory.js", "name": "Personel Meslekleri ve Yaşayan İş Pozları"}; durum: needs_review; üretici: T-CHARACTERS-ANIMATIONS-LIVING-WORLD
+- **Müşteri Arketipleri ve Alışveriş Pozları** (`asset-customer-animations-redesign`, procedural_asset): {"category": "character", "file_ref": "src/presentation/HumanoidFactory.js", "name": "Müşteri Arketipleri ve Alışveriş Pozları"}; durum: needs_review; üretici: T-CHARACTERS-ANIMATIONS-LIVING-WORLD
 
 ## Nesne haritası
 
@@ -128,6 +128,6 @@ Oklar kayıtlı ilişki yönüdür; değişiklik etkisinin yönü üstte ayrıca
 - **T-PRODUCTION-STATIONS-REDESIGN — 9 Üretim İstasyonunun Referans Görsele Göre Yeniden Tasarlanması ve Sinematik Hareketli Animasyonlarının Eklenmesi**: girdiler [mod-farm-production], çıktılar [asset-production-stations], durum needs_review.
 - **T-FARM-ASSETS-ANIMATIONS-REDESIGN — Tarla Yatakları, Meyve Bahçesi, Tavuk Kümesi ve Ahır Detaylarının Referansa Göre Yenilenmesi ve Canlı Animasyonları**: girdiler [mod-farm-production], çıktılar [asset-farm-fields, asset-chicken-coop, asset-barn-silo-paddock], durum needs_review.
 - **T-SUPERMARKET-FIXTURES-REDESIGN — Market Demirbaşlarının Referans Görsele Göre Yeniden Tasarlanması (Manav, Gondol, Soğuk Dolap, Pastane, Kasa, Restoran)**: girdiler [mod-supermarket], çıktılar [asset-produce-shelf-redesign, asset-gondola-shelf-redesign, asset-beverage-cooler-redesign, asset-bakery-counter-redesign, asset-checkout-counter-redesign, asset-restaurant-furniture-redesign], durum done.
-- **T-CHARACTERS-ANIMATIONS-LIVING-WORLD — Personel ve Müşteri Varlıklarının Referans Görsele Göre Geliştirilmesi, Özgün Poz ve Sinematik Hareket Animasyonlarının Uygulanması**: girdiler [mod-supermarket], çıktılar [asset-staff-animations-redesign, asset-customer-animations-redesign], durum done.
+- **T-CHARACTERS-ANIMATIONS-LIVING-WORLD — Personel ve Müşteri Varlıklarının Referans Görsele Göre Geliştirilmesi, Özgün Poz ve Sinematik Hareket Animasyonlarının Uygulanması**: girdiler [mod-supermarket], çıktılar [asset-staff-animations-redesign, asset-customer-animations-redesign], durum review.
 
 Etki yeniden inceleme ihtiyacıdır; nesnenin yanlış olduğu hükmü değildir.
