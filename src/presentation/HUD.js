@@ -65,6 +65,7 @@ export class HUD {
       'order-ad-offer', 'order-ad-copy', 'btn-order-ad', 'machine-ad-offer', 'machine-ad-copy', 'btn-machine-ad',
       'decor-shop-score', 'decor-score-caption', 'decor-list',
       'setting-sound', 'setting-haptics', 'setting-autopickup',
+      'upgrade-list', 'staff-list', 'inventory-list'
     ];
     for (const id of ids) {
       this.elements[id] = document.getElementById(id);
@@ -668,7 +669,7 @@ export class HUD {
   renderUpgrades(state) {
     const staffIds = new Set(STAFF_HIRES.map((entry) => entry.upgradeId));
     const upgrades = this.app.getAvailableUpgrades().filter((upgrade) => !staffIds.has(upgrade.id));
-    const list = document.getElementById('upgrade-list');
+    const list = this.elements['upgrade-list'];
     const english = state.settings.language === 'en';
     const expansionCards = upgrades.map((upgrade) => {
       const affordable = state.economy.balanceAtoms >= upgrade.price * 10_000;
@@ -773,7 +774,7 @@ export class HUD {
   }
 
   renderStaff(state) {
-    const list = document.getElementById('staff-list');
+    const list = this.elements['staff-list'];
     if (!list) return;
     const english = state.settings.language === 'en';
     const hireCards = STAFF_HIRES.map((hire) => {
@@ -894,7 +895,7 @@ export class HUD {
     const signature = JSON.stringify([...items.entries()]);
     if (!force && signature === this.lastInventorySignature) return;
     this.lastInventorySignature = signature;
-    const list = document.getElementById('inventory-list');
+    const list = this.elements['inventory-list'];
     if (!items.size) {
       list.innerHTML = `<div class="empty-upgrades">${state.settings.language === 'en' ? 'No goods in stock yet.' : 'Henüz stokta ürün yok.'}</div>`;
       return;
