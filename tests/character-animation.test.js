@@ -4,6 +4,10 @@ import * as THREE from 'three';
 import { createCustomerMesh, createWorkerMesh } from '../src/presentation/HumanoidFactory.js';
 import { Item3DFactory } from '../src/presentation/Item3DFactory.js';
 import { CharacterAnimator } from '../src/presentation/CharacterAnimator.js';
+import { createInitialState } from '../src/domain/state.js';
+import { advanceSimulation } from '../src/domain/simulation.js';
+import { makeLocation, reserveStock } from '../src/domain/inventory.js';
+import { EnvironmentProps } from '../src/environment/EnvironmentProps.js';
 
 const factory = new Item3DFactory();
 function fixture(kind = 'customer', id = 'actor-a') {
@@ -141,4 +145,205 @@ test('characters have independent breathing timing and dispose their actions', (
   a.animation.dispose();
   a.animation.update(a.entity, 0.1, a.context);
   assert.equal(a.animation.action, null);
+});
+
+test('pausing an interaction freezes the wrist and product; one receipt never replays', () => {
+  const f = fixture();
+  f.entity.basket = ['TOMATO'];
+  cue(f, 'shop', { basketIndex: 0 });
+  frames(f, 1.2);
+  const rotation = f.actor.wrists[0].quaternion.clone();
+  const time = f.animation.action.elapsed;
+  f.animation.update(f.entity, 0, f.context);
+  assert.ok(f.actor.wrists[0].quaternion.equals(rotation));
+  assert.equal(f.animation.action.elapsed, time);
+  frames(f, 4);
+  assert.equal(f.animation.action, null);
+});
+
+test('delivery cargo stays visible while approaching its delayed presentation anchor', () => {
+  const f = fixture('worker');
+  const mesh = new THREE.Mesh();
+  f.context.resolveTarget = () => ({ point: new THREE.Vector3(0, 0.75, 1.5), mesh });
+  f.entity.z = 1;
+  cue(f, 'deliver', { x: 0, z: 1, shelf: true });
+  f.animation.update(f.entity, 1 / 60, f.context);
+  assert.equal(f.actor.cargo.visible, true);
+  assert.equal(mesh.visible, false);
+  frames(f, 4);
+  assert.equal(mesh.visible, true);
+  assert.equal(f.actor.cargo.visible, false);
+});
+
+test('changed source task cancels pickup and preserves stock that is still carried', () => {
+  const f = fixture('worker');
+  f.entity.task = { phase: 'to-target' };
+  f.context.items = { TOMATO: 1 };
+  cue(f, 'pickup');
+  frames(f, 0.4);
+  f.entity.task = null;
+  f.animation.update(f.entity, 1 / 60, f.context);
+  assert.equal(f.animation.action, null);
+  assert.equal(f.actor.cargo.parent, f.actor.group);
+  assert.equal(f.actor.cargo.visible, true);
+});
+
+test('simulation emits cues only after successful inventory transfers and keeps economics', () => {
+  const state = createInitialState(7);
+  state.farms = {};
+  state.stock['shelf:TOMATO'].items.TOMATO = 2;
+  makeLocation(state.stock, 'customer:buyer', 4);
+  const customer = { id: 'buyer', kind: 'shopper', x: 3, z: 3.3, phase: 'waiting-stock',
+    targetShelfId: 'tomatoShelf', shoppingList: ['TOMATO'], shoppingIndex: 0,
+    demand: 'TOMATO', basket: [], checkoutOrder: 1, waitTicks: 0, payTicks: 0 };
+  state.customers.push(customer);
+  state.workers.push({ id: 'cashier', type: 'cashier', x: 5, z: -4, task: null });
+  advanceSimulation(state);
+  assert.equal(customer.animationCues.length, 1);
+  assert.equal(customer.animationCues[0].location, 'shelf:TOMATO');
+  assert.equal(state.stock['shelf:TOMATO'].items.TOMATO, 1);
+  assert.deepEqual(customer.basket, ['TOMATO']);
+  for (let i = 0; i < 80; i++) { state.tick++; state.customerSpawnTicks = 0; advanceSimulation(state); }
+  assert.equal(state.stats.tomatoSold, 1);
+  assert.equal(state.economy.balanceAtoms, 1030000);
+});
+
+test('real staff job emits ordered pickup/delivery receipts exactly once', () => {
+  const state = createInitialState();
+  state.farms = {};
+  state.stock['farm:TOMATO'].items.TOMATO = 1;
+  const id = 'worker-test';
+  makeLocation(state.stock, `worker:${id}`, 6);
+  reserveStock(state, { reservationId: 'job-test', from: 'farm:TOMATO', to: 'shelf:TOMATO', item: 'TOMATO', quantity: 1 });
+  const worker = { id, type: 'factoryFeeder', x: -10, z: 5, task: { from: 'farm:TOMATO', to: 'shelf:TOMATO',
+    carrier: `worker:${id}`, item: 'TOMATO', quantity: 1, reservationId: 'job-test', phase: 'to-source' } };
+  state.workers.push(worker);
+  for (let i = 0; i < 160; i++) { state.tick++; state.customerSpawnTicks = 0; advanceSimulation(state); }
+  assert.deepEqual(worker.animationCues.map((cue) => cue.type), ['pickup', 'deliver']);
+  assert.equal(state.stock['shelf:TOMATO'].items.TOMATO, 1);
+  assert.equal(state.stock[`worker:${id}`].items.TOMATO ?? 0, 0);
+});
+
+test('a 40-character scene leaves finite poses, bounded queues and independent actions', () => {
+  const fixtures = Array.from({ length: 40 }, (_, i) => fixture(i < 32 ? 'customer' : 'worker', `crowd-${i}`));
+  for (let i = 0; i < fixtures.length; i++) {
+    const f = fixtures[i];
+    if (i < 32) { f.entity.basket = ['TOMATO']; cue(f, 'shop', { basketIndex: 0 }); }
+    else cue(f, 'deliver', { shelf: true });
+  }
+  for (let n = 0; n < 240; n++) for (const f of fixtures) f.animation.update(f.entity, 1 / 60, f.context);
+  for (const f of fixtures) {
+    assert.equal(f.animation.action, null);
+    assert.equal(f.animation.pending.length, 0);
+    assert.equal(f.animation.path.length, 0);
+    assert.ok(Number.isFinite(f.actor.arms[0].quaternion.x));
+  }
+});
+
+test('coalesced simulation ticks preserve delivery after its source job has finished', () => {
+  const f = fixture('worker');
+  f.entity.task = null;
+  f.entity.animationCues = [
+    { id: 'source', type: 'pickup', item: 'TOMATO', x: 0, z: 0 },
+    { id: 'target', type: 'deliver', item: 'TOMATO', x: 0, z: 0, shelf: true },
+  ];
+  frames(f, 0.4);
+  assert.equal(f.animation.action.type, 'deliver');
+  frames(f, 2);
+  assert.equal(f.animation.action, null);
+});
+
+test('cart hands remain on its correctly oriented handle and diner poses recover to idle', () => {
+  const actor = createCustomerMesh({ id: 'cart', kind: 'shopper', archetype: 'shopperCart' },
+    { props: new EnvironmentProps() }, factory);
+  const animation = new CharacterAnimator(actor, factory, 'customer');
+  const entity = { id: 'cart', x: 0, z: 0, facing: 0, phase: 'queueing', basket: [] };
+  for (let i = 0; i < 120; i++) animation.update(entity, 1 / 60);
+  actor.group.updateMatrixWorld(true);
+  const grip = actor.cartMesh.localToWorld(new THREE.Vector3(-0.31, 0.78, 0.2));
+  assert.ok(actor.wrists[0].getWorldPosition(new THREE.Vector3()).distanceTo(grip) < 0.04);
+  assert.equal(actor.cartMesh.rotation.y, -Math.PI / 2);
+  entity.phase = 'eating';
+  for (let i = 0; i < 60; i++) animation.update(entity, 1 / 60);
+  assert.ok(actor.knees[0].rotation.x > 1);
+  entity.phase = 'waiting-table';
+  for (let i = 0; i < 120; i++) animation.update(entity, 1 / 60);
+  assert.ok(Math.abs(actor.knees[0].rotation.x) < 0.01);
+  assert.ok(Math.abs(actor.group.position.y) < 0.01);
+});
+
+test('delivery releases a shelf claim once, even throughout facing and barcode scanning', () => {
+  const f = fixture('worker');
+  let releases = 0;
+  f.context.resolveTarget = () => ({ point: new THREE.Vector3(0, 0.75, 0.5), mesh: new THREE.Mesh(), release: () => releases++ });
+  cue(f, 'deliver', { shelf: true });
+  frames(f, 3);
+  assert.equal(releases, 1);
+});
+
+test('staff presentation follows a real source-to-shelf route and drains its actions', () => {
+  const state = createInitialState();
+  state.farms = {};
+  state.stock['farm:TOMATO'].items.TOMATO = 1;
+  makeLocation(state.stock, 'worker:route-worker', 6);
+  reserveStock(state, { reservationId: 'route-job', from: 'farm:TOMATO', to: 'shelf:TOMATO', item: 'TOMATO', quantity: 1 });
+  const worker = { id: 'route-worker', type: 'factoryFeeder', x: -7, z: 5, task: { from: 'farm:TOMATO', to: 'shelf:TOMATO',
+    carrier: 'worker:route-worker', item: 'TOMATO', quantity: 1, reservationId: 'route-job', phase: 'to-source' } };
+  state.workers.push(worker);
+  const actor = createWorkerMesh(worker.type, factory);
+  const animation = new CharacterAnimator(actor, factory, 'worker');
+  const shelfMesh = new THREE.Mesh();
+  const context = { items: {}, resolveTarget: (receipt) => ({ point: new THREE.Vector3(receipt.x, 0.75, receipt.z + 0.4),
+    mesh: receipt.type === 'deliver' ? shelfMesh : null }) };
+  animation.update(worker, 1 / 60, context);
+  const observed = new Set();
+  for (let i = 0; i < 200; i++) {
+    state.tick++;
+    state.customerSpawnTicks = 0;
+    advanceSimulation(state);
+    context.items = state.stock['worker:route-worker'].items;
+    for (let frame = 0; frame < 6; frame++) {
+      animation.update(worker, 1 / 60, context);
+      if (animation.action) observed.add(animation.action.type);
+    }
+  }
+  assert.deepEqual([...observed], ['pickup', 'deliver']);
+  assert.equal(animation.action, null);
+  assert.equal(animation.pending.length, 0);
+  assert.equal(animation.path.length, 0);
+  assert.equal(shelfMesh.visible, true);
+  assert.equal(actor.cargo.visible, false);
+  assert.ok(Math.hypot(actor.group.position.x - worker.x, actor.group.position.z - worker.z) < 0.01);
+});
+
+test('customer waits for the staff hand to release the same shelf product', () => {
+  const f = fixture();
+  let delivering = true;
+  f.context.resolveTarget = () => ({ point: new THREE.Vector3(0, 0.75, 0.5), waitForDelivery: () => delivering });
+  f.entity.basket = ['TOMATO'];
+  cue(f, 'shop', { basketIndex: 0 });
+  frames(f, 1);
+  assert.equal(f.animation.action, null);
+  assert.equal(f.actor.cargo[0].visible, false);
+  delivering = false;
+  frames(f, 3);
+  assert.equal(f.actor.cargo[0].visible, true);
+  assert.equal(f.animation.pending.length, 0);
+});
+
+test('removing an interaction target cancels its pose and restores its claim', () => {
+  const f = fixture('worker');
+  let valid = true;
+  let released = false;
+  const mesh = new THREE.Mesh();
+  f.context.resolveTarget = () => ({ point: new THREE.Vector3(0, 0.7, 0.5), mesh, isValid: () => valid,
+    release: () => { released = true; } });
+  cue(f, 'deliver', { shelf: true });
+  frames(f, 0.2);
+  valid = false;
+  frames(f, 0.1);
+  assert.equal(f.animation.action, null);
+  assert.equal(f.actor.cargo.visible, false);
+  assert.equal(mesh.visible, true);
+  assert.equal(released, true);
 });

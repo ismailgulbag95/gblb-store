@@ -735,6 +735,8 @@ function workerTick(state, environmentObstacles) {
     if (task.phase === 'to-source') {
       const picked = pickUpReservedStock(state, task.reservationId, task.carrier);
       if (picked.ok) {
+        recordAnimationCue(worker, state, 'pickup', { id: `${task.reservationId}:pickup`,
+          item: task.item, location: task.from });
         if (task.farmId && state.farms[task.farmId]) removeFarmReady(state.farms[task.farmId], task.quantity, state.tick);
         task.phase = 'to-target';
         clearWorkerRoute(task);
@@ -751,10 +753,14 @@ function workerTick(state, environmentObstacles) {
       reservationId: task.reservationId,
     });
     if (!delivered.ok) continue;
+    recordAnimationCue(worker, state, 'deliver', { id: `${task.reservationId}:deliver`,
+      item: task.item, location: task.to, shelf: task.to.startsWith('shelf:') });
     if (task.customerId) {
       const customer = state.customers.find((entry) => entry.id === task.customerId);
       const table = state.diningTables[task.tableId];
       if (customer && table) {
+        recordAnimationCue(customer, state, 'receive', { id: `${task.reservationId}:receive`,
+          item: task.item, location: `customer:${customer.id}` });
         customer.phase = 'eating';
         customer.meal = task.item;
         customer.eatTicks = 0;
@@ -767,6 +773,15 @@ function workerTick(state, environmentObstacles) {
     durable = true;
   }
   return durable;
+}
+
+// Presentation-only receipts: inventory and AI timing remain authoritative.
+// Keep several receipts so a render following multiple simulation ticks does
+// not miss a pickup/delivery. No unbounded per-character event history.
+function recordAnimationCue(entity, state, type, details) {
+  entity.animationCues ??= [];
+  entity.animationCues.push({ type, tick: state.tick, x: entity.x, z: entity.z, ...details });
+  if (entity.animationCues.length > 8) entity.animationCues.shift();
 }
 
 function moveToward(customer, targetX, targetZ, distance) {
@@ -1445,10 +1460,13 @@ function customerTick(state, events) {
       }
       const position = shelfQueuePosition(item, Math.max(0, queueIndex), state, customer.targetShelfId);
       moveToward(customer, position.x, position.z, CUSTOMER_SPEED);
+      if (shelf) customer.facing = Math.atan2(shelf.x - customer.x, shelf.z - customer.z);
       customer.waitTicks += 1;
       if (queueIndex === 0 && shelf && quantityAt(state.stock, shelf.stockId, item) > 0) {
         const moved = move(state, shelf.stockId, `customer:${customer.id}`, item, 1, `customer-pickup:${customer.id}:${customer.shoppingIndex}`);
         if (moved) {
+          recordAnimationCue(customer, state, 'shop', { id: `shop:${customer.id}:${customer.shoppingIndex}`,
+            item, location: shelf.stockId, basketIndex: customer.basket.length });
           customer.basket.push(item);
           customer.shoppingIndex += 1;
           customer.waitTicks = 0;

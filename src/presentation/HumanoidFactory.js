@@ -283,19 +283,27 @@ export function makeHumanoid(group, shirtColor, hairColor, style = 0, profession
   // 2. Legs & Footwear
   let leftLeg;
   let rightLeg;
+  const knees = [];
   for (const side of [-1, 1]) {
     const leg = new THREE.Group();
     leg.position.set(side * 0.135, 0.43, 0);
-    const pants = new THREE.Mesh(new THREE.CapsuleGeometry(0.088, 0.25, 4, 8), trousers);
-    pants.position.y = -0.15;
+    const pants = new THREE.Mesh(new THREE.CapsuleGeometry(0.088, 0.09, 4, 8), trousers);
+    pants.position.y = -0.09;
     pants.castShadow = true;
+    const knee = new THREE.Group();
+    knee.position.y = -0.19;
+    const shin = new THREE.Mesh(new THREE.CapsuleGeometry(0.082, 0.07, 4, 8), trousers);
+    shin.position.y = -0.06;
+    shin.castShadow = true;
 
     const boot = new THREE.Mesh(new RoundedBoxGeometry(0.19, 0.12, 0.3, 3, 0.055), shoe);
-    boot.position.set(0, -0.31, 0.065);
+    boot.position.set(0, -0.12, 0.065);
     boot.castShadow = true;
     const sole = new THREE.Mesh(new RoundedBoxGeometry(0.2, 0.03, 0.32, 2, 0.015), dark);
-    sole.position.set(0, -0.365, 0.065);
-    leg.add(pants, boot, sole);
+    sole.position.set(0, -0.175, 0.065);
+    knee.add(shin, boot, sole);
+    leg.add(pants, knee);
+    knees.push(knee);
     group.add(leg);
 
     if (side < 0) leftLeg = leg;
@@ -304,6 +312,8 @@ export function makeHumanoid(group, shirtColor, hairColor, style = 0, profession
 
   // 3. Arms, Hands & Sleeves
   const arms = [];
+  const elbows = [];
+  const wrists = [];
   for (const side of [-1, 1]) {
     const arm = new THREE.Group();
     arm.position.set(side * 0.26, 0.91, 0);
@@ -315,21 +325,30 @@ export function makeHumanoid(group, shirtColor, hairColor, style = 0, profession
 
     const cuff = new THREE.Mesh(new THREE.SphereGeometry(0.09, 10, 8), trim);
     cuff.scale.set(0.8, 0.48, 0.75);
-    cuff.position.y = -0.28;
+    cuff.position.y = -0.23;
+    const elbow = new THREE.Group();
+    elbow.position.y = -0.24;
 
     const forearm = new THREE.Mesh(new THREE.CapsuleGeometry(0.07, 0.16, 3, 8), skin);
-    forearm.position.y = -0.36;
+    forearm.position.y = -0.12;
     forearm.rotation.z = -side * 0.12;
 
     const hand = new THREE.Mesh(new THREE.SphereGeometry(0.082, 10, 8), skin);
-    hand.position.set(0, -0.48, 0.035);
+    const wrist = new THREE.Group();
+    wrist.position.y = -0.24;
+    hand.position.set(0, 0, 0.035);
 
     const thumb = new THREE.Mesh(new THREE.SphereGeometry(0.04, 8, 6), skin);
-    thumb.position.set(side * -0.045, -0.43, 0.095);
+    thumb.position.set(side * -0.045, 0.05, 0.095);
 
-    arm.add(sleeve, cuff, forearm, hand, thumb);
+    wrist.add(hand, thumb);
+    elbow.add(forearm, wrist);
+    arm.add(sleeve, cuff, elbow);
+    arm.userData.rigParts = [sleeve, cuff, elbow];
     group.add(arm);
     arms.push(arm);
+    elbows.push(elbow);
+    wrists.push(wrist);
   }
 
   // 4. Detailed Stylized Head
@@ -425,9 +444,16 @@ export function makeHumanoid(group, shirtColor, hairColor, style = 0, profession
     // Cardboard stocking box held in hands
     const boxGroup = new THREE.Group();
     boxGroup.position.set(0, 0.68, 0.32);
-    const boxMesh = new THREE.Mesh(new RoundedBoxGeometry(0.34, 0.26, 0.24, 2, 0.02), new THREE.MeshStandardMaterial({ color: 0xc28d53, roughness: 0.85 }));
-    const boxTape = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.04, 0.25), new THREE.MeshStandardMaterial({ color: 0xd4a373, roughness: 0.6 }));
-    boxGroup.add(boxMesh, boxTape);
+    const cardboard = new THREE.MeshStandardMaterial({ color: 0xc28d53, roughness: 0.85 });
+    for (const [w, h, d, x, y, z] of [
+      [0.34, 0.025, 0.24, 0, -0.12, 0],
+      [0.025, 0.26, 0.24, -0.16, 0, 0], [0.025, 0.26, 0.24, 0.16, 0, 0],
+      [0.34, 0.26, 0.025, 0, 0, -0.11], [0.34, 0.26, 0.025, 0, 0, 0.11],
+    ]) {
+      const wall = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), cardboard);
+      wall.position.set(x, y, z);
+      boxGroup.add(wall);
+    }
     group.add(boxGroup);
     propObjects.box = boxGroup;
 
@@ -748,9 +774,27 @@ export function makeHumanoid(group, shirtColor, hairColor, style = 0, profession
     group.add(inspectMesh);
   }
 
+  // Keep profession/archetype tools at their existing grip, now under a wrist.
+  group.updateMatrixWorld(true);
+  arms.forEach((arm, index) => {
+    for (const tool of [...arm.children]) {
+      if (!arm.userData.rigParts.includes(tool)) wrists[index].attach(tool);
+    }
+  });
+  const torso = new THREE.Group();
+  torso.position.y = 0.43;
+  group.add(torso);
+  group.updateMatrixWorld(true);
+  const equipment = new Set([leftLeg, rightLeg, torso, inspectMesh, propObjects.box, propObjects.bucket]);
+  for (const child of [...group.children]) if (!equipment.has(child)) torso.attach(child);
+
   return {
     legs: [leftLeg, rightLeg],
     arms,
+    elbows,
+    wrists,
+    knees,
+    torso,
     head,
     archetype,
     propObjects,
@@ -771,6 +815,19 @@ export function createWorkerMesh(type, itemFactory) {
 
   const body = makeHumanoid(group, uniformColor, 0x4a2c11, professionKey.length, professionKey);
 
+  // Small hand terminal for an actual completed shelf delivery's barcode check.
+  const terminal = new THREE.Group();
+  const terminalBody = new THREE.Mesh(new RoundedBoxGeometry(0.09, 0.14, 0.05, 2, 0.01),
+    new THREE.MeshStandardMaterial({ color: 0x2d3436, roughness: 0.6 }));
+  const screen = new THREE.Mesh(new THREE.BoxGeometry(0.065, 0.08, 0.006),
+    new THREE.MeshBasicMaterial({ color: 0x2ed573 }));
+  screen.position.z = 0.029;
+  terminal.add(terminalBody, screen);
+  terminal.position.z = 0.055;
+  terminal.visible = false;
+  body.wrists[1].add(terminal);
+  body.propObjects.terminal = terminal;
+
   // Dedicated handheld cargo mesh
   let cargo = null;
   if (itemFactory && itemFactory.getItemGeometry) {
@@ -786,6 +843,10 @@ export function createWorkerMesh(type, itemFactory) {
     cargo,
     legs: body.legs,
     arms: body.arms,
+    elbows: body.elbows,
+    wrists: body.wrists,
+    knees: body.knees,
+    torso: body.torso,
     head: body.head,
     profession: professionKey,
     propObjects: body.propObjects,
@@ -837,7 +898,9 @@ export function createCustomerMesh(customer, environment, itemFactory) {
 
   if (hasCart && environment?.props?.createShoppingCartModel) {
     cartMesh = environment.props.createShoppingCartModel(0.92);
-    cartMesh.position.set(0, 0, 0.58);
+    // Cart model travels along local X; characters face local +Z.
+    cartMesh.rotation.y = -Math.PI / 2;
+    cartMesh.position.set(0, 0, 0.62);
     group.add(cartMesh);
     arms[0].rotation.set(-0.55, 0, 0.08);
     arms[1].rotation.set(-0.55, 0, -0.08);
@@ -889,6 +952,10 @@ export function createCustomerMesh(customer, environment, itemFactory) {
     group,
     legs,
     arms,
+    elbows: body.elbows,
+    wrists: body.wrists,
+    knees: body.knees,
+    torso: body.torso,
     head: body.head,
     bubble,
     bubbleCanvas,

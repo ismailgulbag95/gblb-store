@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="tr">
+<meta charset="utf-8">
+<title>Karakter animasyon doğrulaması</title>
+<style>
+  body { margin:0; font:14px system-ui; }
+  #game-container { position:fixed; inset:0; }
+  nav { position:fixed; top:12px; right:12px; z-index:2; background:#fff; padding:8px; border:2px solid #222; max-width:280px; }
+  button, a { margin:4px; padding:6px; }
+  #status { white-space:pre-wrap; font:11px monospace; max-height:180px; overflow:auto; }
+</style>
+<div id="game-container"></div>
+<nav>
+  <a href="?mode=shop">Alışveriş döngüsü</a>
+  <a href="?mode=restock">Raf doldurma döngüsü</a>
+  <a href="?mode=crowd">Kalabalık 40 karakter</a>
+  <button id="run">Çalıştır</button><button id="pause">Durdur</button>
+  <button id="step">0.1 saniye ilerlet</button>
+  <button id="shop-pose">Ürün inceleme pozu</button>
+  <button id="scan-pose">Barkod okutma pozu</button>
+  <button id="wide">Genel görünüm</button>
+  <pre id="status">Hazırlanıyor</pre>
+</nav>
+<script type="module" src="./character-animation-scene.js"></script>
+</html>

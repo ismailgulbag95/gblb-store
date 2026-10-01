@@ -22,6 +22,7 @@ import { createShelfModel } from './ShelfModel.js';
 import { buildDecorationModel } from './DecorationModel.js';
 import { createWorkerMesh, createCustomerMesh } from './HumanoidFactory.js';
 import { createDiningTableModel } from './DiningTableModel.js';
+import { CharacterAnimator } from './CharacterAnimator.js';
 
 export class WorldScene {
   constructor(containerId = 'game-container') {
@@ -35,6 +36,7 @@ export class WorldScene {
     this.selfRegisters = new Map();
     this.customers = new Map();
     this.workers = new Map();
+    this.animationClaims = new Set();
     this.tables = new Map();
     this.decorItems = new Map();
     this.decorationModels = new Map();
@@ -907,134 +909,54 @@ export class WorldScene {
     return actor;
   }
 
-  #syncCustomer(actor, customer, time, frameDelta) {
-    actor.group.position.set(customer.x, 0, customer.z);
-    actor.group.rotation.y = customer.facing ?? 0;
-    const isSitting = ['waiting-meal', 'eating', 'ready-tip'].includes(customer.phase);
-    const moving = !['paying', 'waiting-stock', 'waiting-meal', 'waiting-table', 'eating', 'ready-tip'].includes(customer.phase);
-
-    if (isSitting) {
-      if (actor.inspectMesh) actor.inspectMesh.visible = false;
-      // 1. Leg posture: Bent 90 degrees forward over chair seat
-      actor.legs[0].rotation.x = THREE.MathUtils.lerp(actor.legs[0].rotation.x, -Math.PI / 2.15, frameDelta * 12);
-      actor.legs[1].rotation.x = THREE.MathUtils.lerp(actor.legs[1].rotation.x, -Math.PI / 2.15, frameDelta * 12);
-
-      // 2. Vertical posture: Lower hip onto chair cushion (cushion y ~ 0.54, humanoid hip pivot y = 0.43)
-      actor.group.position.y = 0.11;
-
-      // 3. Dynamic upper-body & arm animation depending on diner phase
-      if (customer.phase === 'eating') {
-        // Chewing / dining motion with rhythmic arm elevation towards table
-        actor.arms[0].rotation.x = -0.76 + Math.sin(time * 6.5) * 0.14;
-        actor.arms[1].rotation.x = -0.76 - Math.sin(time * 6.5) * 0.14;
-        actor.arms[0].rotation.z = -0.16;
-        actor.arms[1].rotation.z = 0.16;
-        actor.group.position.y += Math.sin(time * 6.5) * 0.007; // Natural chewing head sway
-      } else if (customer.phase === 'ready-tip') {
-        // Finished meal, satisfied wave/gesture
-        actor.arms[0].rotation.x = -1.2 + Math.sin(time * 4) * 0.12;
-        actor.arms[1].rotation.x = -0.52;
-        actor.arms[0].rotation.z = -0.22;
-        actor.arms[1].rotation.z = 0.12;
-      } else {
-        // Waiting for order with hands placed neatly towards the table
-        actor.arms[0].rotation.x = THREE.MathUtils.lerp(actor.arms[0].rotation.x, -0.64, frameDelta * 8);
-        actor.arms[1].rotation.x = THREE.MathUtils.lerp(actor.arms[1].rotation.x, -0.64, frameDelta * 8);
-        actor.arms[0].rotation.z = -0.14;
-        actor.arms[1].rotation.z = 0.14;
-        actor.group.position.y += Math.sin(time * 2.5 + customer.id.length) * 0.006;
-      }
-    } else if (moving) {
-      if (actor.inspectMesh) actor.inspectMesh.visible = false;
-      actor.walkCycle += frameDelta * 12;
-      actor.legs[0].rotation.x = Math.sin(actor.walkCycle) * 0.5;
-      actor.legs[1].rotation.x = -Math.sin(actor.walkCycle) * 0.5;
-
-      if (actor.hasCart) {
-        // Market Arabası Sürme: Pushing shopping cart with hands on handle
-        actor.arms[0].rotation.set(-0.55 + Math.sin(actor.walkCycle) * 0.05, 0, 0.08);
-        actor.arms[1].rotation.set(-0.55 - Math.sin(actor.walkCycle) * 0.05, 0, -0.08);
-        if (actor.cartMesh) {
-          actor.cartMesh.rotation.z = Math.sin(actor.walkCycle * 2) * 0.015;
-          actor.cartMesh.position.y = Math.abs(Math.sin(actor.walkCycle * 4)) * 0.006;
-        }
-      } else if (actor.hasBasket) {
-        // Sepet Taşıma: Arm holding basket with pendulum sway, free arm swinging
-        actor.arms[0].rotation.set(-Math.sin(actor.walkCycle) * 0.35, 0, 0);
-        actor.arms[1].rotation.set(0.08 + Math.sin(actor.walkCycle) * 0.08, 0, -0.15);
-        if (actor.basketMesh) {
-          actor.basketMesh.rotation.z = Math.sin(actor.walkCycle) * 0.06;
-        }
-        actor.group.rotation.z = Math.sin(actor.walkCycle) * 0.018;
-      } else if (actor.archetype === 'elderly') {
-        const caneWalk = Math.sin(actor.walkCycle);
-        actor.arms[1].rotation.set(-0.35 + caneWalk * 0.22, 0, -0.1);
-        actor.arms[0].rotation.set(-caneWalk * 0.28, 0, 0.1);
-        actor.group.rotation.x = 0.12;
-      } else {
-        actor.arms[0].rotation.set(-Math.sin(actor.walkCycle) * 0.32, 0, 0);
-        actor.arms[1].rotation.set(Math.sin(actor.walkCycle) * 0.32, 0, 0);
-        actor.group.rotation.x = 0;
-        actor.group.rotation.z = 0;
-      }
-      actor.group.position.y = Math.abs(Math.sin(actor.walkCycle * 2)) * 0.05;
-    } else {
-      actor.legs[0].rotation.x = THREE.MathUtils.lerp(actor.legs[0].rotation.x, 0, frameDelta * 10);
-      actor.legs[1].rotation.x = THREE.MathUtils.lerp(actor.legs[1].rotation.x, 0, frameDelta * 10);
-      actor.group.rotation.z = THREE.MathUtils.lerp(actor.group.rotation.z, 0, frameDelta * 10);
-      actor.group.rotation.x = THREE.MathUtils.lerp(actor.group.rotation.x, 0, frameDelta * 10);
-
-      if (customer.phase === 'waiting-stock') {
-        // Ürün İnceleme (Inspecting product held up in both hands)
-        if (actor.inspectMesh) {
-          actor.inspectMesh.visible = true;
-          actor.inspectMesh.rotation.y = Math.sin(time * 2.8) * 0.45;
-          actor.inspectMesh.position.y = 0.76 + Math.sin(time * 2.8) * 0.02;
-        }
-        actor.arms[0].rotation.set(-0.76, 0.22, 0.18);
-        actor.arms[1].rotation.set(-0.76, -0.22, -0.18);
-        if (actor.head) actor.head.rotation.set(0.24 + Math.sin(time * 2.8) * 0.06, 0, 0);
-        actor.group.position.y += Math.sin(time * 2) * 0.005;
-      } else if (customer.phase === 'paying') {
-        // Kasa Ödeme (Paying with contactless card / mobile tap)
-        if (actor.inspectMesh) actor.inspectMesh.visible = false;
-        actor.arms[1].rotation.set(-0.85 + Math.sin(time * 3.5) * 0.15, 0, -0.12);
-        actor.arms[0].rotation.set(-0.25, 0, 0.08);
-        if (actor.head) actor.head.rotation.set(0.12 + Math.sin(time * 3.5) * 0.08, 0, 0);
-      } else if (customer.phase === 'waiting-table' || customer.phase === 'queueing') {
-        if (actor.inspectMesh) actor.inspectMesh.visible = false;
-        if (actor.hasCart) {
-          actor.arms[0].rotation.set(-0.55, 0, 0.08);
-          actor.arms[1].rotation.set(-0.55, 0, -0.08);
-        } else if (actor.hasBasket) {
-          actor.arms[0].rotation.set(0.04, 0, 0);
-          actor.arms[1].rotation.set(0.08, 0, -0.15);
-        } else if (actor.archetype === 'elderly') {
-          actor.arms[1].rotation.set(-0.35, 0, -0.1);
-          actor.arms[0].rotation.set(0.04, 0, 0);
-          actor.group.rotation.x = 0.1;
-        } else {
-          actor.arms[0].rotation.set(0.04, 0, 0);
-          actor.arms[1].rotation.set(-0.04, 0, 0);
-        }
-        actor.group.rotation.z = Math.sin(time * 1.5) * 0.015;
-        if (actor.head) actor.head.rotation.set(0.05, Math.sin(time * 1.2) * 0.22, 0);
-      } else {
-        if (actor.inspectMesh) actor.inspectMesh.visible = false;
-        if (actor.hasCart) {
-          actor.arms[0].rotation.set(-0.55, 0, 0.08);
-          actor.arms[1].rotation.set(-0.55, 0, -0.08);
-        } else if (actor.hasBasket) {
-          actor.arms[0].rotation.set(0.04, 0, 0);
-          actor.arms[1].rotation.set(0.08, 0, -0.15);
-        } else {
-          actor.arms[0].rotation.set(0.04, 0, 0);
-          actor.arms[1].rotation.set(-0.04, 0, 0);
-        }
-        actor.group.position.y += Math.sin(time * 3 + customer.id.length) * 0.008;
-        if (actor.head) actor.head.rotation.set(0, THREE.MathUtils.lerp(actor.head.rotation.y, 0, frameDelta * 5), 0);
-      }
+  #animationTarget(cue, state, actor) {
+    const shelf = [...this.shelves.values(), ...this.customShelves.values()]
+      .find((entry) => entry.id === cue.location || `shelf:${entry.id}` === cue.location
+        || entry.id === `shelf:${STATIONS[cue.location?.slice(6)]?.item}`);
+    if (shelf) {
+      shelf.group.updateMatrixWorld(true);
+      const count = state.stock[cue.location]?.items[cue.item] ?? 0;
+      let candidates = shelf.productMeshes;
+      if (cue.type === 'shop') candidates = shelf.productMeshes.slice(Math.min(count, shelf.productMeshes.length - 1));
+      if (cue.type === 'deliver') candidates = shelf.productMeshes.slice(0, count)
+        .filter((mesh) => !this.animationClaims.has(mesh));
+      candidates = [...candidates];
+      const origin = new THREE.Vector3(cue.x ?? actor.group.position.x, 0.8, cue.z ?? actor.group.position.z);
+      // Use the accessible outer product, not a random item buried in a rack.
+      candidates.sort((a, b) => a.getWorldPosition(new THREE.Vector3()).distanceToSquared(origin)
+        - b.getWorldPosition(new THREE.Vector3()).distanceToSquared(origin));
+      const mesh = candidates[0];
+      const point = mesh?.getWorldPosition(new THREE.Vector3())
+        ?? shelf.group.localToWorld(new THREE.Vector3(0, 0.75, 0.6));
+      const barcode = point.clone().setY(0.34);
+      if (cue.type === 'deliver' && mesh) this.animationClaims.add(mesh);
+      return { point, barcode, mesh: cue.type === 'deliver' ? mesh : null,
+        isValid: () => shelf.group.parent === this.scene,
+        waitForDelivery: cue.type === 'shop' ? () => this.animationClaims.has(mesh) : null,
+        release: () => this.animationClaims.delete(mesh) };
     }
+    const id = cue.location?.split(':')[1];
+    const customer = cue.location?.startsWith('customer:') ? state.customers.find((entry) => entry.id === id) : null;
+    if (customer) {
+      const table = this.tables.get(customer.tableId);
+      const food = table?.userData?.foodMesh;
+      if (food) return { point: food.getWorldPosition(new THREE.Vector3()), mesh: cue.type === 'deliver' ? food : null };
+    }
+    const stationId = cue.location?.startsWith('farm:')
+      ? Object.keys(state.farms).find((farmId) => (STATIONS[farmId]?.item ?? state.farms[farmId].item) === cue.item)
+        ?? Object.keys(STATIONS).find((farmId) => STATIONS[farmId].kind === 'farm' && STATIONS[farmId].item === cue.item)
+      : id;
+    const position = customer ?? stationPosition(state, stationId);
+    return position ? { point: new THREE.Vector3(position.x, customer ? 0.85 : 0.75, position.z) } : null;
+  }
+
+  #syncCustomer(actor, customer, state, frameDelta) {
+    actor.animator ??= new CharacterAnimator(actor, this.itemFactory, 'customer');
+    actor.animator.update(customer, state.paused ? 0 : frameDelta, {
+      resolveTarget: (cue) => this.#animationTarget(cue, state, actor),
+      speed: state.speedMultiplier,
+      lookTarget: customer.phase === 'waiting-stock' ? this.#animationTarget({ location: 'shelf:' + (customer.targetShelfId?.replace('shelf:', '') ?? customer.demand), item: customer.demand }, state, actor)?.point : null,
+    });
 
     const wish = customer.reaction ? (customer.reaction === 'happy' ? 'satisfied' : 'unhappy') : customer.kind === 'diner'
       ? (customer.phase === 'waiting-meal' ? customer.demand : null)
@@ -1059,15 +981,6 @@ export class WorldScene {
       actor.bubble.visible = Boolean(wish);
       actor.lastWish = wish;
     }
-
-    (customer.basket ?? []).forEach((itemId, index) => {
-      const mesh = actor.cargo[index];
-      if (!mesh || !ITEMS[itemId]) return;
-      mesh.geometry = this.itemFactory.getItemGeometry(itemId);
-      mesh.material = this.itemFactory.getItemMaterial(itemId);
-      mesh.visible = true;
-    });
-    for (let index = customer.basket?.length ?? 0; index < actor.cargo.length; index += 1) actor.cargo[index].visible = false;
   }
 
   #addUpgradeMarker(upgrade) {
@@ -1089,6 +1002,7 @@ export class WorldScene {
     const idSet = new Set(ids);
     for (const [id, value] of map) {
       if (idSet.has(id)) continue;
+      value.animator?.dispose();
       dispose?.(value);
       this.scene.remove(value.group ?? value);
       map.delete(id);
@@ -1480,162 +1394,24 @@ export class WorldScene {
     }, (group) => this.#disposeVisual(group));
     for (const customer of state.customers) {
       const actor = this.customers.get(customer.id);
-      if (actor) this.#syncCustomer(actor, customer, time, frameDelta);
+      if (actor) this.#syncCustomer(actor, customer, state, frameDelta);
     }
 
     const workerIds = state.workers.map((worker) => worker.id);
     this.#syncCollection(this.workers, workerIds, (id) => {
       const worker = state.workers.find((entry) => entry.id === id);
       if (worker) this.workers.set(id, this.#createWorker(worker.type));
-    });
-    state.workers.forEach((worker, index) => {
+    }, (actor) => this.#disposeVisual(actor));
+    state.workers.forEach((worker) => {
       const actor = this.workers.get(worker.id);
       if (!actor) return;
-      const x = worker.x ?? -8 + (index % 3) * 0.65;
-      const z = worker.z ?? (index % 2 ? 0.7 : -0.7);
-      const moving = Math.hypot(x - actor.group.position.x, z - actor.group.position.z) > 0.025;
-      const stock = state.stock[`worker:${worker.id}`]?.items ?? {};
-      const carriedItem = Object.keys(stock)[0];
-      actor.cargo.visible = Boolean(carriedItem);
-      if (carriedItem) {
-        actor.cargo.geometry = this.itemFactory.getItemGeometry(carriedItem);
-        actor.cargo.material = this.itemFactory.getItemMaterial(carriedItem);
-      }
-
-      if (moving) {
-        actor.walkCycle += frameDelta * 12;
-        actor.legs[0].rotation.x = Math.sin(actor.walkCycle) * 0.48;
-        actor.legs[1].rotation.x = -Math.sin(actor.walkCycle) * 0.48;
-        actor.group.position.y = Math.abs(Math.sin(actor.walkCycle * 2)) * 0.045;
-        actor.group.rotation.x = 0;
-        actor.group.rotation.z = 0;
-
-        if (carriedItem) {
-          // Taşıma (Carrying Cargo Box with both hands wrapped forward)
-          actor.arms[0].rotation.set(-0.76, 0.22, 0.15);
-          actor.arms[1].rotation.set(-0.76, -0.22, -0.15);
-          actor.cargo.position.set(0, 0.72 + Math.abs(Math.sin(actor.walkCycle * 2)) * 0.035, 0.34);
-          actor.cargo.rotation.set(Math.sin(actor.walkCycle) * 0.04, 0, 0);
-          if (actor.propObjects?.box) actor.propObjects.box.visible = false;
-        } else {
-          // Normal walking arm swing
-          actor.arms[0].rotation.set(-Math.sin(actor.walkCycle) * 0.35, 0, 0);
-          actor.arms[1].rotation.set(Math.sin(actor.walkCycle) * 0.35, 0, 0);
-          if (actor.propObjects?.box) actor.propObjects.box.visible = (actor.profession === 'stockClerk' || actor.profession === 'factoryFeeder');
-        }
-      } else {
-        actor.legs[0].rotation.x = THREE.MathUtils.lerp(actor.legs[0].rotation.x, 0, frameDelta * 10);
-        actor.legs[1].rotation.x = THREE.MathUtils.lerp(actor.legs[1].rotation.x, 0, frameDelta * 10);
-        actor.group.position.y = THREE.MathUtils.lerp(actor.group.position.y, 0, frameDelta * 10);
-
-        if (carriedItem) {
-          // Taşıma (Holding Cargo at rest)
-          actor.arms[0].rotation.set(-0.76, 0.18, 0.1);
-          actor.arms[1].rotation.set(-0.76, -0.18, -0.1);
-          actor.cargo.position.set(0, 0.72 + Math.sin(time * 3) * 0.012, 0.34);
-          if (actor.propObjects?.box) actor.propObjects.box.visible = false;
-        } else {
-          // Role-specific idle workstation animations
-          const prof = actor.profession ?? worker.type;
-          if (prof === 'cashier') {
-            const scan = Math.sin(time * 3.5);
-            actor.arms[1].rotation.set(-0.75 + scan * 0.22, 0.15, 0);
-            actor.arms[0].rotation.set(-0.55 + Math.cos(time * 5) * 0.12, -0.1, 0);
-            if (actor.head) actor.head.rotation.set(0.18 + scan * 0.08, Math.sin(time * 1.8) * 0.15, 0);
-            if (actor.propObjects?.laser?.material?.color) {
-              actor.propObjects.laser.material.color.setHex(Math.sin(time * 8) > 0 ? 0x2ed573 : 0xff4757);
-            }
-          } else if (prof === 'stockClerk' || prof === 'factoryFeeder') {
-            // Raf Düzenleme (Shelf facing & stocking)
-            actor.arms[0].rotation.set(-0.88 + Math.sin(time * 3.2) * 0.18, 0.15, 0);
-            actor.arms[1].rotation.set(-0.76 + Math.cos(time * 3.2) * 0.18, -0.15, 0);
-            if (actor.head) actor.head.rotation.set(0.14, Math.sin(time * 2) * 0.2, 0);
-            actor.group.rotation.x = Math.sin(time * 1.5) * 0.04;
-          } else if (prof === 'janitor') {
-            // Temizlik (Floor mopping sweep)
-            const sweep = Math.sin(time * 2.8);
-            actor.arms[1].rotation.set(-0.65, 0.2, 0);
-            actor.arms[0].rotation.set(-0.45, -0.2, 0);
-            if (actor.propObjects?.mop) {
-              actor.propObjects.mop.rotation.z = sweep * 0.35;
-              actor.propObjects.mop.rotation.y = Math.cos(time * 2.8) * 0.2;
-            }
-            actor.group.rotation.y = (worker.facing ?? 0) + sweep * 0.22;
-            if (actor.head) actor.head.rotation.set(0.2, -sweep * 0.15, 0);
-          } else if (prof === 'chef' || prof === 'chefWaiter') {
-            // Yemek Hazırlama (Cooking & pan tossing)
-            const toss = (time * 2.5) % (Math.PI * 2);
-            const flick = Math.max(0, Math.sin(toss)) ** 4;
-            actor.arms[1].rotation.set(-0.68 - flick * 0.42, 0, -0.1);
-            actor.arms[0].rotation.set(-0.45 + Math.sin(time * 3.5) * 0.12, 0.2, 0.1);
-            if (actor.propObjects?.egg) {
-              actor.propObjects.egg.position.y = 0.02 + flick * 0.35;
-              actor.propObjects.egg.rotation.x = flick * Math.PI * 2;
-            }
-            if (actor.head) actor.head.rotation.set(0.22 - flick * 0.1, 0, 0);
-          } else if (prof === 'technician') {
-            // Onarım (Machinery Repair)
-            actor.legs[0].rotation.x = -0.38;
-            actor.legs[1].rotation.x = -0.38;
-            actor.group.position.y = -0.09;
-            const turn = Math.sin(time * 5.5);
-            actor.arms[1].rotation.set(-0.85 + turn * 0.25, 0, -0.1);
-            if (actor.propObjects?.wrench) actor.propObjects.wrench.rotation.z = turn * 0.55;
-            actor.arms[0].rotation.set(-0.4, 0.2, 0);
-            if (actor.head) actor.head.rotation.set(0.3, 0, 0);
-          } else if (prof === 'waiter') {
-            // Servis (Serving tray balance)
-            actor.arms[1].rotation.set(-1.38, 0, -0.18);
-            actor.arms[0].rotation.set(0.25, 0, 0.15);
-            if (actor.propObjects?.tray) {
-              actor.propObjects.tray.rotation.x = 1.38;
-              actor.propObjects.tray.position.y = 0.24 + Math.sin(time * 2) * 0.015;
-            }
-            if (actor.head) actor.head.rotation.set(0.04, Math.sin(time * 1.5) * 0.18, 0);
-          } else if (prof === 'butcher') {
-            // Et Doğrama (Cleaver chopping)
-            const chop = Math.max(0, Math.sin(time * 5.5));
-            actor.arms[1].rotation.set(-0.35 - chop * 0.75, 0, 0);
-            actor.arms[0].rotation.set(-0.7, 0.15, 0.1);
-            if (actor.head) actor.head.rotation.set(0.25, 0, 0);
-          } else if (prof === 'baker') {
-            // Ekmek Pişirme (Peel sliding)
-            const slide = Math.sin(time * 2.6) * 0.22;
-            actor.arms[0].rotation.set(-0.72 + slide, 0.1, 0);
-            actor.arms[1].rotation.set(-0.72 + slide, -0.1, 0);
-            if (actor.propObjects?.peel) actor.propObjects.peel.position.z = 0.28 + slide * 0.35;
-          } else if (prof === 'security') {
-            // Devriye & Telsiz
-            if (actor.head) actor.head.rotation.set(0, Math.sin(time * 0.9) * 0.48, 0);
-            const radioCheck = Math.sin(time * 0.6) > 0.55;
-            if (radioCheck) {
-              actor.arms[1].rotation.set(-1.3, -0.25, -0.35);
-            } else {
-              actor.arms[1].rotation.set(0.05, 0, -0.05);
-            }
-            actor.arms[0].rotation.set(0.05, 0, 0.05);
-          } else if (prof === 'storeManager' || prof === 'driver') {
-            actor.arms[0].rotation.set(0.06, 0, 0.08);
-            actor.arms[1].rotation.set(-0.3 + Math.sin(time * 2) * 0.12, 0, 0);
-            if (actor.head) actor.head.rotation.set(0.12 + Math.sin(time * 2.2) * 0.08, Math.sin(time * 1.1) * 0.24, 0);
-          } else if (prof === 'gardener' || prof === 'harvester' || prof === 'caretaker') {
-            actor.group.rotation.x = 0.12;
-            actor.arms[0].rotation.set(-0.75 + Math.sin(time * 3) * 0.14, 0.12, 0);
-            actor.arms[1].rotation.set(-0.75 - Math.sin(time * 3) * 0.14, -0.12, 0);
-            if (actor.head) actor.head.rotation.set(0.3, Math.sin(time * 1.8) * 0.15, 0);
-          } else {
-            actor.arms[0].rotation.set(Math.sin(time * 1.5) * 0.04, 0, 0.04);
-            actor.arms[1].rotation.set(-Math.sin(time * 1.5) * 0.04, 0, -0.04);
-            if (actor.head) actor.head.rotation.set(0.06, Math.sin(time * 1.2) * 0.18, 0);
-          }
-        }
-      }
-
-      actor.group.position.x = x;
-      actor.group.position.z = z;
-      if (actor.profession !== 'janitor' || moving) {
-        actor.group.rotation.y = worker.facing ?? 0;
-      }
+      actor.animator ??= new CharacterAnimator(actor, this.itemFactory, 'worker');
+      actor.animator.update(worker, state.paused ? 0 : frameDelta, {
+        items: state.stock['worker:' + worker.id]?.items ?? {},
+        speed: state.speedMultiplier,
+        resolveTarget: (cue) => this.#animationTarget(cue, state, actor),
+        paying: worker.type === 'cashier' && state.customers.some((customer) => customer.phase === 'paying'),
+      });
     });
 
     for (const marker of this.upgradeMarkers.values()) {
