@@ -160,6 +160,10 @@ export class InputManager {
       const distance = Math.hypot(event.clientX - this.pointerStart.x, event.clientY - this.pointerStart.y);
       this.pointerStart = null;
       if (distance > 18 || event.target.closest('[data-ui]')) return;
+      if (!this.layoutMode && this.world.terminalAtScreen?.(event.clientX, event.clientY, this.app.getState())) {
+        this.app.openProcurement();
+        return;
+      }
       const target = this.world.screenToWorld(event.clientX, event.clientY);
       if (this.layoutMode) {
         if (!target) return;
@@ -185,7 +189,7 @@ export class InputManager {
         }
         return;
       }
-      if (target && target.x > -55 && target.x < 18 && target.z > -16 && target.z < 30) this.app.setPlayerTarget(target.x, target.z);
+      if (target && target.x > -55 && target.x < (this.app.getState().unlocked.managerOffice ? 27 : 18) && target.z > -16 && target.z < 30) this.app.setPlayerTarget(target.x, target.z);
     });
     this.canvas.addEventListener('pointercancel', () => { this.pointerStart = null; });
     this.canvas.addEventListener('pointermove', (event) => {

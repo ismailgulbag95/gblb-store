@@ -15,7 +15,35 @@ export const ITEMS = Object.freeze({
   ORANGE_TART: { id: 'ORANGE_TART', name: 'Portakallı tart', icon: 'orangeTart', price: 42, color: 0xf59e0b },
   BURGER: { id: 'BURGER', name: 'Gurme burger', icon: 'burger', price: 75, color: 0xfb923c },
   PIZZA: { id: 'PIZZA', name: 'Pizza', icon: 'pizza', price: 90, color: 0xdc2626 },
+  COLA: { id: 'COLA', name: 'Kola', icon: 'orangeJuice', price: 8, color: 0x991b1b, imported: true },
+  SODA: { id: 'SODA', name: 'Gazoz', icon: 'orangeJuice', price: 6, color: 0x22c55e, imported: true },
+  CHIPS: { id: 'CHIPS', name: 'Cips', icon: 'popcorn', price: 12, color: 0xf59e0b, imported: true },
+  BISCUIT: { id: 'BISCUIT', name: 'Bisküvi', icon: 'bread', price: 10, color: 0xd97706, imported: true },
+  CHOCOLATE: { id: 'CHOCOLATE', name: 'Çikolata', icon: 'tomatoPaste', price: 15, color: 0x713f12, imported: true },
+  CANNED_FISH: { id: 'CANNED_FISH', name: 'Konserve balık', icon: 'tomatoPaste', price: 20, color: 0x64748b, imported: true },
+  DETERGENT: { id: 'DETERGENT', name: 'Deterjan', icon: 'chickenFeed', price: 25, color: 0x3b82f6, imported: true },
+  SHAMPOO: { id: 'SHAMPOO', name: 'Şampuan', icon: 'orangeJuice', price: 22, color: 0xa855f7, imported: true },
 });
+
+export const IMPORTED_SHELVES = Object.freeze({
+  COLA: { item: 'COLA', stationId: 'colaShelf', price: 120, displayType: 'cooler', x: 9.6, z: 4.7 },
+  SODA: { item: 'SODA', stationId: 'sodaShelf', price: 120, displayType: 'cooler', x: 9.6, z: 7 },
+  CHIPS: { item: 'CHIPS', stationId: 'chipsShelf', price: 80, displayType: 'gondola', x: -0.8, z: 6.4 },
+  BISCUIT: { item: 'BISCUIT', stationId: 'biscuitShelf', price: 80, displayType: 'gondola', x: 1.7, z: 6.4 },
+  CHOCOLATE: { item: 'CHOCOLATE', stationId: 'chocolateShelf', price: 80, displayType: 'gondola', x: 4.2, z: 6.4 },
+  CANNED_FISH: { item: 'CANNED_FISH', stationId: 'cannedFishShelf', price: 80, displayType: 'gondola', x: 6.7, z: 6.4 },
+  DETERGENT: { item: 'DETERGENT', stationId: 'detergentShelf', price: 80, displayType: 'gondola', x: -0.8, z: 4.2 },
+  SHAMPOO: { item: 'SHAMPOO', stationId: 'shampooShelf', price: 80, displayType: 'gondola', x: 1.7, z: 4.2 },
+});
+
+export const PROCUREMENT_CATALOG = Object.freeze(Object.fromEntries(Object.entries(ITEMS).map(([item, definition]) => [item, {
+  item,
+  category: !definition.imported ? 'farm' : ['COLA', 'SODA'].includes(item) ? 'drinks'
+    : ['DETERGENT', 'SHAMPOO'].includes(item) ? 'care' : 'food',
+  caseSize: 6,
+  // Buying is convenient, while farm production retains its higher margin.
+  unitCostAtoms: Math.round(definition.price * MONEY_ATOMS * 0.82),
+}])));
 
 export const RECIPES = Object.freeze({
   paste: { inputs: { TOMATO: 2 }, output: 'TOMATO_PASTE', seconds: 3 },
@@ -63,6 +91,13 @@ export const STATIONS = Object.freeze({
   table2: { kind: 'table', x: -38, z: -4, title: 'Masa 2' },
   table3: { kind: 'table', x: -44, z: 4, title: 'Masa 3' },
   table4: { kind: 'table', x: -44, z: -4, title: 'Masa 4' },
+  managerOffice: { kind: 'office', x: 22, z: 0, title: 'Yönetici Ofisi', access: { x: 22, z: 1.2 } },
+  loadingDock: { kind: 'dock', x: 16.5, z: 0, title: 'Kamyon Teslimat Rampası', access: { x: 15.3, z: 0.7 } },
+  warehouse: { kind: 'warehouse', x: 18, z: 5, title: 'İthal Ürün Deposu', access: { x: 18.9, z: 5 } },
+  ...Object.fromEntries(Object.values(IMPORTED_SHELVES).map(shelf => [shelf.stationId, {
+    kind: 'shelf', item: shelf.item, x: shelf.x, z: shelf.z,
+    title: `${ITEMS[shelf.item].name} ${shelf.displayType === 'cooler' ? 'Soğutucu Reyonu' : 'Gondol Reyonu'}`,
+  }])),
 });
 
 export const SHELVES = Object.freeze({
@@ -76,6 +111,9 @@ export const SHELVES = Object.freeze({
   BREAD: { id: 'shelf:BREAD', x: 8.6, z: -2.2, capacity: 6, displayType: 'bakery' },
   FLOUR: { id: 'shelf:FLOUR', x: 11, z: -4, capacity: 6, displayType: 'gondola' },
   ORANGE_TART: { id: 'shelf:ORANGE_TART', x: 8.6, z: -4.5, capacity: 6, displayType: 'bakery' },
+  ...Object.fromEntries(Object.values(IMPORTED_SHELVES).map(shelf => [shelf.item, {
+    id: `shelf:${shelf.item}`, x: shelf.x, z: shelf.z, capacity: 12, displayType: shelf.displayType,
+  }])),
 });
 
 export const UPGRADES = Object.freeze([
@@ -100,6 +138,9 @@ export const UPGRADES = Object.freeze([
   { id: 'orangeTartKitchen', title: 'Portakallı tart pastanesi', price: 300, x: -40, z: 0, when: 'flourProduced', unlocks: ['orangeTartKitchen'] },
   { id: 'restaurant', title: 'Gurme restoran', price: 250, x: -30, z: 0, when: 'breadSold', unlocks: ['restaurant'] },
   { id: 'chefWaiter', title: 'Şef ve garson işe al', price: 220, x: -34, z: 0, when: 'tipCollected', unlocks: ['chefWaiter'] },
+  { id: 'logisticsOffice', title: 'Yönetici Ofisi ve Lojistik Hattı', price: 650, x: 22, z: 0, when: 'eggSold', unlocks: ['managerOffice', 'loadingDock', 'warehouse'] },
+  { id: 'warehouseOperator', title: 'Depocu işe al', price: 160, x: 18, z: 5, when: 'logisticsOffice', unlocks: ['warehouseOperator'] },
+  { id: 'storeManager', title: 'Mağaza müdürü işe al', price: 200, x: 22, z: 0, when: 'logisticsOffice', unlocks: ['storeManager'] },
 ]);
 
 export const STAFF = Object.freeze({
@@ -108,6 +149,8 @@ export const STAFF = Object.freeze({
   factoryFeeder: { title: 'Fabrika lojistikçisi', icon: 'courierAvatar' },
   caretaker: { title: 'Çiftlik bakıcısı', icon: 'workerAvatar' },
   chefWaiter: { title: 'Şef ve garson', icon: 'chef' },
+  warehouseOperator: { title: 'Depocu', icon: 'courierAvatar' },
+  storeManager: { title: 'Mağaza müdürü', icon: 'cashier' },
 });
 
 export const STAFF_HIRES = Object.freeze([
@@ -116,6 +159,8 @@ export const STAFF_HIRES = Object.freeze([
   { upgradeId: 'factoryFeeder', staffTypes: ['factoryFeeder'], effect: 'Reyon stoklarını tamamlayıp üretim hatlarını besler.', unlock: 'İlk portakal suyu satışından sonra açılır.' },
   { upgradeId: 'caretaker', staffTypes: ['caretaker'], effect: 'Yemi kümese, yumurtaları reyona taşır.', unlock: 'İlk yumurta satışından sonra açılır.' },
   { upgradeId: 'chefWaiter', staffTypes: ['chefWaiter', 'waiter'], effect: 'Restoran mutfağını ve masa servisini otomatikleştirir.', unlock: 'Restoran müşterisinden bahşiş alınca açılır.' },
+  { upgradeId: 'warehouseOperator', staffTypes: ['warehouseOperator'], effect: 'Rampadan kolileri depoya ve reyonlara taşır.', unlock: 'Yönetici Ofisi ve Lojistik Hattı açılınca kullanılabilir.' },
+  { upgradeId: 'storeManager', staffTypes: ['storeManager'], effect: 'Terminaldeki asgari stok eşiğine göre toptan sipariş verir.', unlock: 'Yönetici Ofisi ve Lojistik Hattı açılınca kullanılabilir.' },
 ]);
 
 export const STAFF_ARCHETYPES = Object.freeze({

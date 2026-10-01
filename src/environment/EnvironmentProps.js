@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+import { createManagerOfficeModel } from './LogisticsModels.js';
 
 function createSafeCanvas(width, height) {
   if (typeof document === 'undefined') return null;
@@ -21,6 +22,12 @@ export class EnvironmentProps {
     this.scene = scene;
     this.animatedTrees = [];
     this.animatedProps = [];
+  }
+
+  createManagerOffice(x = 22, z = 0) {
+    const office = createManagerOfficeModel(x, z);
+    this.scene.add(office);
+    return office;
   }
 
   // --- 1. TREES & VEGETATION ---
@@ -326,7 +333,7 @@ export class EnvironmentProps {
     return this.createSedan(x, z, rotationY, carColor);
   }
 
-  createDeliveryTruck(x, z, rotationY = 0) {
+  createDeliveryTruck(x, z, rotationY = 0, options = {}) {
     const group = new THREE.Group();
     group.position.set(x, 0, z);
     group.rotation.y = rotationY;
@@ -401,10 +408,22 @@ export class EnvironmentProps {
     group.add(reefer);
 
     // Main Insulated Cargo Box with GBLB STORE billboard
-    const boxBody = new THREE.Mesh(new RoundedBoxGeometry(3.1, 1.85, 1.56, 2, 0.06), whiteMat);
-    boxBody.position.set(-0.75, 1.48, 0);
-    boxBody.castShadow = true;
-    group.add(boxBody);
+    if (options.openCargo) {
+      // A real open rear bay allows the state-driven pallet to leave the cargo box.
+      for (const side of [-1, 1]) {
+        const wall = new THREE.Mesh(new THREE.BoxGeometry(3.1, 1.85, 0.06), whiteMat);
+        wall.position.set(-0.75, 1.48, side * 0.75); wall.castShadow = true; group.add(wall);
+      }
+      for (const height of [0.58, 2.4]) {
+        const panel = new THREE.Mesh(new THREE.BoxGeometry(3.1, 0.06, 1.56), whiteMat);
+        panel.position.set(-0.75, height, 0); group.add(panel);
+      }
+      const front = new THREE.Mesh(new THREE.BoxGeometry(0.06, 1.85, 1.56), whiteMat);
+      front.position.set(0.8, 1.48, 0); group.add(front);
+    } else {
+      const boxBody = new THREE.Mesh(new RoundedBoxGeometry(3.1, 1.85, 1.56, 2, 0.06), whiteMat);
+      boxBody.position.set(-0.75, 1.48, 0); boxBody.castShadow = true; group.add(boxBody);
+    }
 
     // Billboard canvas texture for sides
     const sideCanvas = createSafeCanvas(512, 256);
@@ -449,6 +468,7 @@ export class EnvironmentProps {
       rearDoorMat = new THREE.MeshStandardMaterial({ color: 0xbdc3c7, roughness: 0.4 });
     }
     const rearDoor = new THREE.Mesh(new THREE.PlaneGeometry(1.35, 1.55), rearDoorMat);
+    rearDoor.name = 'delivery-rear-door';
     rearDoor.rotation.y = -Math.PI / 2;
     rearDoor.position.set(-2.31, 1.45, 0);
     group.add(rearDoor);

@@ -9,6 +9,7 @@ export const ZONES = {
   market: { minX: -3.5, maxX: 13.5, minZ: -8.5, maxZ: 8.5 },
   restaurant: { minX: -47.5, maxX: -26.5, minZ: -8.5, maxZ: 8.5 },
   staff: { minX: -3.5, maxX: 13.5, minZ: -20, maxZ: -9 },
+  logistics: { minX: 14.5, maxX: 26.5, minZ: -8, maxZ: 8 },
 };
 
 export const SHELF_STAGING_AREA = Object.freeze({
@@ -34,6 +35,17 @@ export const STATION_FOOTPRINTS = Object.freeze({
   // Soğutucu Dolaplar (Cooler)
   juiceShelf: { width: 2.34, depth: 1.25 },
   eggShelf: { width: 2.34, depth: 1.25 },
+  colaShelf: { width: 2.34, depth: 1.25 },
+  sodaShelf: { width: 2.34, depth: 1.25 },
+  chipsShelf: { width: 1.86, depth: 0.98 },
+  biscuitShelf: { width: 1.86, depth: 0.98 },
+  chocolateShelf: { width: 1.86, depth: 0.98 },
+  cannedFishShelf: { width: 1.86, depth: 0.98 },
+  detergentShelf: { width: 1.86, depth: 0.98 },
+  shampooShelf: { width: 1.86, depth: 0.98 },
+  managerOffice: { width: 5, depth: 3.6 },
+  loadingDock: { width: 2.6, depth: 2.3 },
+  warehouse: { width: 3, depth: 3 },
 
   // Fırın Tezgâhı (Bakery)
   breadShelf: { width: 2.34, depth: 0.95 },
@@ -129,6 +141,7 @@ export function getDecorationZone(type) {
 
 export function stationZone(id) {
   if (id.startsWith('staff-')) return 'staff';
+  if (['office', 'dock', 'warehouse'].includes(STATIONS[id]?.kind)) return 'logistics';
   const baseId = id.split('_')[0];
   if (baseId === 'register' || baseId === 'selfRegister' || STATIONS[baseId]?.kind === 'shelf' || baseId.endsWith('Shelf')) return 'market';
   if (baseId.startsWith('table') || baseId.endsWith('Kitchen')) return 'restaurant';
@@ -203,6 +216,7 @@ export function isStationUnlocked(state, id) {
   if (station.kind === 'shelf') return state.unlockedProducts.includes(station.item);
   if (station.kind === 'coop') return Boolean(state.coops?.coop);
   if (station.kind === 'table') return Boolean(state.diningTables?.[id] || state.unlocked?.restaurant);
+  if (['office', 'dock', 'warehouse'].includes(station.kind)) return Boolean(state.unlocked?.[id]);
   return true;
 }
 

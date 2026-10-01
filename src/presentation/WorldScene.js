@@ -911,6 +911,19 @@ export class WorldScene {
   }
 
   #animationTarget(cue, state, actor) {
+    const logisticsStock = cue.location === 'dock:incoming' ? this.environment.logistics?.dockStock
+      : cue.location === 'warehouse:main' ? this.environment.logistics?.warehouseStock : null;
+    if (logisticsStock) {
+      logisticsStock.updateMatrixWorld(true);
+      const origin = new THREE.Vector3(cue.x ?? actor.group.position.x, 0.65, cue.z ?? actor.group.position.z);
+      const cartons = (logisticsStock.userData.boxes ?? []).filter(mesh => mesh.visible && mesh.userData.items?.[cue.item]);
+      cartons.sort((a, b) => a.getWorldPosition(new THREE.Vector3()).distanceToSquared(origin)
+        - b.getWorldPosition(new THREE.Vector3()).distanceToSquared(origin));
+      const point = cartons[0]?.getWorldPosition(new THREE.Vector3())
+        ?? logisticsStock.localToWorld(new THREE.Vector3(-0.215, 0.32, 0.22));
+      // Cartons summarize multiple units: inventory owns their count, so do not hide a whole carton for one unit.
+      return { point, isValid: () => Boolean(this.environment.logistics) && logisticsStock.parent !== null };
+    }
     const shelf = [...this.shelves.values(), ...this.customShelves.values()]
       .find((entry) => entry.id === cue.location || `shelf:${entry.id}` === cue.location
         || entry.id === `shelf:${STATIONS[cue.location?.slice(6)]?.item}`);
@@ -1030,6 +1043,7 @@ export class WorldScene {
     this.lighting.updateDaylight(gameDaylight, state.tick, THREE);
     this.environment.setRestaurantUnlocked(state.unlocked?.restaurant);
     this.environment.syncStaffFacilities(state);
+    this.environment.syncLogistics(state);
     this.environment.update(frameDelta, time);
     const wasMoving = Math.hypot(state.player.x - this.playerMesh.position.x, state.player.z - this.playerMesh.position.z) > 0.001;
     if (this.playerCharacter.type !== state.player.character) {
@@ -1432,6 +1446,22 @@ export class WorldScene {
       this.worldCoords.x = this.intersectPoint.x;
       this.worldCoords.z = this.intersectPoint.z;
       return this.worldCoords;
+    }
+    return null;
+  }
+
+  terminalAtScreen(clientX, clientY, state) {
+    const office = this.environment.logistics?.office;
+    if (!state.unlocked?.managerOffice || !office) return null;
+    const rect = this.engine.renderer.domElement.getBoundingClientRect();
+    this.pointer.set(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1);
+    this.raycaster.setFromCamera(this.pointer, this.engine.camera);
+    for (const intersection of this.raycaster.intersectObject(office, true)) {
+      let object = intersection.object;
+      while (object && object !== office) {
+        if (object.userData.stationId === 'managerOffice') return 'managerOffice';
+        object = object.parent;
+      }
     }
     return null;
   }

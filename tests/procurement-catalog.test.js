@@ -95,6 +95,7 @@ test('version 10 saves migrate empty logistics without altering wallet, workers 
 
 test('logistics saves preserve delivered stock and an unloading receipt across reload', () => {
   const state = createInitialState();
+  state.tick = 20;
   state.unlocked.loadingDock = true;
   state.procurement.orders.push({ id: 'procurement-1', lines: [{ item: 'COLA', cases: 1, quantity: 6, unitCostAtoms: 65_600 }],
     totalAtoms: 393_600, status: 'unloading', createdTick: 0 });

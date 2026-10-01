@@ -6,7 +6,8 @@ import { quoteWholesaleOrder, placeWholesaleOrder, advanceProcurement, normalize
 import { GameApplication } from '../src/application/GameApplication.js';
 import { SaveService } from '../src/infrastructure/SaveService.js';
 import { advanceSimulation } from '../src/domain/simulation.js';
-import { quantityAt, makeLocation } from '../src/domain/inventory.js';
+import { quantityAt } from '../src/domain/inventory.js';
+import { RewardedAdService } from '../src/infrastructure/RewardedAdProvider.js';
 import { normalizeWorkerWelfare } from '../src/domain/staff.js';
 
 class MemoryStorage {
@@ -135,6 +136,46 @@ test('domain normalization preserves released cargo and rebuilds pending truck s
   assert.equal(state.procurement.delivery.cargoReleased, true);
 });
 
+test('legacy unload receipts finish a replay on a full dock without duplicating cargo', () => {
+  const state = opened();
+  const order = placeWholesaleOrder(state, { COLA: 1 });
+  advance(state, 31);
+  state.stock['dock:incoming'].items.COLA = 240;
+  state.stockTransactions.push(`procurement-unload:${order.id}:COLA`);
+  advance(state, 41);
+  assert.equal(state.procurement.delivery.phase, 'departing');
+  assert.equal(quantityAt(state.stock, 'dock:incoming', 'COLA'), 240);
+});
+
+test('unsafe order IDs are rejected and payment receipts prevent free duplicate orders', () => {
+  const state = opened();
+  placeWholesaleOrder(state, { COLA: 1 });
+  state.procurement.orders[0].id = 'procurement-1e309';
+  state.procurement.nextOrderId = Infinity;
+  normalizeProcurement(state);
+  assert.equal(state.procurement.orders.length, 0);
+  assert.equal(state.procurement.nextOrderId, 2);
+  const before = state.economy.balanceAtoms;
+  assert.equal(placeWholesaleOrder(state, { COLA: 1 }).ok, true);
+  assert.ok(state.economy.balanceAtoms < before);
+  state.procurement.nextOrderId = 2;
+  assert.equal(placeWholesaleOrder(state, { COLA: 1 }).reason, 'invalid-order-id');
+  assert.equal(state.procurement.orders.length, 1);
+});
+
+test('east logistics movement unlocks safely and fixed buildings cannot be moved', () => {
+  const app = new GameApplication(new SaveService(new MemoryStorage()));
+  app.state.player.x = 13; app.state.player.z = 11;
+  app.setPlayerMove({ x: 1, z: 0 }, 1);
+  assert.ok(app.state.player.x <= 13.2);
+  app.state = opened();
+  app.state.player.x = 14.8; app.state.player.z = 10;
+  app.setPlayerMove({ x: 1, z: 0 }, 1);
+  assert.ok(app.state.player.x > 20);
+  assert.equal(app.moveStation('managerOffice', 23, 0).reason, 'fixed-station');
+  assert.equal(app.rotateSelected('loadingDock').reason, 'fixed-station');
+});
+
 test('application exposes terminal and purchases shelf without bypassing unlock or charging twice', () => {
   const app = new GameApplication(new SaveService(new MemoryStorage()));
   assert.equal(app.placeWholesaleOrder({ COLA: 1 }).ok, false);
@@ -151,6 +192,25 @@ test('application exposes terminal and purchases shelf without bypassing unlock 
   assert.ok(events.some(event => event.type === 'procurement-open'));
 });
 
+test('new logistics professions work through the existing rewarded hiring path', async () => {
+  for (const role of ['warehouseOperator', 'storeManager']) {
+    const app = new GameApplication(new SaveService(new MemoryStorage()));
+    app.state = opened();
+    app.state.completedUpgrades.push('logisticsOffice');
+    app.state.availableUpgrades.push(role);
+    app.adSessionTicks = 1800; app.state.ordersCompleted = 1;
+    app.rewardedAdService = new RewardedAdService({ isReady: () => true,
+      async show(_placement, callbacks, context) {
+        callbacks.onCompleted?.({ rewardId: context.rewardId, rewarded: true });
+        return { rewarded: true, rewardId: context.rewardId };
+      } });
+    const before = app.getBalance();
+    assert.equal((await app.watchRewardedAd('staff-hire', { role })).ok, true);
+    assert.deepEqual(app.state.workers.map(worker => worker.type), [role]);
+    assert.equal(app.getBalance(), before);
+  }
+});
+
 test('player and warehouse operator move delivered products using stock reservations', () => {
   const state = opened();
   state.unlockedProducts.push('COLA'); state.layout.colaShelf = { x: 9.6, z: 4.7 };
@@ -164,7 +224,7 @@ test('player and warehouse operator move delivered products using stock reservat
   assert.equal(app.interact('loadingDock').ok, true);
   assert.equal(quantityAt(app.state.stock, 'player', 'COLA'), 6);
   assert.equal(quantityAt(app.state.stock, 'dock:incoming', 'COLA'), 0);
-  app.state.player.x = 16.1; app.state.player.z = 5;
+  app.state.player.x = 18.9; app.state.player.z = 5;
   assert.equal(app.interact('warehouse').ok, true);
   assert.equal(quantityAt(app.state.stock, 'warehouse:main', 'COLA'), 6);
 });

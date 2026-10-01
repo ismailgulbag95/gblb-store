@@ -5,6 +5,7 @@ import { SHELF_STAGING_AREA } from '../domain/layout.js';
 import { EnvironmentProps } from './EnvironmentProps.js';
 import { STAFF_FACILITIES } from '../domain/catalog.js';
 import { createStaffFacilityModel, disposeStaffFacilityModel } from '../presentation/StaffFacilityModel.js';
+import { createProcurementDeliveryModel, syncProcurementDelivery, syncProcurementStock, disposeLogisticsModel } from './LogisticsModels.js';
 
 export class MarketGrid {
   constructor(scene) {
@@ -15,6 +16,7 @@ export class MarketGrid {
     this.staffFacilities = new Map();
     this.staffLand = null;
     this.staffPlotTrees = [];
+    this.logistics = null;
     this.props = new EnvironmentProps(scene);
     this.buildEnvironment();
   }
@@ -990,9 +992,7 @@ export class MarketGrid {
     safetyLine.position.set(22, 0.005, 9.0);
     this.scene.add(safetyLine);
 
-    // 2. Elevated Concrete Loading Dock Platform with Motorized Shutter Door
-    this.props.createLoadingDock(16.5, 0, -Math.PI / 2);
-    this.registerObstacle(16.5, 0, 3.8, 5.8);
+    // The functional office, receiving dock and stock are created by syncLogistics.
 
     // 3. Warehouse Logistics Hangar Facade with "MAL KABUL & LOJİSTİK" Sign
     this.props.createWarehouseHangarBuilding(23.5, -6.0, 0);
@@ -1003,8 +1003,8 @@ export class MarketGrid {
     this.registerObstacle(24.0, 5.8, 3.6, 3.2);
 
     // 5. Industrial Yellow Warehouse Forklift
-    this.props.createWarehouseForklift(19.2, 2.8, 0.4);
-    this.registerObstacle(19.2, 2.8, 1.4, 2.4);
+    this.props.createWarehouseForklift(27.4, 6.1, 0.4);
+    this.registerObstacle(27.4, 6.1, 1.4, 2.4);
 
     // 6. Manual Hydraulic Pallet Jack (Transpalet)
     this.props.createHydraulicPalletJack(18.6, -2.4, -0.3, 0xe74c3c);
@@ -1016,8 +1016,8 @@ export class MarketGrid {
     this.props.createPalletStack(17.0, 6.2, 3, false, -0.15);
     this.registerObstacle(17.0, 6.2, 1.4, 1.2);
 
-    this.props.createPalletStack(20.5, -1.8, 3, true, 0.1);
-    this.registerObstacle(20.5, -1.8, 1.4, 1.2);
+    this.props.createPalletStack(28.7, -6.5, 3, true, 0.1);
+    this.registerObstacle(28.7, -6.5, 1.4, 1.2);
 
     // 8. 3-Stream Commercial Industrial Recycling Dumpsters
     this.props.createRecyclingDumpsters(28.0, 0.8, -Math.PI / 2);
@@ -1026,6 +1026,61 @@ export class MarketGrid {
 
   getObstacles() {
     return this.obstacles;
+  }
+
+  syncLogistics(state) {
+    const unlocked = Boolean(state.unlocked?.managerOffice);
+    if (!unlocked && this.logistics) {
+      disposeLogisticsModel(this.logistics.group);
+      this.logistics = null;
+      for (let index = this.obstacles.length - 1; index >= 0; index--) {
+        if (this.obstacles[index].logisticsId) this.obstacles.splice(index, 1);
+      }
+    }
+    if (!unlocked) return;
+    if (!this.logistics) {
+      const group = new THREE.Group(); group.name = 'east-logistics';
+      const office = this.props.createManagerOffice(22, 0);
+      group.add(office);
+      const dock = new THREE.Group(); dock.name = 'procurement-loading-dock'; dock.position.set(16.5, 0, 0);
+      const concrete = new THREE.MeshStandardMaterial({ color: 0xa9afb0, roughness: 0.88 });
+      const platform = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.2, 2.3), concrete);
+      platform.position.y = 0.1; platform.receiveShadow = true; dock.add(platform);
+      const hazard = new THREE.MeshStandardMaterial({ color: 0xffc83d, roughness: 0.6 });
+      for (const side of [-1, 1]) {
+        const rail = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.7, 1.45), hazard);
+        rail.position.set(side * 1.25, 0.55, -0.425); dock.add(rail);
+      }
+      const warehouse = new THREE.Group(); warehouse.name = 'procurement-warehouse-pallet'; warehouse.position.set(18, 0, 5);
+      const floor = new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.035, 1.5), new THREE.MeshStandardMaterial({ color: 0xd2b252, roughness: 0.85 }));
+      floor.position.y = 0.025; warehouse.add(floor);
+      const dockStock = new THREE.Group(); dockStock.name = 'dock-incoming-stock'; dockStock.position.set(16.5, 0.19, 0.4);
+      const warehouseStock = new THREE.Group(); warehouseStock.name = 'warehouse-main-stock'; warehouseStock.position.set(18, 0.04, 5);
+      const truck = this.props.createDeliveryTruck(16.5, 15, -Math.PI / 2, { openCargo: true });
+      const delivery = createProcurementDeliveryModel(truck);
+      group.add(dock, warehouse, dockStock, warehouseStock, delivery); this.scene.add(group);
+      this.logistics = { group, office, dock, delivery, dockStock, warehouseStock };
+      for (const collision of office.userData.collisionBoxes) this.obstacles.push({ ...collision, logisticsId: 'managerOffice' });
+      // Keep the landing open; narrow rails and pallet footprints remain solid.
+      for (const side of [-1, 1]) this.obstacles.push({ logisticsId: 'loadingDock', min: { x: 16.5 + side * 1.25 - 0.055, z: -1.15 }, max: { x: 16.5 + side * 1.25 + 0.055, z: 0.3 } });
+      this.obstacles.push({ logisticsId: 'warehouseDepot', min: { x: 17.45, z: 4.5 }, max: { x: 18.55, z: 5.5 } });
+    }
+    const { dockStock, warehouseStock, delivery } = this.logistics;
+    syncProcurementStock(dockStock, state.stock?.['dock:incoming']);
+    syncProcurementStock(warehouseStock, state.stock?.['warehouse:main']);
+    syncProcurementDelivery(delivery, state);
+    let truckObstacle = this.obstacles.find(box => box.logisticsId === 'procurementTruck');
+    if (delivery.visible) {
+      if (!truckObstacle) {
+        truckObstacle = { logisticsId: 'procurementTruck', min: {}, max: {} };
+        this.obstacles.push(truckObstacle);
+      }
+      const point = delivery.userData.truck.position;
+      truckObstacle.min.x = point.x - 0.9; truckObstacle.max.x = point.x + 0.9;
+      truckObstacle.min.z = point.z - 2.4; truckObstacle.max.z = point.z + 2.25;
+    } else if (truckObstacle) {
+      this.obstacles.splice(this.obstacles.indexOf(truckObstacle), 1);
+    }
   }
 
   syncStaffFacilities(state) {

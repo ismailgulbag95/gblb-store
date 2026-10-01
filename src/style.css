@@ -503,3 +503,77 @@ kbd { display: inline-grid; place-items: center; min-width: 26px; min-height: 24
   *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
   .loading-basket i { animation: none !important; }
 }
+
+/* The office terminal uses the existing modal/pause path, with a CSS-only CRT surface. */
+#procurement-modal { background: rgb(3 13 8 / 78%); }
+.crt-terminal {
+  --crt-green: #a0ffa4;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: min(1030px, 100%);
+  max-height: min(92dvh, 920px);
+  padding: 22px;
+  overflow: hidden;
+  border: 9px solid #424c45;
+  border-radius: 22px;
+  background: #07150c;
+  color: var(--crt-green);
+  box-shadow: 0 0 0 3px #181e1a, 0 14px 0 #1b231d, 0 24px 55px rgb(0 0 0 / 55%), inset 0 0 45px rgb(82 255 116 / 8%);
+  font: 14px/1.45 Consolas, 'Courier New', monospace;
+  text-shadow: 0 0 5px rgb(96 255 122 / 30%);
+}
+.crt-terminal::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background: repeating-linear-gradient(to bottom, transparent 0, transparent 2px, rgb(0 0 0 / 12%) 3px, rgb(0 0 0 / 12%) 4px);
+}
+.crt-header { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding-bottom: 14px; border-bottom: 1px solid #448650; }
+.crt-header span, .crt-footer { font-size: 11px; letter-spacing: .06em; color: #80be89; }
+.crt-header h1 { margin: 5px 0 0; font: bold clamp(18px, 3vw, 26px)/1.2 Consolas, 'Courier New', monospace; letter-spacing: -.02em; }
+.crt-content { min-height: 0; padding-block: 14px; overflow: auto; scrollbar-color: #569861 #0b2112; }
+.crt-terminal button { min-height: 40px; padding: 8px 10px; border: 1px solid #69c079; border-radius: 2px; background: #0c2514; color: var(--crt-green); font: inherit; cursor: pointer; box-shadow: none; }
+.crt-terminal button:hover:not(:disabled), .crt-terminal button[aria-selected='true'] { background: #a0ffa4; color: #07150c; text-shadow: none; }
+.crt-terminal button:disabled { border-color: #345d3b; color: #72917a; cursor: default; opacity: .75; }
+.crt-terminal :focus-visible { outline: 2px solid #d7ffe0; outline-offset: 3px; }
+.crt-close { flex: 0 0 auto; white-space: nowrap; }
+.crt-system-line { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; font-size: 12px; }
+.crt-tabs { display: flex; gap: 6px; margin-bottom: 15px; overflow-x: auto; padding: 3px; }
+.crt-tabs button { flex: 1 0 auto; font-size: 12px; }
+.crt-main { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(240px, 1fr); gap: 18px; }
+.crt-terminal h2 { margin: 0 0 10px; font: bold 14px/1.4 Consolas, 'Courier New', monospace; color: #c2ffca; }
+.crt-note { margin: 8px 0 12px; font-size: 12px; color: #91bd99; line-height: 1.6; }
+.crt-products { display: grid; gap: 8px; }
+.crt-product { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px; border: 1px dashed #42724c; }
+.crt-product strong, .crt-product small { display: block; }
+.crt-product small { color: #91bd99; font-size: 12px; }
+.crt-product-controls { display: flex; flex-direction: column; gap: 6px; align-items: stretch; }
+.crt-product-controls button { font-size: 11px; }
+.crt-cart { align-self: start; padding: 12px; border: 1px solid #549361; background: rgb(37 71 44 / 15%); }
+.crt-terminal ul { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.crt-cart li { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 7px; font-size: 12px; }
+.crt-cart li button { min-width: 34px; min-height: 34px; padding: 3px; font-size: 18px; }
+.crt-total { display: flex; justify-content: space-between; gap: 8px; padding-block: 12px; margin-top: 12px; border-top: 1px dashed #549361; }
+#procurement-confirm { width: 100%; font-weight: bold; }
+.crt-automation, .crt-deliveries { margin-top: 20px; padding-top: 15px; border-top: 1px dashed #42724c; }
+.crt-policy-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 14px; }
+.crt-policy-controls label, .crt-auto-items label { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; }
+.crt-terminal input { accent-color: #a0ffa4; }
+.crt-terminal input[type='number'] { width: 62px; min-height: 38px; padding: 6px; border: 1px solid #69c079; border-radius: 2px; background: #0c2514; color: var(--crt-green); font: inherit; }
+.crt-auto-items { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 9px 12px; margin-top: 14px; }
+.crt-auto-items label { min-height: 32px; }
+.crt-deliveries li { display: flex; justify-content: space-between; gap: 14px; font-size: 12px; }
+.crt-deliveries li strong { flex: 0 0 auto; color: #c2ffca; }
+.crt-footer { display: flex; justify-content: space-between; padding-top: 10px; border-top: 1px solid #448650; }
+@media (max-width: 720px) {
+  .crt-terminal { max-height: 96dvh; padding: 13px; border-width: 6px; border-radius: 14px; }
+  .crt-header { gap: 8px; }
+  .crt-header span { font-size: 9px; }
+  .crt-terminal .crt-close { padding-inline: 5px; font-size: 10px; }
+  .crt-main { grid-template-columns: 1fr; gap: 16px; }
+  .crt-product-controls button { min-height: 44px; }
+  .crt-deliveries li { flex-wrap: wrap; gap: 4px; }
+}

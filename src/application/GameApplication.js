@@ -1,4 +1,4 @@
-import { AD_ONLY_UPGRADE_IDS, FARM_AD_UPGRADE_IDS, ITEMS, MONEY_ATOMS, RECIPES, SHELVES, STAFF, STAFF_HIRES, STATIONS, UPGRADES, getStaffCount, staffDailySalaryAtoms } from '../domain/catalog.js';
+import { AD_ONLY_UPGRADE_IDS, FARM_AD_UPGRADE_IDS, IMPORTED_SHELVES, ITEMS, MONEY_ATOMS, RECIPES, SHELVES, STAFF, STAFF_HIRES, STATIONS, UPGRADES, getStaffCount, staffDailySalaryAtoms } from '../domain/catalog.js';
 import { EconomyLedger } from '../domain/ledger.js';
 import { canTransfer, makeLocation, quantityAt, transferStock } from '../domain/inventory.js';
 import { createInitialState, hydrateState } from '../domain/state.js';
@@ -12,6 +12,9 @@ import { machineProductionSeconds, machineSpeedMultiplier, machineUpgradeCost, p
 import { PLAYER_CHARACTERS, PLAYER_CHARACTER_IDS } from '../domain/characters.js';
 import { STAFF_FACILITIES, STAFF_LAND_PRICE } from '../domain/catalog.js';
 import { generateStaffCandidates, normalizeWorkerWelfare } from '../domain/staff.js';
+import { placeWholesaleOrder, configureProcurementAutomation } from '../domain/procurement.js';
+
+const LOGISTICS_KINDS = ['office', 'dock', 'warehouse'];
 
 function clone(value) {
   return structuredClone(value);
@@ -551,6 +554,7 @@ export class GameApplication {
   }
 
   moveStation(id, x, z) {
+    if (LOGISTICS_KINDS.includes(STATIONS[id]?.kind)) return { ok: false, reason: 'fixed-station' };
     const snappedX = Math.round(x * 2) / 2;
     const snappedZ = Math.round(z * 2) / 2;
     if (!canPlaceStation(this.state, id, snappedX, snappedZ)) return { ok: false, reason: 'invalid-placement' };
@@ -572,6 +576,7 @@ export class GameApplication {
 
   rotateSelected(id) {
     if (!id) return { ok: false, reason: 'nothing-selected' };
+    if (LOGISTICS_KINDS.includes(STATIONS[id]?.kind)) return { ok: false, reason: 'fixed-station' };
     if (id.startsWith('decor:')) {
       const decorId = id.slice(6);
       return this.#command(`decoration-rotate:${decorId}:${this.state.revision + 1}`, (draft) => {
@@ -813,6 +818,7 @@ export class GameApplication {
 
     if (FARM_AD_UPGRADE_IDS.includes(upgradeId)) addFarm(upgradeId);
     if (upgradeId === 'cashier') this.#hire(state, 'cashier');
+    if (upgradeId === 'warehouseOperator' || upgradeId === 'storeManager') this.#hire(state, upgradeId);
     if (upgradeId === 'paste') { addMachine('paste'); unlockProduct('TOMATO_PASTE'); }
     if (upgradeId === 'harvester') this.#hire(state, 'harvester');
     if (upgradeId === 'orange') {
@@ -889,13 +895,13 @@ export class GameApplication {
     candidates.sort((a, b) => a.distance - b.distance);
     const destination = candidates.find(({ x, z }) => this.#isPlayerPositionClear(state, x, z));
     if (!destination) return;
-    player.x = Math.max(-49, Math.min(13.2, destination.x));
-    player.z = Math.max(-8.2, Math.min(11.8, destination.z));
+    player.x = Math.max(-49, Math.min(state.unlocked.managerOffice ? 26.3 : 13.2, destination.x));
+    player.z = Math.max(-8.2, Math.min(state.unlocked.managerOffice ? 18 : 11.8, destination.z));
     this.target = null;
   }
 
   #isPlayerPositionClear(state, x, z) {
-    if (x < -49 || x > 13.2 || z < -8.2 || z > 11.8) return false;
+    if (x < -49 || x > (state.unlocked.managerOffice ? 26.3 : 13.2) || z < -8.2 || z > (state.unlocked.managerOffice ? 18 : 11.8)) return false;
     const radius = 0.38;
     const marketBoxes = getMarketCollisionBoxes(state);
     if (marketBoxes.some((box) => x > box.minX - radius && x < box.maxX + radius
@@ -923,6 +929,8 @@ export class GameApplication {
     const positions = {
       cashier: [STATIONS.register.x, STATIONS.register.z - 1.75], harvester: [-10, 7], factoryFeeder: [-10, 0],
       caretaker: [-18, 0], chefWaiter: [-30, 0], waiter: [-35, 0],
+      warehouseOperator: [STATIONS.loadingDock.access.x, STATIONS.loadingDock.access.z],
+      storeManager: [STATIONS.managerOffice.access.x, STATIONS.managerOffice.access.z],
     };
     const [x, z] = positions[type] ?? [-8, 0];
     state.workers.push(normalizeWorkerWelfare({
@@ -955,6 +963,9 @@ export class GameApplication {
       chicken3: state.completedUpgrades.includes('chicken2'),
       restaurant: state.stats.breadSold > 0,
       chefWaiter: state.stats.tipsCollected > 0,
+      logisticsOffice: state.stats.eggSold > 0,
+      warehouseOperator: state.completedUpgrades.includes('logisticsOffice'),
+      storeManager: state.completedUpgrades.includes('logisticsOffice'),
     };
     for (const [id, available] of Object.entries(statRequirements)) {
       if (available && !state.completedUpgrades.includes(id) && !state.availableUpgrades.includes(id)) {
@@ -1040,6 +1051,42 @@ export class GameApplication {
     return { changed, paidAtoms, paidCount, newlyWaitingCount, resumedCount, waitingCount, day, shouldReport };
   }
 
+  openProcurement() {
+    if (!this.state.unlocked.managerOffice) return { ok: false, reason: 'locked' };
+    this.onEvent?.({ type: 'procurement-open' });
+    return { ok: true };
+  }
+
+  placeWholesaleOrder(cart) {
+    return this.#command(`wholesale:${this.state.revision + 1}`, draft => placeWholesaleOrder(draft, cart));
+  }
+
+  configureProcurementAutomation(settings) {
+    return this.#command(`procurement-policy:${this.state.revision + 1}`, draft => configureProcurementAutomation(draft, settings));
+  }
+
+  buyImportedShelf(item) {
+    const definition = IMPORTED_SHELVES[item];
+    if (!this.state.unlocked.managerOffice) return { ok: false, reason: 'locked' };
+    if (!definition) return { ok: false, reason: 'unknown-product' };
+    if (this.state.unlockedProducts.includes(item)) return { ok: false, reason: 'already-owned' };
+    return this.#command(`imported-shelf:${item}`, draft => {
+      if (draft.economy.balanceAtoms < definition.price * MONEY_ATOMS) return { ok: false, reason: 'insufficient-funds' };
+      new EconomyLedger(draft.economy).debit(`imported-shelf:${item}`, definition.price, 'shelf-purchase');
+      draft.unlockedProducts.push(item);
+      draft.unlocked[definition.stationId] = true;
+      const station = STATIONS[definition.stationId];
+      makeLocation(draft.stock, SHELVES[item].id, SHELVES[item].capacity);
+      if (canPlaceStation(draft, definition.stationId, station.x, station.z)) draft.layout[definition.stationId] = { x: station.x, z: station.z };
+      else {
+        draft.pendingShelfIds.push(definition.stationId);
+        this.#stageNextPendingShelf(draft);
+      }
+      this.#pushPlayerClearOfStation(draft, definition.stationId);
+      return { ok: true, stationId: definition.stationId, message: `${ITEMS[item].name} reyonu alındı.` };
+    });
+  }
+
   interact(targetId) {
     const state = this.state;
     const player = state.player;
@@ -1074,11 +1121,21 @@ export class GameApplication {
     if (!isUnlocked) return { ok: false, reason: 'locked' };
     const pos = stationPosition(state, targetId);
     if (!pos) return { ok: false, reason: 'pending-delivery' };
-    const distance = Math.hypot(player.x - pos.x, player.z - pos.z);
+    const access = LOGISTICS_KINDS.includes(station.kind) ? station.access : pos;
+    const distance = Math.hypot(player.x - access.x, player.z - access.z);
     if (distance > 2.5) return { ok: false, reason: 'too-far' };
+    if (station.kind === 'office') return this.openProcurement();
 
     return this.#command(`interact:${targetId}:${state.revision + 1}`, (draft) => {
       let moved = 0;
+      if (station.kind === 'dock' || station.kind === 'warehouse') {
+        const depot = station.kind === 'dock' ? 'dock:incoming' : 'warehouse:main';
+        const deposit = station.kind === 'warehouse' && availablePlayerItems(draft) > 0;
+        const from = deposit ? 'player' : depot;
+        const to = deposit ? depot : 'player';
+        for (const item of Object.keys(draft.stock[from].items)) moved += this.#transferUpTo(draft, from, to, item, draft.stock[from].items[item]);
+        return moved ? { ok: true, moved, message: `${moved} ürün ${deposit ? 'depoya bırakıldı' : 'alındı'}.` } : { ok: false, reason: 'empty' };
+      }
       if (station.kind === 'farm') {
         syncFarmHarvest(draft);
         const from = `farm:${station.item}`;
@@ -1223,8 +1280,8 @@ export class GameApplication {
       if (!blocked(player.x, nextZ)) player.z = nextZ;
     }
     if (vector.x || vector.z) player.facing = Math.atan2(vector.x, vector.z);
-    player.x = Math.max(-49, Math.min(13.2, player.x));
-    player.z = Math.max(-8.2, Math.min(11.8, player.z));
+    player.x = Math.max(-49, Math.min(this.state.unlocked.managerOffice ? 26.3 : 13.2, player.x));
+    player.z = Math.max(-8.2, Math.min(this.state.unlocked.managerOffice ? 18 : 11.8, player.z));
     this.state.player = player;
   }
 
@@ -1260,9 +1317,10 @@ export class GameApplication {
           : station.kind === 'shelf' ? this.state.unlockedProducts.includes(station.item)
           : station.kind === 'coop' ? Boolean(this.state.coops.coop)
             : station.kind === 'table' ? Boolean(this.state.diningTables[id])
-              : true;
+              : isStationUnlocked(state, id);
       const position = stationPosition(state, id);
-      if (unlocked && position) candidates.push({ id, ...station, ...position, distance: Math.hypot(player.x - position.x, player.z - position.z) });
+      const access = LOGISTICS_KINDS.includes(station.kind) ? station.access : position;
+      if (unlocked && position) candidates.push({ id, ...station, ...position, distance: Math.hypot(player.x - access.x, player.z - access.z) });
     }
     for (const upgrade of this.getAvailableUpgrades()) {
       candidates.push({ ...upgrade, kind: 'upgrade', distance: Math.hypot(player.x - upgrade.x, player.z - upgrade.z) });
@@ -1285,6 +1343,13 @@ export class GameApplication {
     if (!nearest || nearest.distance > 2.2) return null;
     if (nearest.kind === 'upgrade') return { ...nearest, label: `${nearest.title} · $${nearest.price}` };
     if (nearest.kind === 'trashBin') return nearest;
+    if (nearest.kind === 'office') return { ...nearest, label: 'Toptan sipariş terminalini aç', actionable: true };
+    if (nearest.kind === 'dock' || nearest.kind === 'warehouse') {
+      const depot = nearest.kind === 'dock' ? 'dock:incoming' : 'warehouse:main';
+      const available = Object.values(state.stock[depot].items).some(count => count > 0);
+      const deposit = nearest.kind === 'warehouse' && availablePlayerItems(state) > 0;
+      return { ...nearest, label: deposit ? 'Ürünleri depoya bırak' : nearest.kind === 'dock' ? 'Teslimat kolilerini al' : 'Depodan ürün al', actionable: deposit || available };
+    }
     if (nearest.kind === 'farm') {
       const ready = state.farms[nearest.id]?.readyCount ?? 0;
       const carried = Object.values(state.stock.player.items).reduce((total, count) => total + count, 0);
@@ -1320,7 +1385,7 @@ export class GameApplication {
     if (!this.state.settings?.autoPickup) return null;
     const action = this.getNearbyAction();
     if (!action || !action.actionable) return null;
-    if (action.kind === 'upgrade' || action.kind === 'trashBin') return null;
+    if (['upgrade', 'trashBin', ...LOGISTICS_KINDS].includes(action.kind)) return null;
     if (action.kind === 'shelf' && quantityAt(this.state.stock, 'player', action.item) <= 0) return null;
     if (action.kind === 'machine') {
       const carried = Object.values(this.state.stock.player.items).reduce((a, b) => a + b, 0);

@@ -1,4 +1,4 @@
-import { FARM_AD_UPGRADE_IDS, ITEMS, MONEY_ATOMS, RECIPES, SHELVES, STAFF, STAFF_ARCHETYPES, STAFF_FACILITIES, STAFF_HIRES, STAFF_LAND_PRICE, STATIONS, UPGRADES, staffDailySalaryAtoms } from '../domain/catalog.js';
+import { FARM_AD_UPGRADE_IDS, IMPORTED_SHELVES, ITEMS, MONEY_ATOMS, PROCUREMENT_CATALOG, RECIPES, SHELVES, STAFF, STAFF_ARCHETYPES, STAFF_FACILITIES, STAFF_HIRES, STAFF_LAND_PRICE, STATIONS, UPGRADES, staffDailySalaryAtoms } from '../domain/catalog.js';
 import { DECORATIONS, decorBonus, decorScore } from '../domain/decorCatalog.js';
 import { decorationPrice, orderProgress } from '../domain/orders.js';
 import { machineProductionSeconds, machineSpeedMultiplier, machineUpgradeCost, percentGain, staffSpeedMultiplier, staffUpgradeCost } from '../domain/progression.js';
@@ -29,17 +29,28 @@ const EN = {
     cashier: 'Handles customer payments at the register.', harvester: 'Stocks shelves first, then supplies production machines.',
     factoryFeeder: 'Refills retail stock before carrying production ingredients.', caretaker: 'Supplies the coop and stocks eggs on the shelf.',
     chefWaiter: 'Automates restaurant cooking and table service.',
+    warehouseOperator: 'Carries incoming dock stock to retail shelves.', storeManager: 'Manages minimum stock orders from the office terminal.',
   },
   staffUnlock: {
     cashier: 'Unlocks after your first tomato sale.', harvester: 'Unlocks after your first paste sale.',
     factoryFeeder: 'Unlocks after your first orange juice sale.', caretaker: 'Unlocks after your first egg sale.',
     chefWaiter: 'Unlocks after collecting a restaurant tip.',
+    warehouseOperator: 'Unlocks with the office and logistics line.', storeManager: 'Unlocks with the office and logistics line.',
   },
 };
 
 const escapeMarkup = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]);
 const staffNeed = (value) => Math.round(Math.min(100, Math.max(0, Number.isFinite(value) ? value : 100)));
 const staffMoney = (atoms, english) => (atoms / MONEY_ATOMS).toLocaleString(english ? 'en-US' : 'tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const PROCUREMENT_CATEGORIES = [
+  { id: 'farm', tr: 'Toptan Çiftlik Ürünleri', en: 'Wholesale farm goods' },
+  { id: 'food', tr: 'İthal Gıda', en: 'Imported food' },
+  { id: 'drinks', tr: 'İçecek', en: 'Drinks' },
+  { id: 'care', tr: 'Temizlik & Bakım', en: 'Cleaning & care' },
+];
+const PROCUREMENT_NAMES_EN = { COLA: 'Cola', SODA: 'Soda', CHIPS: 'Chips', BISCUIT: 'Biscuits', CHOCOLATE: 'Chocolate', CANNED_FISH: 'Canned fish', DETERGENT: 'Detergent', SHAMPOO: 'Shampoo', TOMATO: 'Tomato', TOMATO_PASTE: 'Tomato paste', ORANGE: 'Orange', ORANGE_JUICE: 'Orange juice', CORN: 'Corn', POPCORN: 'Popcorn', WHEAT: 'Wheat', FLOUR: 'Flour', BREAD: 'Bread', EGG: 'Egg', CHICKEN_FEED: 'Chicken feed', ORANGE_TART: 'Orange tart', BURGER: 'Gourmet burger', PIZZA: 'Pizza' };
+const procurementName = (item, english) => escapeMarkup(english ? PROCUREMENT_NAMES_EN[item] ?? ITEMS[item]?.name ?? item : ITEMS[item]?.name ?? item);
+const procurementTotal = (cart) => Object.entries(cart ?? {}).reduce((total, [item, cases]) => total + (PROCUREMENT_CATALOG[item] ? PROCUREMENT_CATALOG[item].unitCostAtoms * PROCUREMENT_CATALOG[item].caseSize * cases : 0), 0);
 
 function staffBreakText(worker, english) {
   const phase = worker.break?.phase;
@@ -55,7 +66,9 @@ export class HUD {
     this.app = app;
     this.input = input;
     this.onModalChange = onModalChange;
-    this.modals = ['expansion-modal', 'staff-candidates-modal', 'settings-modal', 'inventory-modal', 'decor-modal', 'recovery-modal', 'bonus-offer-modal'];
+    this.modals = ['expansion-modal', 'staff-candidates-modal', 'procurement-modal', 'settings-modal', 'inventory-modal', 'decor-modal', 'recovery-modal', 'bonus-offer-modal'];
+    this.procurementCart = {};
+    this.procurementCategory = 'farm';
     this.lastUpgradeSignature = '';
     this.lastInventorySignature = '';
     this.lastLanguage = null;
@@ -78,7 +91,7 @@ export class HUD {
       'order-ad-offer', 'order-ad-copy', 'btn-order-ad', 'machine-ad-offer', 'machine-ad-copy', 'btn-machine-ad',
       'decor-shop-score', 'decor-score-caption', 'decor-list',
       'setting-sound', 'setting-haptics', 'setting-autopickup',
-      'upgrade-list', 'staff-list', 'staff-candidate-list', 'staff-candidate-title', 'staff-candidate-intro', 'staff-candidate-eyebrow', 'inventory-list'
+      'upgrade-list', 'staff-list', 'staff-candidate-list', 'staff-candidate-title', 'staff-candidate-intro', 'staff-candidate-eyebrow', 'inventory-list', 'procurement-content', 'btn-procurement'
     ];
     for (const id of ids) {
       this.elements[id] = document.getElementById(id);
@@ -116,6 +129,53 @@ export class HUD {
     });
 
     document.getElementById('btn-expansions').addEventListener('click', () => this.open('expansion-modal'));
+    document.getElementById('btn-procurement').addEventListener('click', () => this.openProcurement());
+    document.getElementById('procurement-content').addEventListener('click', (event) => {
+      const category = event.target.closest('[data-procurement-category]');
+      if (category) {
+        this.procurementCategory = category.dataset.procurementCategory;
+        this.renderProcurement(this.app.getState(), true);
+        document.querySelector(`[data-procurement-category="${this.procurementCategory}"]`)?.focus();
+        return;
+      }
+      const add = event.target.closest('[data-procurement-add]'), remove = event.target.closest('[data-procurement-remove]');
+      if (add || remove) { this.updateProcurementCart((add ?? remove).dataset[add ? 'procurementAdd' : 'procurementRemove'], add ? 1 : -1); return; }
+      const furniture = event.target.closest('[data-imported-shelf]');
+      if (furniture) {
+        const result = this.app.buyImportedShelf(furniture.dataset.importedShelf);
+        const english = this.app.getState().settings.language === 'en';
+        if (!result.ok) this.toast(result.reason === 'insufficient-funds' ? (english ? 'Insufficient funds.' : 'Bakiye yetersiz.') : (english ? 'This shelf is already available or no free retail space remains.' : 'Bu reyon zaten mevcut veya boş market alanı kalmadı.'), 'error');
+        else this.close('procurement-modal');
+        this.renderProcurement(this.app.getState(), true);
+        return;
+      }
+      if (event.target.closest('#procurement-confirm')) this.submitProcurement();
+      if (event.target.closest('#procurement-auto-save')) {
+        const content = this.elements['procurement-content'];
+        this.applyProcurementAutomation({ enabled: content.querySelector('#procurement-auto-enabled').checked,
+          threshold: Number(content.querySelector('#procurement-auto-threshold').value),
+          items: [...content.querySelectorAll('[data-procurement-auto-item]:checked')].map((input) => input.dataset.procurementAutoItem) });
+      }
+    });
+    document.getElementById('procurement-content').addEventListener('change', (event) => {
+      const input = event.target;
+      if (input.id === 'procurement-auto-enabled' || input.id === 'procurement-auto-threshold' || input.dataset.procurementAutoItem) {
+        const content = this.elements['procurement-content'];
+        this.procurementAutomationDraft = { enabled: content.querySelector('#procurement-auto-enabled').checked,
+          threshold: Number(content.querySelector('#procurement-auto-threshold').value),
+          items: [...content.querySelectorAll('[data-procurement-auto-item]:checked')].map((box) => box.dataset.procurementAutoItem) };
+      }
+    });
+    document.getElementById('procurement-content').addEventListener('keydown', (event) => {
+      const current = event.target.closest('[data-procurement-category]');
+      if (!current || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+      event.preventDefault();
+      const index = PROCUREMENT_CATEGORIES.findIndex((entry) => entry.id === current.dataset.procurementCategory);
+      const next = event.key === 'Home' ? 0 : event.key === 'End' ? 3 : (index + (event.key === 'ArrowRight' ? 1 : 3)) % 4;
+      this.procurementCategory = PROCUREMENT_CATEGORIES[next].id;
+      this.renderProcurement(this.app.getState(), true);
+      document.querySelector(`[data-procurement-category="${this.procurementCategory}"]`)?.focus();
+    });
     document.getElementById('btn-settings').addEventListener('click', () => this.open('settings-modal'));
     document.getElementById('btn-inventory').addEventListener('click', () => this.open('inventory-modal'));
     document.getElementById('btn-decor').addEventListener('click', () => this.open('decor-modal'));
@@ -396,6 +456,94 @@ export class HUD {
     this.open('staff-candidates-modal');
   }
 
+  openProcurement() {
+    const state = this.app.getState();
+    if (!state.unlocked?.managerOffice) {
+      this.toast(state.settings.language === 'en' ? 'Unlock the office and logistics line first.' : 'Önce Yönetici Ofisi ve Lojistik Hattı yükseltmesini aç.', 'error');
+      return;
+    }
+    this.procurementCart ??= {};
+    this.procurementCategory ??= 'farm';
+    this.procurementAutomationDraft = structuredClone(state.procurement?.automation ?? { enabled: false, threshold: 2, items: [] });
+    this.renderProcurement(state, true);
+    this.open('procurement-modal');
+  }
+
+  updateProcurementCart(item, change) {
+    if (!PROCUREMENT_CATALOG[item] || !Number.isInteger(change)) return;
+    this.procurementCart ??= {};
+    const otherCases = Object.entries(this.procurementCart).reduce((total, [key, cases]) => total + (key === item ? 0 : cases), 0);
+    const count = Math.max(0, Math.min(10, 20 - otherCases, (this.procurementCart[item] ?? 0) + change));
+    if (count) this.procurementCart[item] = count;
+    else delete this.procurementCart[item];
+    this.renderProcurement(this.app.getState(), true);
+  }
+
+  submitProcurement() {
+    const result = this.app.placeWholesaleOrder({ ...this.procurementCart });
+    const english = this.app.getState().settings.language === 'en';
+    if (result.ok) {
+      this.procurementCart = {};
+      this.toast(english ? 'Order paid. Truck delivery has been queued.' : 'Sipariş ödendi. Kamyon teslimatı sıraya alındı.');
+    } else {
+      const reasons = english ? { 'insufficient-funds': 'Insufficient funds.', 'queue-full': 'The delivery queue is full.', 'empty-order': 'Add a case to the cart.' }
+        : { 'insufficient-funds': 'Bakiye yetersiz.', 'queue-full': 'Teslimat kuyruğu dolu.', 'empty-order': 'Sepete en az bir koli ekle.' };
+      this.toast(reasons[result.reason] ?? (english ? 'This order is unavailable. Check office access and quantities.' : 'Bu sipariş hazır değil. Ofis erişimini ve miktarları kontrol et.'), 'error');
+    }
+    this.renderProcurement(this.app.getState(), true);
+    return result;
+  }
+
+  applyProcurementAutomation(config) {
+    const result = this.app.configureProcurementAutomation(config);
+    const state = this.app.getState(), english = state.settings.language === 'en';
+    if (result.ok) {
+      this.procurementAutomationDraft = structuredClone(state.procurement.automation);
+      this.toast(english ? 'Minimum stock policy saved.' : 'Asgari stok politikası kaydedildi.');
+    } else this.toast(english ? 'Hire a store manager and enter a valid threshold.' : 'Mağaza Müdürü işe al ve geçerli bir eşik gir.', 'error');
+    this.renderProcurement(state, true);
+    return result;
+  }
+
+  renderProcurement(state, force = false) {
+    const content = this.elements['procurement-content'];
+    if (!content) return;
+    const english = state.settings.language === 'en';
+    const cart = this.procurementCart ?? {};
+    const orders = state.procurement?.orders ?? [];
+    const manager = state.workers.some((worker) => worker.type === 'storeManager');
+    const automation = this.procurementAutomationDraft ?? state.procurement?.automation ?? { enabled: false, threshold: 2, items: [] };
+    const signature = JSON.stringify([state.settings.language, this.procurementCategory, cart, state.economy.balanceAtoms,
+      orders.map((order) => [order.id, order.status]), manager, automation, Object.keys(state.unlocked ?? {}).filter((id) => state.unlocked[id])]);
+    if (!force && signature === this.lastProcurementSignature) return;
+    this.lastProcurementSignature = signature;
+    const category = PROCUREMENT_CATEGORIES.find((entry) => entry.id === this.procurementCategory) ?? PROCUREMENT_CATEGORIES[0];
+    const cartCases = Object.values(cart).reduce((total, cases) => total + cases, 0);
+    const tabs = PROCUREMENT_CATEGORIES.map((entry) => `<button type="button" id="procurement-tab-${entry.id}" role="tab" data-procurement-category="${entry.id}" aria-selected="${entry.id === category.id}" aria-controls="procurement-products" tabindex="${entry.id === category.id ? 0 : -1}">${english ? entry.en : entry.tr}</button>`).join('');
+    const cards = Object.values(PROCUREMENT_CATALOG).filter((entry) => entry.category === category.id).map((entry) => {
+      const shelf = IMPORTED_SHELVES[entry.item];
+      const shelfBuilt = shelf && Boolean(state.unlocked?.[shelf.stationId]);
+      const shelfCost = shelf?.price * MONEY_ATOMS;
+      const furniture = shelf ? `<button type="button" data-imported-shelf="${entry.item}" ${shelfBuilt || state.economy.balanceAtoms < shelfCost ? 'disabled' : ''}>${shelfBuilt ? (english ? 'Shelf available' : 'Reyon mevcut') : `${shelf.displayType === 'cooler' ? (english ? 'Place cooler' : 'Soğutucu yerleştir') : (english ? 'Place gondola' : 'Gondol yerleştir')} · $${staffMoney(shelfCost, english)}`}</button>` : '';
+      return `<article class="crt-product"><div><strong>${procurementName(entry.item, english)}</strong><small>${english ? 'Case' : 'Koli'} × ${entry.caseSize} · $${staffMoney(entry.unitCostAtoms * entry.caseSize, english)}</small></div><div class="crt-product-controls"><button type="button" data-procurement-add="${entry.item}" ${cart[entry.item] >= 10 || cartCases >= 20 ? 'disabled' : ''}>+ ${english ? 'Add case' : 'Koli ekle'}</button>${furniture}</div></article>`;
+    }).join('');
+    const lines = Object.entries(cart).filter(([item, cases]) => PROCUREMENT_CATALOG[item] && cases > 0).map(([item, cases]) => {
+      const entry = PROCUREMENT_CATALOG[item];
+      return `<li><span>${procurementName(item, english)} × ${cases} ${english ? 'cases' : 'koli'} (${cases * entry.caseSize})</span><strong>$${staffMoney(entry.unitCostAtoms * entry.caseSize * cases, english)}</strong><button type="button" data-procurement-remove="${item}" aria-label="${english ? 'Remove a case of' : 'Bir koli çıkar:'} ${procurementName(item, english)}">−</button></li>`;
+    }).join('');
+    const total = procurementTotal(cart);
+    const statuses = english ? { queued: 'Queued', arriving: 'Arriving', unloading: 'Unloading', delivered: 'Unloaded at dock' }
+      : { queued: 'Sırada', arriving: 'Yolda', unloading: 'İndiriliyor', delivered: 'Rampaya indirildi' };
+    const queue = orders.slice(-5).reverse().map((order) => `<li><span>${escapeMarkup(order.id)} · ${(order.lines ?? []).map((line) => `${procurementName(line.item, english)} × ${line.quantity}`).join(', ')}</span><strong>${statuses[order.status] ?? escapeMarkup(order.status)}</strong></li>`).join('');
+    const autoItems = Object.values(PROCUREMENT_CATALOG).map((entry) => `<label><input type="checkbox" data-procurement-auto-item="${entry.item}" ${automation.items?.includes(entry.item) ? 'checked' : ''} ${manager ? '' : 'disabled'} />${procurementName(entry.item, english)}</label>`).join('');
+    content.innerHTML = `<div class="crt-system-line"><span>C:\\WHOLESALE&gt; CATALOG.EXE</span><span>${english ? 'BALANCE' : 'BAKİYE'} $${staffMoney(state.economy.balanceAtoms, english)}</span></div>
+      <div class="crt-tabs" role="tablist" aria-label="${english ? 'Wholesale categories' : 'Toptan ürün kategorileri'}">${tabs}</div>
+      <div class="crt-main"><section id="procurement-products" role="tabpanel" aria-labelledby="procurement-tab-${category.id}" tabindex="0"><h2>${english ? category.en : category.tr}</h2><p class="crt-note">${english ? 'Wholesale stock arrives at the loading dock. Place an imported shelf before retail sales; farm production retains a higher margin.' : 'Toptan stok yükleme rampasına gelir. İthal ürün satışı için önce reyon yerleştir; çiftlik üretimi daha yüksek kâr getirir.'}</p><div class="crt-products">${cards}</div></section>
+      <aside class="crt-cart"><h2>${english ? 'ORDER CART' : 'SİPARİŞ SEPETİ'} [${cartCases}/20]</h2><ul>${lines || `<li>${english ? 'No cases selected.' : 'Henüz koli seçilmedi.'}</li>`}</ul><div class="crt-total"><span>${english ? 'TOTAL' : 'TOPLAM'}</span><strong>$${staffMoney(total, english)}</strong></div><button type="button" id="procurement-confirm" ${!total || total > state.economy.balanceAtoms ? 'disabled' : ''}>${english ? 'Confirm Order' : 'Siparişi Onayla'}</button><p class="crt-note">${english ? 'Paid immediately. Up to 10 cases per product and 20 per delivery. Close this terminal to let deliveries continue.' : 'Ödeme onayda alınır. Ürün başına 10, teslimat başına 20 koli. Teslimatın ilerlemesi için terminali kapat.'}</p></aside></div>
+      <section class="crt-automation"><h2>${english ? 'MINIMUM STOCK POLICY' : 'OTOMATİK ASGARİ STOK EŞİĞİ'}</h2><p class="crt-note">${manager ? (english ? 'The on-duty manager orders one case when selected shelves fall below the threshold. Incoming stock prevents duplicate orders.' : 'Görevdeki müdür seçili reyon eşiğin altına inince bir koli sipariş eder. Gelen stok tekrar siparişini önler.') : (english ? 'Hire a Store Manager to enable automatic orders.' : 'Otomatik sipariş için Mağaza Müdürü işe al.')}</p><div class="crt-policy-controls"><label><input type="checkbox" id="procurement-auto-enabled" ${automation.enabled ? 'checked' : ''} ${manager ? '' : 'disabled'} />${english ? 'Automatic ordering' : 'Otomatik sipariş'}</label><label for="procurement-auto-threshold">${english ? 'Order below' : 'Bu stoktan azsa sipariş'} <input type="number" id="procurement-auto-threshold" min="1" max="12" step="1" value="${Number.isInteger(automation.threshold) ? automation.threshold : 2}" ${manager ? '' : 'disabled'} /></label><button type="button" id="procurement-auto-save" ${manager ? '' : 'disabled'}>${english ? 'Save policy' : 'Eşiği kaydet'}</button></div><div class="crt-auto-items">${autoItems}</div></section>
+      <section class="crt-deliveries" aria-live="polite"><h2>${english ? 'DELIVERY LOG' : 'TESLİMAT KAYDI'} [${orders.length}]</h2><ul>${queue || `<li>${english ? 'No deliveries yet.' : 'Henüz teslimat yok.'}</li>`}</ul></section>`;
+  }
+
   openBonusOffer(offer) {
     if (!offer || !['walk-speed', 'bag-capacity', 'character-unlock'].includes(offer.type)) return;
     this.currentBonusOffer = offer;
@@ -570,6 +718,11 @@ export class HUD {
       this.renderStaff(state);
     }
     this.updateStaffNeeds(state);
+    if (this.elements['btn-procurement']) {
+      this.elements['btn-procurement'].classList.toggle('hidden', !state.unlocked?.managerOffice);
+      this.elements['btn-procurement'].textContent = language === 'en' ? 'Wholesale terminal' : 'Toptan sipariş terminali';
+    }
+    if (this.modals?.includes('procurement-modal') && !document.getElementById('procurement-modal').classList.contains('hidden')) this.renderProcurement(state, force);
     if (force) this.renderInventory(state, true);
   }
 
@@ -842,7 +995,7 @@ export class HUD {
       const unlocked = state.availableUpgrades.includes(hire.upgradeId) && !state.completedUpgrades.includes(hire.upgradeId);
       const canHire = unlocked || state.completedUpgrades.includes(hire.upgradeId);
       const title = STAFF[hire.upgradeId]?.title ?? hire.staffTypes.map((type) => STAFF[type]?.title ?? type).join(' ve ');
-      const englishTitle = hire.staffTypes.length > 1 ? 'Chef and waiter' : ({ cashier: 'Cashier', harvester: 'Harvester', factoryFeeder: 'Factory feeder', caretaker: 'Farm caretaker' })[hire.staffTypes[0]];
+      const englishTitle = hire.staffTypes.length > 1 ? 'Chef and waiter' : ({ cashier: 'Cashier', harvester: 'Harvester', factoryFeeder: 'Factory feeder', caretaker: 'Farm caretaker', warehouseOperator: 'Warehouse operator', storeManager: 'Store manager' })[hire.staffTypes[0]] ?? title;
       const effect = state.settings.language === 'en' ? EN.staffEffect[hire.upgradeId] : hire.effect;
       const unlock = state.settings.language === 'en' ? EN.staffUnlock[hire.upgradeId] : hire.unlock;
       const subtitle = hired ? (state.settings.language === 'en' ? `On staff · ${hiredCount || hire.staffTypes.length}` : `Ekibinde · ${hiredCount || hire.staffTypes.length} kişi`)
@@ -863,7 +1016,7 @@ export class HUD {
       const currentSpeed = 3.4 * staffSpeedMultiplier(level) * (archetype?.speed ?? 1);
       const nextSpeed = 3.4 * staffSpeedMultiplier(level + 1) * (archetype?.speed ?? 1);
       const gain = percentGain(currentSpeed, nextSpeed);
-      const title = english ? ({ cashier: 'Cashier', harvester: 'Harvester', factoryFeeder: 'Factory feeder', caretaker: 'Farm caretaker', chefWaiter: 'Chef', waiter: 'Waiter' })[worker.type] : (STAFF[worker.type]?.title ?? (worker.type === 'waiter' ? 'Garson' : worker.type));
+      const title = english ? ({ cashier: 'Cashier', harvester: 'Harvester', factoryFeeder: 'Factory feeder', caretaker: 'Farm caretaker', chefWaiter: 'Chef', waiter: 'Waiter', warehouseOperator: 'Warehouse operator', storeManager: 'Store manager' })[worker.type] ?? worker.type : (STAFF[worker.type]?.title ?? (worker.type === 'waiter' ? 'Garson' : worker.type));
       const number = (value) => value.toLocaleString(english ? 'en-US' : 'tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       const salaryAtoms = worker.salaryAtoms ?? staffDailySalaryAtoms(worker.type);
       const salaryStatus = worker.waitingForSalary
@@ -943,12 +1096,16 @@ export class HUD {
       caretaker: 'Hire a farm caretaker', bakery: 'Wheat field and stone oven',
       flourMill: 'Flour mill and shelf', orangeTartKitchen: 'Orange tart pastry kitchen',
       restaurant: 'Gourmet restaurant', chefWaiter: 'Hire chef and waiter',
+      managerOffice: 'Manager office and logistics line', warehouseOperator: 'Hire a warehouse operator', storeManager: 'Hire a store manager',
     };
     return names[id] ?? fallback;
   }
 
   #actionText(action, state) {
     if (state.settings.language !== 'en') return action.label;
+    if (action.kind === 'office') return 'Open wholesale procurement terminal';
+    if (action.kind === 'dock') return 'Collect stock from the loading dock';
+    if (action.kind === 'warehouse') return 'Store bag items or collect warehouse stock';
     if (action.kind === 'upgrade') return `${this.#upgradeNameEnglish(action.id, action.title)} · $${action.price}`;
     if (action.kind === 'trashBin') {
       if (action.actionable !== false) return 'Discard bag items';

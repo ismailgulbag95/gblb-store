@@ -178,6 +178,7 @@ async function boot() {
   }
 
   app.setEventHandler((event) => {
+    if (event.type === 'procurement-open') { hud.openProcurement(); return; }
     if (event.type === 'bonus-offer-ready') {
       if (!pauseReasons.size && !document.hidden && !app.getState().ads.pending) hud.openBonusOffer(event.offer);
       return;
@@ -248,6 +249,7 @@ async function boot() {
   let hudElapsed = 0;
   let autoPickupElapsed = 0;
   let firstFrameRendered = false;
+  let insideTerminal = false;
   function frame(now) {
     const elapsed = Math.min((now - previousTime) / 1000, 0.1);
     previousTime = now;
@@ -293,6 +295,10 @@ async function boot() {
     }
 
     const state = app.getState();
+    const nearbyAction = app.getNearbyAction();
+    const nearTerminal = nearbyAction?.kind === 'office' && nearbyAction.distance <= 1.1;
+    if (nearTerminal && !insideTerminal && pauseReasons.size === 0 && !input.layoutMode) app.openProcurement();
+    insideTerminal = nearTerminal;
     const upgrades = app.getAvailableUpgrades();
     try {
       if (!pauseReasons.has('render-error') && !pauseReasons.has('webgl')) world.render(state, upgrades);
@@ -304,7 +310,7 @@ async function boot() {
     hudElapsed += elapsed;
     if (hudElapsed >= 0.12) {
       hudElapsed = 0;
-      hud.render(state, app.getNearbyAction());
+      hud.render(state, nearbyAction);
     }
     if (!firstFrameRendered) {
       firstFrameRendered = true;

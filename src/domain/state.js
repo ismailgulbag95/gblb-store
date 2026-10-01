@@ -4,8 +4,9 @@ import { createFarmState, ensureFarmState, syncFarmHarvest } from './farm.js';
 import { canPlaceDecoration } from './layout.js';
 import { machineSpeedMultiplier, staffSpeedMultiplier } from './progression.js';
 import { PLAYER_CHARACTER_IDS } from './characters.js';
+import { normalizeProcurement } from './procurement.js';
 
-export const SAVE_VERSION = 10;
+export const SAVE_VERSION = 11;
 
 function emptyStock(capacity) {
   return { capacity, items: {}, reserved: {}, reservedCapacity: 0 };
@@ -18,6 +19,8 @@ export function createInitialState(seed = 0x51f15e) {
     'shelf:TOMATO': emptyStock(SHELVES.TOMATO.capacity),
     'checkout:queue': emptyStock(12),
     'order:delivery': emptyStock(500),
+    'dock:incoming': emptyStock(240),
+    'warehouse:main': emptyStock(500),
   };
   const farms = {
     tomatoFarm: createFarmState(0, 'tomatoFarm'),
@@ -66,6 +69,8 @@ export function createInitialState(seed = 0x51f15e) {
       { id: 'trash-bin', type: 'trashBin', x: 12.5, z: 7.5, rotation: 0 },
     ],
     activeOrder: null,
+    procurement: { nextOrderId: 1, orders: [], delivery: null,
+      automation: { enabled: false, threshold: 2, items: [] }, nextAutoTick: 0 },
     lastOrderReward: null,
     ordersCompleted: 0,
     decorVouchers: 0,
@@ -245,7 +250,7 @@ function removeLegacyFurniture(candidate) {
 
 export function hydrateState(candidate) {
   if (!candidate || typeof candidate !== 'object') throw new Error('Kayıt boş veya bozuk.');
-  if (![2, 3, 4, 5, 6, 7, 8, 9, SAVE_VERSION].includes(candidate.saveVersion)) throw new Error(`Bu kayıt sürümü desteklenmiyor (${candidate.saveVersion ?? 'bilinmiyor'}).`);
+  if (![2, 3, 4, 5, 6, 7, 8, 9, 10, SAVE_VERSION].includes(candidate.saveVersion)) throw new Error(`Bu kayıt sürümü desteklenmiyor (${candidate.saveVersion ?? 'bilinmiyor'}).`);
   candidate = removeLegacyFurniture(candidate);
   const initial = createInitialState(candidate.rng);
   const hydrated = { ...initial, ...candidate };
@@ -417,6 +422,7 @@ export function hydrateState(candidate) {
     if (!saved || typeof saved.items !== 'object') hydrated.stock[id] = structuredClone(base);
     else hydrated.stock[id] = { ...base, ...saved, items: { ...saved.items } };
   }
+  normalizeProcurement(hydrated);
   for (const customer of hydrated.customers) {
     if (!customer.id || !['shopper', 'diner'].includes(customer.kind)
       || !Number.isFinite(customer.x) || !Number.isFinite(customer.z)) throw new Error('Kayıttaki müşteri bilgisi geçersiz.');

@@ -9,6 +9,7 @@ import { nextOrder } from './orders.js';
 import { cancelReservation, capacityAt, makeLocation, pickUpReservedStock, quantityAt, reserveStock, totalAt, transferStock } from './inventory.js';
 import { staffSpeedMultiplier } from './progression.js';
 import { STAFF_WAITING_AREA } from './dayCycle.js';
+import { advanceProcurement } from './procurement.js';
 
 const TICKS_PER_SECOND = 10;
 const CUSTOMER_SPAWN_TICKS = 40;
@@ -138,6 +139,8 @@ function produceMachines(state, events) {
 }
 
 function locationPosition(state, locationId) {
+  if (locationId === 'dock:incoming') return STATIONS.loadingDock.access;
+  if (locationId === 'warehouse:main') return STATIONS.warehouse.access;
   if (locationId.startsWith('farm:')) {
     const item = locationId.slice('farm:'.length);
     // Önce custom farm'lara bak, sonra sabit STATIONS'a
@@ -294,6 +297,16 @@ function machineInputSources(state, item) {
 }
 
 function workerCandidate(state, worker) {
+  if (worker.type === 'warehouseOperator' && state.unlocked.managerOffice) {
+    for (const shelf of shelfTargets(state)) {
+      for (const from of ['dock:incoming', 'warehouse:main']) {
+        if (canMoveOne(state, from, shelf.stockId, shelf.item)) return { from, to: shelf.stockId, item: shelf.item, purpose: 'shelf-restock' };
+      }
+    }
+    for (const item of Object.keys(state.stock['dock:incoming'].items)) {
+      if (canMoveOne(state, 'dock:incoming', 'warehouse:main', item)) return { from: 'dock:incoming', to: 'warehouse:main', item, purpose: 'warehouse-store' };
+    }
+  }
   if (worker.type === 'harvester') {
     for (const [farmId, farm] of Object.entries(state.farms)) {
       // Custom farm ya da sabit STATIONS'dan item'ı al
@@ -1661,6 +1674,7 @@ export function advanceSimulation(state, environmentObstacles = []) {
   let durable = produceFarm(state, events);
   durable = produceMachines(state, events) || durable;
   durable = coopTick(state) || durable;
+  durable = advanceProcurement(state, events) || durable;
   durable = workerTick(state, environmentObstacles) || durable;
   syncFarmHarvest(state);
   durable = customerTick(state, events) || durable;

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { HUD } from '../src/presentation/HUD.js';
-import { MONEY_ATOMS } from '../src/domain/catalog.js';
+import { MONEY_ATOMS, PROCUREMENT_CATALOG } from '../src/domain/catalog.js';
 
 function game() {
   return { settings: { language: 'tr' }, unlocked: { managerOffice: true }, workers: [],
@@ -46,6 +46,19 @@ test('cart changes use catalogue cases and stay bounded without changing the dom
   assert.deepEqual(state, before);
 });
 
+test('cart respects the shipment limit of twenty cases across different products', () => {
+  const hud = view();
+  hud.updateProcurementCart('COLA', 10);
+  hud.updateProcurementCart('SODA', 10);
+  hud.updateProcurementCart('SHAMPOO', 1);
+  assert.equal(hud.procurementCart.SHAMPOO, undefined);
+  assert.match(hud.elements['procurement-content'].innerHTML, /data-procurement-add="COLA"[^>]*disabled/);
+  hud.updateProcurementCart('COLA', -1);
+  hud.updateProcurementCart('SHAMPOO', 1);
+  assert.equal(hud.procurementCart.SHAMPOO, 1);
+  assert.equal(Object.values(hud.procurementCart).reduce((total, cases) => total + cases, 0), 20);
+});
+
 test('confirm sends an item-to-case cart, preserves failed orders and clears only successful orders', () => {
   const state = game(), hud = view(state), calls = [];
   hud.procurementCart = { COLA: 2 };
@@ -84,6 +97,7 @@ test('queue rendering escapes identifiers and distinguishes arriving and deliver
   assert.match(html, /&lt;truck&gt;/);
   assert.match(html, /Yolda/);
   assert.match(html, /Rampaya indirildi/);
+  assert.match(html, /TESLİMAT KAYDI.*\[2\]/);
   assert.doesNotMatch(html, /<truck>/);
 });
 
@@ -95,4 +109,90 @@ test('opening the terminal requires office access and uses the existing modal pa
   state.unlocked.managerOffice = false;
   hud.openProcurement();
   assert.deepEqual(calls, ['procurement-modal']);
+});
+
+test('case cart displays exact price and disables payment when balance drops below total', () => {
+  const state = game(), hud = view(state);
+  hud.procurementCart = { COLA: 2, SHAMPOO: 1 };
+  const total = PROCUREMENT_CATALOG.COLA.unitCostAtoms * PROCUREMENT_CATALOG.COLA.caseSize * 2
+    + PROCUREMENT_CATALOG.SHAMPOO.unitCostAtoms * PROCUREMENT_CATALOG.SHAMPOO.caseSize;
+  state.economy.balanceAtoms = total;
+  hud.renderProcurement(state);
+  const money = (total / MONEY_ATOMS).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  assert.ok(hud.elements['procurement-content'].innerHTML.includes(`<strong>$${money}</strong>`));
+  assert.doesNotMatch(hud.elements['procurement-content'].innerHTML, /id="procurement-confirm"[^>]*disabled/);
+  state.economy.balanceAtoms = total - 1;
+  hud.renderProcurement(state);
+  assert.match(hud.elements['procurement-content'].innerHTML, /id="procurement-confirm"[^>]*disabled/);
+});
+
+test('manager automation saves explicit selected items through the application API', () => {
+  const state = game(), hud = view(state), config = { enabled: true, threshold: 3, items: ['COLA', 'SODA'] };
+  state.workers = [{ type: 'storeManager' }];
+  hud.app.configureProcurementAutomation = (received) => {
+    assert.deepEqual(received, config);
+    state.procurement.automation = structuredClone(received);
+    return { ok: true };
+  };
+  assert.deepEqual(hud.applyProcurementAutomation(config), { ok: true });
+  assert.deepEqual(hud.procurementAutomationDraft, config);
+  state.procurement.automation.items.push('SHAMPOO');
+  assert.deepEqual(hud.procurementAutomationDraft.items, ['COLA', 'SODA']);
+});
+
+test('saved automation draft survives a cart update and English furniture names render', () => {
+  const state = game(), hud = view(state);
+  state.settings.language = 'en';
+  state.workers = [{ type: 'storeManager' }];
+  hud.procurementAutomationDraft = { enabled: true, threshold: 5, items: ['COLA'] };
+  hud.updateProcurementCart('COLA', 1);
+  const html = hud.elements['procurement-content'].innerHTML;
+  assert.match(html, /id="procurement-auto-threshold"[^>]*value="5"/);
+  assert.match(html, /data-procurement-auto-item="COLA"[^>]*checked/);
+  assert.match(html, /Place cooler/);
+  assert.match(html, /Confirm Order/);
+  assert.match(html, /1 cases \(6\)/);
+});
+
+test('terminal event delegation opens, selects cases, pays once and returns to the game', () => {
+  const originalDocument = globalThis.document, originalWindow = globalThis.window;
+  const nodes = new Map();
+  const node = (id) => {
+    if (!nodes.has(id)) {
+      const classes = new Set(['hidden']);
+      nodes.set(id, { dataset: {}, listeners: {}, innerHTML: '', textContent: '',
+        classList: { add: (value) => classes.add(value), contains: (value) => classes.has(value),
+          toggle: (value, force = !classes.has(value)) => { force ? classes.add(value) : classes.delete(value); return force; } },
+        setAttribute() {}, focus() {}, querySelector: node, querySelectorAll: () => [],
+        addEventListener(type, listener) { this.listeners[type] = listener; },
+      });
+    }
+    return nodes.get(id);
+  };
+  globalThis.document = { getElementById: node, querySelector: node, querySelectorAll: () => [] };
+  globalThis.window = { matchMedia: () => ({ matches: false, addEventListener() {} }), addEventListener() {} };
+  try {
+    const state = game(), paused = [], carts = [];
+    const app = { getState: () => state, placeWholesaleOrder(cart) { carts.push(cart); return { ok: true, id: 'procurement-1' }; } };
+    const hud = new HUD(app, {}, (value) => paused.push(value));
+    hud.toast = () => {};
+    node('btn-procurement').listeners.click();
+    assert.equal(node('procurement-modal').classList.contains('hidden'), false);
+    assert.equal(paused.at(-1), true);
+    const click = (selector, dataset = {}) => node('procurement-content').listeners.click({ target: { closest: (query) => query === selector ? { dataset } : null } });
+    click('[data-procurement-category]', { procurementCategory: 'drinks' });
+    click('[data-procurement-add]', { procurementAdd: 'COLA' });
+    assert.deepEqual(hud.procurementCart, { COLA: 1 });
+    assert.equal(carts.length, 0);
+    click('#procurement-confirm');
+    assert.deepEqual(carts, [{ COLA: 1 }]);
+    assert.deepEqual(hud.procurementCart, {});
+    assert.equal(paused.at(-1), true);
+    hud.close('procurement-modal');
+    assert.equal(paused.at(-1), false);
+    assert.equal(node('procurement-modal').classList.contains('hidden'), true);
+  } finally {
+    globalThis.document = originalDocument;
+    globalThis.window = originalWindow;
+  }
 });

@@ -241,6 +241,11 @@ export class Item3DFactory {
         CHEESE: new THREE.CylinderGeometry(0.18, 0.18, 0.12, 16),
         DETERGENT: new THREE.BoxGeometry(0.22, 0.32, 0.15),
         COLA: new THREE.LatheGeometry(colaProfile, 16),
+        SODA: new THREE.LatheGeometry(juiceBottleProfile, 16),
+        BISCUIT: new THREE.BoxGeometry(0.3, 0.19, 0.12),
+        CHOCOLATE: new THREE.BoxGeometry(0.19, 0.3, 0.055),
+        CANNED_FISH: new THREE.CylinderGeometry(0.135, 0.135, 0.12, 16),
+        SHAMPOO: new THREE.LatheGeometry(juiceBottleProfile, 14),
         WATER: new THREE.LatheGeometry(waterProfile, 16),
         BAGUETTE: new THREE.LatheGeometry(baguetteProfile, 14),
         CHOCO_DONUT: new THREE.TorusGeometry(0.12, 0.055, 12, 24),
@@ -258,7 +263,32 @@ export class Item3DFactory {
     if (!this.itemMaterials.has(itemId)) {
       let material;
 
-      if (itemId === 'TOMATO_PASTE') {
+      const importedPackaging = {
+        SODA: { label: 'GAZOZ', color: '#74b93f', band: '#eafa91' },
+        BISCUIT: { label: 'BİSKÜVİ', color: '#dbaa5b', band: '#bb463c' },
+        CHOCOLATE: { label: 'ÇİKOLATA', color: '#48291e', band: '#cab079' },
+        CANNED_FISH: { label: 'TON BALIĞI', color: '#bbc7c9', band: '#246891' },
+        SHAMPOO: { label: 'ŞAMPUAN', color: '#7b53a3', band: '#dcd6ed' },
+      }[itemId];
+      if (importedPackaging) {
+        // Labels remain optional in headless tests; every product still has a distinct material.
+        material = new THREE.MeshStandardMaterial({ color: importedPackaging.color, roughness: 0.38, metalness: itemId === 'CANNED_FISH' ? 0.45 : 0 });
+        if (typeof document !== 'undefined') {
+          const canvas = document.createElement('canvas');
+          canvas.width = 256; canvas.height = 256;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.fillStyle = importedPackaging.color; ctx.fillRect(0, 0, 256, 256);
+            ctx.fillStyle = importedPackaging.band; ctx.fillRect(0, 76, 256, 110);
+            ctx.fillStyle = '#ffffff'; ctx.textAlign = 'center'; ctx.font = 'bold 29px sans-serif';
+            ctx.fillText(importedPackaging.label, 128, 138);
+            ctx.font = '18px monospace'; ctx.fillText('GBLB IMPORT', 128, 170);
+            material.map = new THREE.CanvasTexture(canvas);
+            material.map.colorSpace = THREE.SRGBColorSpace;
+            material.color.setHex(0xffffff);
+          }
+        }
+      } else if (itemId === 'TOMATO_PASTE') {
         const canvas = document.createElement('canvas');
         canvas.width = 256; canvas.height = 256;
         const ctx = canvas.getContext('2d');
