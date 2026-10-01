@@ -44,6 +44,9 @@ export class WorldScene {
     this.raycaster = new THREE.Raycaster();
     this.pointer = new THREE.Vector2();
     this.groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+    this.intersectPoint = new THREE.Vector3();
+    this.cameraFocus = new THREE.Vector3();
+    this.worldCoords = { x: 0, z: 0 };
     this.clock = new THREE.Clock();
     this.effects = [];
     this.reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -764,13 +767,13 @@ export class WorldScene {
     this.playerCharacter.animate(frameDelta, wasMoving);
     this.#syncPlayerCargo(state.stock.player?.items ?? {});
     const nearby = this.stationAt(state, state.player.x, state.player.z);
-    const cameraFocus = this.playerMesh.position.clone();
+    this.cameraFocus.copy(this.playerMesh.position);
     if (nearby) {
       const target = stationPosition(state, nearby);
-      cameraFocus.x += (target.x - cameraFocus.x) * 0.18;
-      cameraFocus.z += (target.z - cameraFocus.z) * 0.18;
+      this.cameraFocus.x += (target.x - this.cameraFocus.x) * 0.18;
+      this.cameraFocus.z += (target.z - this.cameraFocus.z) * 0.18;
     }
-    this.engine.followTarget(cameraFocus, frameDelta);
+    this.engine.followTarget(this.cameraFocus, frameDelta);
 
     this.#syncCollection(this.farms, Object.keys(state.farms), (id) => this.#addFarm(id), (entry) => this.#disposeVisual(entry));
     for (const [farmId, farm] of this.farms) {
@@ -1023,8 +1026,12 @@ export class WorldScene {
     const rect = this.engine.renderer.domElement.getBoundingClientRect();
     this.pointer.set(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1);
     this.raycaster.setFromCamera(this.pointer, this.engine.camera);
-    const point = new THREE.Vector3();
-    return this.raycaster.ray.intersectPlane(this.groundPlane, point) ? { x: point.x, z: point.z } : null;
+    if (this.raycaster.ray.intersectPlane(this.groundPlane, this.intersectPoint)) {
+      this.worldCoords.x = this.intersectPoint.x;
+      this.worldCoords.z = this.intersectPoint.z;
+      return this.worldCoords;
+    }
+    return null;
   }
 
   getCanvas() {

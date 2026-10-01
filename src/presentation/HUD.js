@@ -62,7 +62,8 @@ export class HUD {
       'order-progress', 'order-progress-fill', 'btn-deliver-order',
       'order-bonus-progress', 'decor-score', 'quest-text', 'progress-count',
       'progress-fill', 'btn-interact', 'action-label', 'upgrade-count',
-      'order-ad-offer', 'order-ad-copy', 'machine-ad-offer', 'machine-ad-copy',
+      'order-ad-offer', 'order-ad-copy', 'btn-order-ad', 'machine-ad-offer', 'machine-ad-copy', 'btn-machine-ad',
+      'decor-shop-score', 'decor-score-caption', 'decor-list',
       'setting-sound', 'setting-haptics', 'setting-autopickup',
     ];
     for (const id of ids) {
@@ -515,29 +516,33 @@ export class HUD {
 
   renderAdOffers(state, action) {
     const english = state.settings.language === 'en';
-    const orderOffer = document.getElementById('order-ad-offer');
+    const orderOffer = this.elements['order-ad-offer'];
     const orderReward = state.lastOrderReward;
     const orderReady = Boolean(orderReward && !orderReward.claimed
       && this.app.canOfferRewardedAd('order-double', { orderId: orderReward.id }));
-    orderOffer.classList.toggle('hidden', !orderReady);
+    if (orderOffer) orderOffer.classList.toggle('hidden', !orderReady);
     if (orderReady) {
       this.app.markRewardedOfferShown('order-double', { orderId: orderReward.id });
-      document.getElementById('order-ad-copy').textContent = english
-        ? `Watch a rewarded ad to double this order bonus (+$${orderReward.reward}).`
-        : `Ödüllü reklamı izle, bu sipariş kazancını ikiye katla (+$${orderReward.reward}).`;
-      document.getElementById('btn-order-ad').dataset.adOrder = orderReward.id;
-      const adLabel = this.app.isRewardedAdSimulated()
-        ? (english ? 'Wait 3 sec · ' : '3 sn bekle · ')
-        : (english ? 'Watch · ' : 'İzle · ');
-      document.getElementById('btn-order-ad').textContent = `${adLabel}+$${orderReward.reward}`;
+      if (this.elements['order-ad-copy']) {
+        this.elements['order-ad-copy'].textContent = english
+          ? `Watch a rewarded ad to double this order bonus (+$${orderReward.reward}).`
+          : `Ödüllü reklamı izle, bu sipariş kazancını ikiye katla (+$${orderReward.reward}).`;
+      }
+      if (this.elements['btn-order-ad']) {
+        this.elements['btn-order-ad'].dataset.adOrder = orderReward.id;
+        const adLabel = this.app.isRewardedAdSimulated()
+          ? (english ? 'Wait 3 sec · ' : '3 sn bekle · ')
+          : (english ? 'Watch · ' : 'İzle · ');
+        this.elements['btn-order-ad'].textContent = `${adLabel}+$${orderReward.reward}`;
+      }
     }
 
-    const machineOffer = document.getElementById('machine-ad-offer');
+    const machineOffer = this.elements['machine-ad-offer'];
     const machine = action?.kind === 'machine' ? state.machines[action.id] : null;
     const supplierPayload = machine ? { machineId: action.id } : null;
     const supplierReady = Boolean(!orderReady && supplierPayload
       && this.app.canOfferRewardedAd('supplier-drop', supplierPayload));
-    machineOffer.classList.toggle('hidden', !supplierReady);
+    if (machineOffer) machineOffer.classList.toggle('hidden', !supplierReady);
     this.currentSupplierMachineId = supplierReady ? action.id : null;
     if (supplierReady) {
       const recipe = RECIPES[machine.recipe ?? STATIONS[action.id]?.recipe];
@@ -553,13 +558,17 @@ export class HUD {
         .filter(([, amount]) => amount > 0);
       const supplies = missing.map(([item, amount]) => `${amount} ${ITEMS[item].name}`).join(' + ');
       this.app.markRewardedOfferShown('supplier-drop', supplierPayload);
-      document.getElementById('machine-ad-copy').textContent = english
-        ? `Machine stopped for missing inputs. Watch to deliver ${supplies} for one recipe batch.`
-        : `Makine girdisiz durdu. Bir tariflik ${supplies} girdiyi reklamla al.`;
-      document.getElementById('btn-machine-ad').dataset.adMachine = action.id;
-      document.getElementById('btn-machine-ad').textContent = this.app.isRewardedAdSimulated()
-        ? (english ? 'Wait 3 sec · Get inputs' : '3 sn bekle · Girdiyi al')
-        : (english ? 'Watch and get inputs' : 'İzle ve girdiyi al');
+      if (this.elements['machine-ad-copy']) {
+        this.elements['machine-ad-copy'].textContent = english
+          ? `Machine stopped for missing inputs. Watch to deliver ${supplies} for one recipe batch.`
+          : `Makine girdisiz durdu. Bir tariflik ${supplies} girdiyi reklamla al.`;
+      }
+      if (this.elements['btn-machine-ad']) {
+        this.elements['btn-machine-ad'].dataset.adMachine = action.id;
+        this.elements['btn-machine-ad'].textContent = this.app.isRewardedAdSimulated()
+          ? (english ? 'Wait 3 sec · Get inputs' : '3 sn bekle · Girdiyi al')
+          : (english ? 'Watch and get inputs' : 'İzle ve girdiyi al');
+      }
     }
   }
 
@@ -724,17 +733,21 @@ export class HUD {
     const score = decorScore(state);
     const bonus = decorBonus(state);
     const scoreLabel = english ? `${score} points · +${(bonus * 100).toFixed(1)}% sales` : `${score} puan · +${(bonus * 100).toFixed(1)}% satış`;
-    document.getElementById('decor-shop-score').textContent = scoreLabel;
-    document.getElementById('decor-score-caption').textContent = state.decorVouchers
-      ? (english ? `${state.decorVouchers} voucher(s): $20 off your next decoration.` : `${state.decorVouchers} kupon: sonraki dekorasyonda $20 indirim.`)
-      : (english ? 'Decorations make your farm and market more welcoming.' : 'Dekorasyonlar çiftliğini ve mağazanı daha davetkâr yapar.');
-    document.getElementById('decor-score').textContent = `${score} · +${(bonus * 100).toFixed(1)}%`;
-    document.getElementById('decor-list').innerHTML = Object.entries(DECORATIONS).map(([id, item]) => {
-      const owned = state.decorations.filter((entry) => entry.type === id).length;
-      const name = item.name[state.settings.language];
-      const price = decorationPrice(state, item.price);
-      return `<article class="decor-item"><div class="decor-item-icon">${assetIconMarkup(this.#decorationIcon(id), 38)}</div><div class="upgrade-copy"><strong>${name}</strong><small>${assetIconMarkup('decorScore', 18)} +${item.score} ${english ? 'style points' : 'dekor puanı'} · ${owned} ${english ? 'placed' : 'mağazada'}</small></div><button class="buy-button" data-buy-decoration="${id}" ${state.economy.balanceAtoms < price * 10_000 ? 'disabled' : ''}>$ ${price}</button></article>`;
-    }).join('');
+    if (this.elements['decor-shop-score']) this.elements['decor-shop-score'].textContent = scoreLabel;
+    if (this.elements['decor-score-caption']) {
+      this.elements['decor-score-caption'].textContent = state.decorVouchers
+        ? (english ? `${state.decorVouchers} voucher(s): $20 off your next decoration.` : `${state.decorVouchers} kupon: sonraki dekorasyonda $20 indirim.`)
+        : (english ? 'Decorations make your farm and market more welcoming.' : 'Dekorasyonlar çiftliğini ve mağazanı daha davetkâr yapar.');
+    }
+    if (this.elements['decor-score']) this.elements['decor-score'].textContent = `${score} · +${(bonus * 100).toFixed(1)}%`;
+    if (this.elements['decor-list']) {
+      this.elements['decor-list'].innerHTML = Object.entries(DECORATIONS).map(([id, item]) => {
+        const owned = state.decorations.filter((entry) => entry.type === id).length;
+        const name = item.name[state.settings.language];
+        const price = decorationPrice(state, item.price);
+        return `<article class="decor-item"><div class="decor-item-icon">${assetIconMarkup(this.#decorationIcon(id), 38)}</div><div class="upgrade-copy"><strong>${name}</strong><small>${assetIconMarkup('decorScore', 18)} +${item.score} ${english ? 'style points' : 'dekor puanı'} · ${owned} ${english ? 'placed' : 'mağazada'}</small></div><button class="buy-button" data-buy-decoration="${id}" ${state.economy.balanceAtoms < price * 10_000 ? 'disabled' : ''}>$ ${price}</button></article>`;
+      }).join('');
+    }
   }
 
   #decorationIcon(id) {

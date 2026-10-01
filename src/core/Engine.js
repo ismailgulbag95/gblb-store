@@ -31,6 +31,8 @@ export class Engine {
     this.camera.position.copy(this.cameraOffset);
     this.camera.lookAt(0, 0, 0);
     this.cameraTarget = new THREE.Vector3();
+    this.desiredPosition = new THREE.Vector3();
+    this.targetLookAt = new THREE.Vector3();
 
     // Renderer
     this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
@@ -89,10 +91,11 @@ export class Engine {
   }
 
   followTarget(targetPosition, delta = 0.1) {
-    const desiredPosition = targetPosition.clone().add(this.cameraOffset);
+    this.desiredPosition.copy(targetPosition).add(this.cameraOffset);
     const easing = Math.min(1, delta * 6);
-    this.camera.position.lerp(desiredPosition, easing);
-    this.cameraTarget.lerp(new THREE.Vector3(targetPosition.x, targetPosition.y + 0.5, targetPosition.z), easing);
+    this.camera.position.lerp(this.desiredPosition, easing);
+    this.targetLookAt.set(targetPosition.x, targetPosition.y + 0.5, targetPosition.z);
+    this.cameraTarget.lerp(this.targetLookAt, easing);
     this.camera.lookAt(this.cameraTarget);
   }
 
