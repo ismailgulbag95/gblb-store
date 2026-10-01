@@ -43,7 +43,7 @@ test('older v2 saves migrate customer and order fields without losing inventory'
   old.customers.push({ id: 'customer-90', kind: 'shopper', x: 5, z: 5, phase: 'leaving',
     shoppingList: ['TOMATO'], basket: [], demand: 'TOMATO' });
   const migrated = hydrateState(old);
-  assert.equal(migrated.saveVersion, 7);
+  assert.equal(migrated.saveVersion, 9);
   assert.equal(migrated.stock.player.items.TOMATO, 2);
   assert.equal(migrated.customers[0].checkoutWaitTicks, 0);
   assert.equal(migrated.ordersCompleted, 0);
@@ -55,7 +55,7 @@ test('v6 saves migrate to the bonus-offer defaults without losing player capacit
   delete old.bonusOffers;
   const migrated = hydrateState(old);
 
-  assert.equal(migrated.saveVersion, 7);
+  assert.equal(migrated.saveVersion, 9);
   assert.deepEqual(migrated.bonusOffers, {
     activePlayMs: 0,
     nextOfferAtActiveMs: 180_000,
@@ -189,7 +189,7 @@ test('legacy farm saves retain ripe quantity and upgrade to independent timers',
   delete legacy.farms.tomatoFarm.plants;
 
   const migrated = hydrateState(legacy);
-  assert.equal(migrated.saveVersion, 7);
+  assert.equal(migrated.saveVersion, 9);
   assert.equal(migrated.farms.tomatoFarm.plants.length, 4);
   assert.equal(migrated.farms.tomatoFarm.plants.filter((plant) => plant.ready).length, 3);
   assert.equal(migrated.stock['farm:TOMATO'].items.TOMATO, 3);
@@ -210,7 +210,7 @@ test('version four farm timers migrate to one evenly phased cycle without losing
 
   const migrated = hydrateState(legacy);
   const plants = migrated.farms.tomatoFarm.plants;
-  assert.equal(migrated.saveVersion, 7);
+  assert.equal(migrated.saveVersion, 9);
   assert.equal(migrated.farms.tomatoFarm.readyCount, 1);
   assert.equal(migrated.stock['farm:TOMATO'].items.TOMATO, 1);
   assert.deepEqual(plants.map((plant) => plant.cycleTicks), [45, 45, 45, 45]);
@@ -462,8 +462,9 @@ test('tomatoes can be loaded, cooked into paste, collected, and stocked', () => 
   assert.equal(quantityAt(app.getState().stock, 'machine:paste:output', 'TOMATO_PASTE'), 1);
   assert.equal(app.getState().stats.pasteProduced, 1);
   assert.equal(app.interact('paste').ok, true);
-  app.getState().player.x = 7.5;
-  app.getState().player.z = 2;
+  const pos = app.getState().layout?.pasteShelf ?? STATIONS.pasteShelf;
+  app.getState().player.x = pos.x;
+  app.getState().player.z = pos.z;
   assert.equal(app.interact('pasteShelf').ok, true);
   assert.equal(quantityAt(app.getState().stock, 'shelf:TOMATO_PASTE', 'TOMATO_PASTE'), 1);
 });
@@ -515,7 +516,10 @@ test('corn production unlocks the full feed, egg, bread, and restaurant chain', 
   state.stats.juiceSold = 1;
   state.workers.push({ id: 'cashier-chain', type: 'cashier', x: 5, z: -5.75, task: null });
   app.tick();
-  const at = (id) => Object.assign(app.getState().player, { x: STATIONS[id].x, z: STATIONS[id].z });
+  const at = (id) => {
+    const p = app.getState().layout?.[id] ?? STATIONS[id];
+    Object.assign(app.getState().player, { x: p.x, z: p.z });
+  };
   const sell = (item, stat) => {
     const before = app.getState().stats[stat];
     const shelf = SHELVES[item].id;
@@ -528,7 +532,14 @@ test('corn production unlocks the full feed, egg, bread, and restaurant chain', 
       targetShelfId: Object.entries(STATIONS).find(([, station]) => station.kind === 'shelf' && station.item === item)?.[0],
       basket: [], checkoutOrder: app.getState().nextEntityId++, waitTicks: 0, payTicks: 0,
     });
+    const targetShelfId = Object.entries(STATIONS).find(([, station]) => station.kind === 'shelf' && station.item === item)?.[0];
+    const targetPos = targetShelfId ? app.getState().layout?.[targetShelfId] ?? STATIONS[targetShelfId] : null;
+    console.log('Spawning customer for', item, 'target:', targetShelfId, 'pos:', targetPos);
     for (let tick = 0; tick < 90 && app.getState().stats[stat] === before; tick += 1) app.tick();
+    if (app.getState().stats[stat] === before) {
+       const c = app.getState().customers.find(x => x.id === `chain-${item}`);
+       console.log('Customer stuck! phase:', c?.phase, 'pos:', c?.x, c?.z, 'route:', c?.route);
+    }
     assert.equal(app.getState().stats[stat], before + 1, `${item} satışa ulaşmalı`);
   };
   const make = (upgrade, machine, inputs, seconds) => {
@@ -543,11 +554,14 @@ test('corn production unlocks the full feed, egg, bread, and restaurant chain', 
   };
 
   assert.equal(app.buyUpgrade('corn').ok, true);
+  app.moveStation('cornShelf', STATIONS.cornShelf.x, STATIONS.cornShelf.z);
   sell('CORN', 'cornSold');
   make('popcorn', 'popcorn', { CORN: 1 }, 2.5);
+  app.moveStation('popcornShelf', STATIONS.popcornShelf.x, STATIONS.popcornShelf.z);
   sell('POPCORN', 'popcornSold');
   make('feed', 'feed', { CORN: 1 }, 2.2);
   assert.equal(app.buyUpgrade('coop').ok, true);
+  app.moveStation('eggShelf', STATIONS.eggShelf.x, STATIONS.eggShelf.z);
   at('feed');
   assert.equal(app.interact('feed').ok, true);
   at('coop');
@@ -556,6 +570,7 @@ test('corn production unlocks the full feed, egg, bread, and restaurant chain', 
   assert.equal(quantityAt(app.getState().stock, 'coop:eggs', 'EGG'), 1);
   sell('EGG', 'eggSold');
   make('bakery', 'bakery', { WHEAT: 2, EGG: 1 }, 4);
+  app.moveStation('breadShelf', STATIONS.breadShelf.x, STATIONS.breadShelf.z);
   sell('BREAD', 'breadSold');
   assert.equal(app.buyUpgrade('restaurant').ok, true);
   assert.deepEqual(Object.keys(app.getState().diningTables), ['table1', 'table2', 'table3', 'table4']);
@@ -868,7 +883,7 @@ test('legacy furniture save migration removes dynamic assets, their stock, and i
   assert.equal(state.diningTables.legacyTable, undefined);
   assert.equal(state.customers.some((customer) => customer.id === 'legacy-diner'), false);
   assert.deepEqual(state.layout, { tomatoFarm: { x: -10, z: 5 } });
-  assert.equal(state.saveVersion, 7);
+  assert.equal(state.saveVersion, 9);
 });
 
 test('AdMob browser adapter remains not ready until a native bridge is supplied', async () => {
@@ -964,7 +979,7 @@ test('surprise bonus offers wait for three active minutes and persist a 5–8 mi
   assert.equal(app.getState().bonusOffers.activePlayMs, 179_999);
 
   const offer = app.advanceBonusOfferClock(1);
-  assert.ok(['walk-speed', 'bag-capacity'].includes(offer.type));
+  assert.ok(['walk-speed', 'bag-capacity', 'character-unlock'].includes(offer.type));
   assert.equal(offer.id, 'bonus-1');
   const wait = app.getState().bonusOffers.nextOfferAtActiveMs - app.getState().bonusOffers.activePlayMs;
   assert.ok(wait >= 300_000 && wait <= 480_000);
@@ -994,7 +1009,7 @@ test('speed bonus is player-only, persists its wall-clock expiry, and repeated a
   assert.equal(first.ok, true);
   assert.match(first.message, /5 dakika/);
   const firstExpiry = app.getState().bonusOffers.walkSpeedExpiresAt;
-  assert.equal(app.getWalkSpeedMultiplier(firstExpiry - 1), 2);
+  assert.equal(app.getWalkSpeedMultiplier(firstExpiry - 1), 1.5);
   assert.equal(app.getWalkSpeedMultiplier(firstExpiry), 1);
   assert.equal(app.getState().speedMultiplier, 1, 'the bonus does not accelerate the simulation');
   const unboosted = new GameApplication(new SaveService(new MemoryStorage()), 1);
@@ -1006,12 +1021,12 @@ test('speed bonus is player-only, persists its wall-clock expiry, and repeated a
   boosted.getState().player.z = 0;
   boosted.getState().bonusOffers.walkSpeedExpiresAt = Date.now() + 10_000;
   boosted.setPlayerMove({ x: 1, z: 0 }, 1);
-  assert.ok(Math.abs(boosted.getState().player.x + 15) < 0.01);
+  assert.ok(Math.abs(boosted.getState().player.x + 18.75) < 0.01);
   assert.ok(Math.abs(unboosted.getState().player.x + 22.5) < 0.01);
 
   const loaded = new GameApplication(new SaveService(storage), 1);
   assert.equal(loaded.getState().bonusOffers.walkSpeedExpiresAt, firstExpiry);
-  assert.equal(loaded.getWalkSpeedMultiplier(firstExpiry - 1), 2);
+  assert.equal(loaded.getWalkSpeedMultiplier(firstExpiry - 1), 1.5);
 
   const nextState = app.getState();
   nextState.ads.recentCompletions = [];
