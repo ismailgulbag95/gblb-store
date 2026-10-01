@@ -1,6 +1,6 @@
 {
   "schema_version": 3,
-  "revision": 93,
+  "revision": 96,
   "project": {
     "id": "gblb-store-3d",
     "name": "GBLB Store 3D Procedural World Transformation",
@@ -3675,6 +3675,308 @@
               "mod-supermarket"
             ],
             "objects": [
+              {
+                "id": "mod-supermarket",
+                "type": "scene_module",
+                "properties": {
+                  "name": "Supermarket Interior",
+                  "description": "Cilalı fayans zemin, manav stantları, gondol reyonlar, içecek dolapları, kasa konveyör hattı",
+                  "phase": 1
+                }
+              }
+            ],
+            "object_types": [
+              {
+                "id": "scene_module",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "required": true,
+                    "enum": null
+                  },
+                  "description": {
+                    "type": "string",
+                    "required": true,
+                    "enum": null
+                  },
+                  "phase": {
+                    "type": "integer",
+                    "required": true,
+                    "enum": null
+                  }
+                }
+              }
+            ],
+            "relation_types": [
+              {
+                "id": "contains",
+                "from_type": "scene_module",
+                "to_type": "procedural_asset",
+                "from_min": 0,
+                "from_max": null,
+                "to_min": 0,
+                "to_max": null,
+                "impact": "forward"
+              }
+            ],
+            "relations": [],
+            "files": []
+          },
+          "producer_generations": {},
+          "contract": {
+            "input_fields": {},
+            "acceptance_rules": [],
+            "support_groups": []
+          }
+        }
+      },
+      "output_snapshot": {
+        "sha256": "5be4e3c99f05c10c081b279674e4a4da11ce339c86efcd152c698e0f08b68054",
+        "manifest": {
+          "inputs": [],
+          "objects": [],
+          "object_types": [],
+          "relation_types": [],
+          "relations": [],
+          "files": []
+        }
+      }
+    },
+    {
+      "id": "T-EAST-LOGISTICS-PROCUREMENT",
+      "title": "Doğu lojistik ofisi, CRT toptan terminal ve kamyon teslimatı",
+      "status": "review",
+      "object_ids": [
+        "mod-logistics-backend",
+        "mod-supermarket"
+      ],
+      "input_ids": [
+        "mod-logistics-backend",
+        "mod-supermarket"
+      ],
+      "output_ids": [],
+      "depends_on": [],
+      "decision_ids": [],
+      "acceptance": [
+        "Ücretli 22 ürün toptan kataloğu, sekiz ithal ürün ve reyon alımı; v2-v10 kayıtları v11 olarak korunur.",
+        "Sipariş kuyruğu, bir kez ödeme/teslimat, depocu ve oyuncu taşıması; müdür eşiği yolda/depo stoğunu sayar.",
+        "Doğu ofisi/cam/ahşap/CRT etkileşimi, CSS retro terminal ve tick tabanlı kamyon/rampa/palet modelleri çalışır.",
+        "Hedefli assert testleri, npm test, Vite build ve izole tarayıcı sahne kontrolü somut kanıt olarak kaydedilir."
+      ],
+      "evidence": [
+        {
+          "path": "src/domain/catalog.js",
+          "criterion": 0,
+          "note": "22 ürün, sekiz ithal SKU, ücretli koli fiyatları ve ithal reyon tanımları.",
+          "reviewer": "agent",
+          "sha256": "8c241711f6f6ad0cf044b23c73a0b943cfd717384efe9474195a67943aeaad22"
+        },
+        {
+          "path": "src/domain/state.js",
+          "criterion": 0,
+          "note": "SAVE_VERSION11 ve v2-v10 kayıt uyumluluğu, mevcut stok korunumu.",
+          "reviewer": "agent",
+          "sha256": "6dc5c67492edc6550ea299756d330890cbb97246f90cf73e47d3abfa87f41091"
+        },
+        {
+          "path": "tests/procurement-catalog.test.js",
+          "criterion": 0,
+          "note": "Katalog/kâr marjı/kayıt migration/layout için altı assert testi.",
+          "reviewer": "agent",
+          "sha256": "9b18ca49d79524afe7243b203f7b18f8698bc1636c16af5314b2129682a32031"
+        },
+        {
+          "path": "src/domain/procurement.js",
+          "criterion": 1,
+          "note": "Ücretli kuyruk, rezervasyon kapasitesi, bir kez kargo ve stok eşiği otomasyonu.",
+          "reviewer": "agent",
+          "sha256": "611ad9944f19df42821fe11dacca219cfcd9322ca4323ae45ee186ea2ecfa081"
+        },
+        {
+          "path": "src/domain/simulation.js",
+          "criterion": 1,
+          "note": "Depocu reyon/depo taşıması mevcut reservation görev sistemini kullanır.",
+          "reviewer": "agent",
+          "sha256": "b398dc5876a2edb48a3095adac9fd52c7e7624806e8b642c6a537c2dab594319"
+        },
+        {
+          "path": "src/application/GameApplication.js",
+          "criterion": 1,
+          "note": "Sipariş/reyon/terminal/depo komutları, yeni roller ve doğu oyuncu erişimi.",
+          "reviewer": "agent",
+          "sha256": "1faccc05ffb27e91d500b3f4b5be855ef708c14ad100388ba9ba1a84cd90fb69"
+        },
+        {
+          "path": "src/environment/LogisticsModels.js",
+          "criterion": 2,
+          "note": "Cam ofis, ahşap masa, emissive CRT, tick kamyon/palet ve bounded gerçek stok modeli.",
+          "reviewer": "agent",
+          "sha256": "c774b646d422f23aa8c0b60a012dfed4c0765972639b8af06fe187f3849a8568"
+        },
+        {
+          "path": "src/environment/MarketGrid.js",
+          "criterion": 2,
+          "note": "Kilide bağlı ofis/rampa/depo ve hareketli kamyon engelleri.",
+          "reviewer": "agent",
+          "sha256": "5db9fd7d25f7a2a75a7f00744ae3363c7f96dea5e5957f8ee832e94f6f6342ce"
+        },
+        {
+          "path": "src/presentation/HUD.js",
+          "criterion": 2,
+          "note": "Dört kategori CRT sepeti, ödeme, ithal reyon ve müdür eşiği arayüzü.",
+          "reviewer": "agent",
+          "sha256": "b2520bc3da41bbcf152ae1909b6f3c89f92e33617baddccac511ac5d7a0db43f"
+        },
+        {
+          "path": "src/style.css",
+          "criterion": 2,
+          "note": "Saf CSS yeşil fosfor/scanline CRT ve responsive terminal.",
+          "reviewer": "agent",
+          "sha256": "2596a75bd36276580b17afbd552e9351c4573b6d3ae69fecaf443faf14fc8ec3"
+        },
+        {
+          "path": "tests/procurement.test.js",
+          "criterion": 3,
+          "note": "13 domain/application/sipariş/taşıma/legacy makbuz/güvenli ödeme ve işe alım testi.",
+          "reviewer": "agent",
+          "sha256": "a01732debc48ca6f0b53691af33bed9d3209d4b2fab33f34ef74d9a0834d7996"
+        },
+        {
+          "path": "tests/procurement-hud.test.js",
+          "criterion": 3,
+          "note": "11 gerçek popup/delegation/ödeme/modal/otomasyon testi.",
+          "reviewer": "agent",
+          "sha256": "5c779c7e670629e84af374b23248e897ccbf0a787325ed0af148e66dc503ef31"
+        },
+        {
+          "path": "tests/procurement-input.test.js",
+          "criterion": 3,
+          "note": "6 gerçek raycast/input/layout/etkileşim koruma testi.",
+          "reviewer": "agent",
+          "sha256": "dea4e655a9cc54ce2bc976ff0c815e2eaadbe271fab3ac56afa91f945eaa51a8"
+        },
+        {
+          "path": "tests/procurement-visual.test.js",
+          "criterion": 3,
+          "note": "8 model/kamyon/dolu rampa/koli korunumu/engeller/temizlik testi.",
+          "reviewer": "agent",
+          "sha256": "b4b6bded0431b141745db090aab16cc6626ddf6303c99977c5161b54331734c5"
+        },
+        {
+          "path": "tests/fixtures/procurement-verification.md",
+          "criterion": 3,
+          "note": "167/167 test, Vite pass, hedefli coverage ve somut browser gözlemleri; eski kanıt sınırları.",
+          "reviewer": "agent",
+          "sha256": "e7837dd06fdffc61ef35991dda22c24c2791df40fb5fde7b8eae38a4b2b87011"
+        },
+        {
+          "path": "tests/fixtures/procurement-crt.jpg",
+          "criterion": 3,
+          "note": "Gerçek CRT tıklaması ardından ücretli sipariş terminali ekranı.",
+          "reviewer": "agent",
+          "sha256": "f98edf5ac4f482de80f26543ae5f0e3b6589d0ae35185bf9ee21e43012468c3e"
+        },
+        {
+          "path": "tests/fixtures/procurement-dock.jpg",
+          "criterion": 3,
+          "note": "Sipariş teslimi sonrası rampada gerçek altı ürün ve kamyon ayrılışı.",
+          "reviewer": "agent",
+          "sha256": "b323e4be27d27ba903b01bb60ffba83a59f476cb1481995cc09125125eb2c78e"
+        }
+      ],
+      "input_snapshot": {
+        "sha256": "c53bd933580557ee3aa694b8968447535009ce74b823aea00b586b82bbdec58c",
+        "manifest": {
+          "graph": {
+            "inputs": [
+              "mod-logistics-backend",
+              "mod-supermarket"
+            ],
+            "objects": [
+              {
+                "id": "mod-logistics-backend",
+                "type": "scene_module",
+                "properties": {
+                  "name": "Logistics & Warehouse",
+                  "description": "Yükleme rampası, forklift, transpalet, palet rafları, atık ve geri dönüşüm merkezi",
+                  "phase": 5
+                }
+              },
+              {
+                "id": "mod-supermarket",
+                "type": "scene_module",
+                "properties": {
+                  "name": "Supermarket Interior",
+                  "description": "Cilalı fayans zemin, manav stantları, gondol reyonlar, içecek dolapları, kasa konveyör hattı",
+                  "phase": 1
+                }
+              }
+            ],
+            "object_types": [
+              {
+                "id": "scene_module",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "required": true,
+                    "enum": null
+                  },
+                  "description": {
+                    "type": "string",
+                    "required": true,
+                    "enum": null
+                  },
+                  "phase": {
+                    "type": "integer",
+                    "required": true,
+                    "enum": null
+                  }
+                }
+              }
+            ],
+            "relation_types": [
+              {
+                "id": "contains",
+                "from_type": "scene_module",
+                "to_type": "procedural_asset",
+                "from_min": 0,
+                "from_max": null,
+                "to_min": 0,
+                "to_max": null,
+                "impact": "forward"
+              }
+            ],
+            "relations": [],
+            "files": []
+          },
+          "producer_generations": {},
+          "contract": {
+            "input_fields": {},
+            "acceptance_rules": [],
+            "support_groups": []
+          }
+        }
+      },
+      "generation": 0,
+      "review_reasons": [],
+      "run_snapshot": {
+        "sha256": "c53bd933580557ee3aa694b8968447535009ce74b823aea00b586b82bbdec58c",
+        "manifest": {
+          "graph": {
+            "inputs": [
+              "mod-logistics-backend",
+              "mod-supermarket"
+            ],
+            "objects": [
+              {
+                "id": "mod-logistics-backend",
+                "type": "scene_module",
+                "properties": {
+                  "name": "Logistics & Warehouse",
+                  "description": "Yükleme rampası, forklift, transpalet, palet rafları, atık ve geri dönüşüm merkezi",
+                  "phase": 5
+                }
+              },
               {
                 "id": "mod-supermarket",
                 "type": "scene_module",
@@ -32462,6 +32764,635 @@
                       "mod-supermarket"
                     ],
                     "objects": [
+                      {
+                        "id": "mod-supermarket",
+                        "type": "scene_module",
+                        "properties": {
+                          "name": "Supermarket Interior",
+                          "description": "Cilalı fayans zemin, manav stantları, gondol reyonlar, içecek dolapları, kasa konveyör hattı",
+                          "phase": 1
+                        }
+                      }
+                    ],
+                    "object_types": [
+                      {
+                        "id": "scene_module",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "required": true,
+                            "enum": null
+                          },
+                          "description": {
+                            "type": "string",
+                            "required": true,
+                            "enum": null
+                          },
+                          "phase": {
+                            "type": "integer",
+                            "required": true,
+                            "enum": null
+                          }
+                        }
+                      }
+                    ],
+                    "relation_types": [
+                      {
+                        "id": "contains",
+                        "from_type": "scene_module",
+                        "to_type": "procedural_asset",
+                        "from_min": 0,
+                        "from_max": null,
+                        "to_min": 0,
+                        "to_max": null,
+                        "impact": "forward"
+                      }
+                    ],
+                    "relations": [],
+                    "files": []
+                  },
+                  "producer_generations": {},
+                  "contract": {
+                    "input_fields": {},
+                    "acceptance_rules": [],
+                    "support_groups": []
+                  }
+                }
+              },
+              "output_snapshot": {
+                "sha256": "5be4e3c99f05c10c081b279674e4a4da11ce339c86efcd152c698e0f08b68054",
+                "manifest": {
+                  "inputs": [],
+                  "objects": [],
+                  "object_types": [],
+                  "relation_types": [],
+                  "relations": [],
+                  "files": []
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "revision": 94,
+      "action": "extend_model",
+      "actor": "agent",
+      "reason": "Kullanıcının doğu lojistik/ofis/toptan sipariş entegrasyonu ve kanıtları için ayrı görev.",
+      "change": {
+        "objects": [],
+        "relations": [],
+        "tasks": [
+          {
+            "id": "T-EAST-LOGISTICS-PROCUREMENT",
+            "title": "Doğu lojistik ofisi, CRT toptan terminal ve kamyon teslimatı",
+            "status": "todo",
+            "object_ids": [
+              "mod-logistics-backend",
+              "mod-supermarket"
+            ],
+            "input_ids": [
+              "mod-logistics-backend",
+              "mod-supermarket"
+            ],
+            "output_ids": [],
+            "depends_on": [],
+            "decision_ids": [],
+            "acceptance": [
+              "Ücretli 22 ürün toptan kataloğu, sekiz ithal ürün ve reyon alımı; v2-v10 kayıtları v11 olarak korunur.",
+              "Sipariş kuyruğu, bir kez ödeme/teslimat, depocu ve oyuncu taşıması; müdür eşiği yolda/depo stoğunu sayar.",
+              "Doğu ofisi/cam/ahşap/CRT etkileşimi, CSS retro terminal ve tick tabanlı kamyon/rampa/palet modelleri çalışır.",
+              "Hedefli assert testleri, npm test, Vite build ve izole tarayıcı sahne kontrolü somut kanıt olarak kaydedilir."
+            ],
+            "evidence": [],
+            "input_snapshot": null,
+            "generation": 0,
+            "review_reasons": []
+          }
+        ],
+        "impact": {
+          "changed_objects": [],
+          "changed_relations": [],
+          "affected_objects": [],
+          "paths": {},
+          "affected_tasks": []
+        },
+        "task_changes": [
+          {
+            "task_id": "T-EAST-LOGISTICS-PROCUREMENT",
+            "before": null,
+            "after": {
+              "id": "T-EAST-LOGISTICS-PROCUREMENT",
+              "title": "Doğu lojistik ofisi, CRT toptan terminal ve kamyon teslimatı",
+              "status": "todo",
+              "object_ids": [
+                "mod-logistics-backend",
+                "mod-supermarket"
+              ],
+              "input_ids": [
+                "mod-logistics-backend",
+                "mod-supermarket"
+              ],
+              "output_ids": [],
+              "depends_on": [],
+              "decision_ids": [],
+              "acceptance": [
+                "Ücretli 22 ürün toptan kataloğu, sekiz ithal ürün ve reyon alımı; v2-v10 kayıtları v11 olarak korunur.",
+                "Sipariş kuyruğu, bir kez ödeme/teslimat, depocu ve oyuncu taşıması; müdür eşiği yolda/depo stoğunu sayar.",
+                "Doğu ofisi/cam/ahşap/CRT etkileşimi, CSS retro terminal ve tick tabanlı kamyon/rampa/palet modelleri çalışır.",
+                "Hedefli assert testleri, npm test, Vite build ve izole tarayıcı sahne kontrolü somut kanıt olarak kaydedilir."
+              ],
+              "evidence": [],
+              "input_snapshot": null,
+              "generation": 0,
+              "review_reasons": []
+            }
+          }
+        ]
+      }
+    },
+    {
+      "revision": 95,
+      "action": "start_task",
+      "actor": "agent",
+      "reason": "Yetkili kullanıcı isteği için uygulanmış lojistik entegrasyonunun kanıt kaydı.",
+      "change": {
+        "task_changes": [
+          {
+            "task_id": "T-EAST-LOGISTICS-PROCUREMENT",
+            "before": {
+              "id": "T-EAST-LOGISTICS-PROCUREMENT",
+              "title": "Doğu lojistik ofisi, CRT toptan terminal ve kamyon teslimatı",
+              "status": "todo",
+              "object_ids": [
+                "mod-logistics-backend",
+                "mod-supermarket"
+              ],
+              "input_ids": [
+                "mod-logistics-backend",
+                "mod-supermarket"
+              ],
+              "output_ids": [],
+              "depends_on": [],
+              "decision_ids": [],
+              "acceptance": [
+                "Ücretli 22 ürün toptan kataloğu, sekiz ithal ürün ve reyon alımı; v2-v10 kayıtları v11 olarak korunur.",
+                "Sipariş kuyruğu, bir kez ödeme/teslimat, depocu ve oyuncu taşıması; müdür eşiği yolda/depo stoğunu sayar.",
+                "Doğu ofisi/cam/ahşap/CRT etkileşimi, CSS retro terminal ve tick tabanlı kamyon/rampa/palet modelleri çalışır.",
+                "Hedefli assert testleri, npm test, Vite build ve izole tarayıcı sahne kontrolü somut kanıt olarak kaydedilir."
+              ],
+              "evidence": [],
+              "input_snapshot": null,
+              "generation": 0,
+              "review_reasons": []
+            },
+            "after": {
+              "id": "T-EAST-LOGISTICS-PROCUREMENT",
+              "title": "Doğu lojistik ofisi, CRT toptan terminal ve kamyon teslimatı",
+              "status": "doing",
+              "object_ids": [
+                "mod-logistics-backend",
+                "mod-supermarket"
+              ],
+              "input_ids": [
+                "mod-logistics-backend",
+                "mod-supermarket"
+              ],
+              "output_ids": [],
+              "depends_on": [],
+              "decision_ids": [],
+              "acceptance": [
+                "Ücretli 22 ürün toptan kataloğu, sekiz ithal ürün ve reyon alımı; v2-v10 kayıtları v11 olarak korunur.",
+                "Sipariş kuyruğu, bir kez ödeme/teslimat, depocu ve oyuncu taşıması; müdür eşiği yolda/depo stoğunu sayar.",
+                "Doğu ofisi/cam/ahşap/CRT etkileşimi, CSS retro terminal ve tick tabanlı kamyon/rampa/palet modelleri çalışır.",
+                "Hedefli assert testleri, npm test, Vite build ve izole tarayıcı sahne kontrolü somut kanıt olarak kaydedilir."
+              ],
+              "evidence": [],
+              "input_snapshot": null,
+              "generation": 0,
+              "review_reasons": [],
+              "run_snapshot": {
+                "sha256": "c53bd933580557ee3aa694b8968447535009ce74b823aea00b586b82bbdec58c",
+                "manifest": {
+                  "graph": {
+                    "inputs": [
+                      "mod-logistics-backend",
+                      "mod-supermarket"
+                    ],
+                    "objects": [
+                      {
+                        "id": "mod-logistics-backend",
+                        "type": "scene_module",
+                        "properties": {
+                          "name": "Logistics & Warehouse",
+                          "description": "Yükleme rampası, forklift, transpalet, palet rafları, atık ve geri dönüşüm merkezi",
+                          "phase": 5
+                        }
+                      },
+                      {
+                        "id": "mod-supermarket",
+                        "type": "scene_module",
+                        "properties": {
+                          "name": "Supermarket Interior",
+                          "description": "Cilalı fayans zemin, manav stantları, gondol reyonlar, içecek dolapları, kasa konveyör hattı",
+                          "phase": 1
+                        }
+                      }
+                    ],
+                    "object_types": [
+                      {
+                        "id": "scene_module",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "required": true,
+                            "enum": null
+                          },
+                          "description": {
+                            "type": "string",
+                            "required": true,
+                            "enum": null
+                          },
+                          "phase": {
+                            "type": "integer",
+                            "required": true,
+                            "enum": null
+                          }
+                        }
+                      }
+                    ],
+                    "relation_types": [
+                      {
+                        "id": "contains",
+                        "from_type": "scene_module",
+                        "to_type": "procedural_asset",
+                        "from_min": 0,
+                        "from_max": null,
+                        "to_min": 0,
+                        "to_max": null,
+                        "impact": "forward"
+                      }
+                    ],
+                    "relations": [],
+                    "files": []
+                  },
+                  "producer_generations": {},
+                  "contract": {
+                    "input_fields": {},
+                    "acceptance_rules": [],
+                    "support_groups": []
+                  }
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "revision": 96,
+      "action": "submit_evidence",
+      "actor": "agent",
+      "reason": "Uygulanan lojistik entegrasyonunun test, derleme ve somut tarayıcı kanıtları; kullanıcı kabulü değildir.",
+      "change": {
+        "task_changes": [
+          {
+            "task_id": "T-EAST-LOGISTICS-PROCUREMENT",
+            "before": {
+              "id": "T-EAST-LOGISTICS-PROCUREMENT",
+              "title": "Doğu lojistik ofisi, CRT toptan terminal ve kamyon teslimatı",
+              "status": "doing",
+              "object_ids": [
+                "mod-logistics-backend",
+                "mod-supermarket"
+              ],
+              "input_ids": [
+                "mod-logistics-backend",
+                "mod-supermarket"
+              ],
+              "output_ids": [],
+              "depends_on": [],
+              "decision_ids": [],
+              "acceptance": [
+                "Ücretli 22 ürün toptan kataloğu, sekiz ithal ürün ve reyon alımı; v2-v10 kayıtları v11 olarak korunur.",
+                "Sipariş kuyruğu, bir kez ödeme/teslimat, depocu ve oyuncu taşıması; müdür eşiği yolda/depo stoğunu sayar.",
+                "Doğu ofisi/cam/ahşap/CRT etkileşimi, CSS retro terminal ve tick tabanlı kamyon/rampa/palet modelleri çalışır.",
+                "Hedefli assert testleri, npm test, Vite build ve izole tarayıcı sahne kontrolü somut kanıt olarak kaydedilir."
+              ],
+              "evidence": [],
+              "input_snapshot": null,
+              "generation": 0,
+              "review_reasons": [],
+              "run_snapshot": {
+                "sha256": "c53bd933580557ee3aa694b8968447535009ce74b823aea00b586b82bbdec58c",
+                "manifest": {
+                  "graph": {
+                    "inputs": [
+                      "mod-logistics-backend",
+                      "mod-supermarket"
+                    ],
+                    "objects": [
+                      {
+                        "id": "mod-logistics-backend",
+                        "type": "scene_module",
+                        "properties": {
+                          "name": "Logistics & Warehouse",
+                          "description": "Yükleme rampası, forklift, transpalet, palet rafları, atık ve geri dönüşüm merkezi",
+                          "phase": 5
+                        }
+                      },
+                      {
+                        "id": "mod-supermarket",
+                        "type": "scene_module",
+                        "properties": {
+                          "name": "Supermarket Interior",
+                          "description": "Cilalı fayans zemin, manav stantları, gondol reyonlar, içecek dolapları, kasa konveyör hattı",
+                          "phase": 1
+                        }
+                      }
+                    ],
+                    "object_types": [
+                      {
+                        "id": "scene_module",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "required": true,
+                            "enum": null
+                          },
+                          "description": {
+                            "type": "string",
+                            "required": true,
+                            "enum": null
+                          },
+                          "phase": {
+                            "type": "integer",
+                            "required": true,
+                            "enum": null
+                          }
+                        }
+                      }
+                    ],
+                    "relation_types": [
+                      {
+                        "id": "contains",
+                        "from_type": "scene_module",
+                        "to_type": "procedural_asset",
+                        "from_min": 0,
+                        "from_max": null,
+                        "to_min": 0,
+                        "to_max": null,
+                        "impact": "forward"
+                      }
+                    ],
+                    "relations": [],
+                    "files": []
+                  },
+                  "producer_generations": {},
+                  "contract": {
+                    "input_fields": {},
+                    "acceptance_rules": [],
+                    "support_groups": []
+                  }
+                }
+              }
+            },
+            "after": {
+              "id": "T-EAST-LOGISTICS-PROCUREMENT",
+              "title": "Doğu lojistik ofisi, CRT toptan terminal ve kamyon teslimatı",
+              "status": "review",
+              "object_ids": [
+                "mod-logistics-backend",
+                "mod-supermarket"
+              ],
+              "input_ids": [
+                "mod-logistics-backend",
+                "mod-supermarket"
+              ],
+              "output_ids": [],
+              "depends_on": [],
+              "decision_ids": [],
+              "acceptance": [
+                "Ücretli 22 ürün toptan kataloğu, sekiz ithal ürün ve reyon alımı; v2-v10 kayıtları v11 olarak korunur.",
+                "Sipariş kuyruğu, bir kez ödeme/teslimat, depocu ve oyuncu taşıması; müdür eşiği yolda/depo stoğunu sayar.",
+                "Doğu ofisi/cam/ahşap/CRT etkileşimi, CSS retro terminal ve tick tabanlı kamyon/rampa/palet modelleri çalışır.",
+                "Hedefli assert testleri, npm test, Vite build ve izole tarayıcı sahne kontrolü somut kanıt olarak kaydedilir."
+              ],
+              "evidence": [
+                {
+                  "path": "src/domain/catalog.js",
+                  "criterion": 0,
+                  "note": "22 ürün, sekiz ithal SKU, ücretli koli fiyatları ve ithal reyon tanımları.",
+                  "reviewer": "agent",
+                  "sha256": "8c241711f6f6ad0cf044b23c73a0b943cfd717384efe9474195a67943aeaad22"
+                },
+                {
+                  "path": "src/domain/state.js",
+                  "criterion": 0,
+                  "note": "SAVE_VERSION11 ve v2-v10 kayıt uyumluluğu, mevcut stok korunumu.",
+                  "reviewer": "agent",
+                  "sha256": "6dc5c67492edc6550ea299756d330890cbb97246f90cf73e47d3abfa87f41091"
+                },
+                {
+                  "path": "tests/procurement-catalog.test.js",
+                  "criterion": 0,
+                  "note": "Katalog/kâr marjı/kayıt migration/layout için altı assert testi.",
+                  "reviewer": "agent",
+                  "sha256": "9b18ca49d79524afe7243b203f7b18f8698bc1636c16af5314b2129682a32031"
+                },
+                {
+                  "path": "src/domain/procurement.js",
+                  "criterion": 1,
+                  "note": "Ücretli kuyruk, rezervasyon kapasitesi, bir kez kargo ve stok eşiği otomasyonu.",
+                  "reviewer": "agent",
+                  "sha256": "611ad9944f19df42821fe11dacca219cfcd9322ca4323ae45ee186ea2ecfa081"
+                },
+                {
+                  "path": "src/domain/simulation.js",
+                  "criterion": 1,
+                  "note": "Depocu reyon/depo taşıması mevcut reservation görev sistemini kullanır.",
+                  "reviewer": "agent",
+                  "sha256": "b398dc5876a2edb48a3095adac9fd52c7e7624806e8b642c6a537c2dab594319"
+                },
+                {
+                  "path": "src/application/GameApplication.js",
+                  "criterion": 1,
+                  "note": "Sipariş/reyon/terminal/depo komutları, yeni roller ve doğu oyuncu erişimi.",
+                  "reviewer": "agent",
+                  "sha256": "1faccc05ffb27e91d500b3f4b5be855ef708c14ad100388ba9ba1a84cd90fb69"
+                },
+                {
+                  "path": "src/environment/LogisticsModels.js",
+                  "criterion": 2,
+                  "note": "Cam ofis, ahşap masa, emissive CRT, tick kamyon/palet ve bounded gerçek stok modeli.",
+                  "reviewer": "agent",
+                  "sha256": "c774b646d422f23aa8c0b60a012dfed4c0765972639b8af06fe187f3849a8568"
+                },
+                {
+                  "path": "src/environment/MarketGrid.js",
+                  "criterion": 2,
+                  "note": "Kilide bağlı ofis/rampa/depo ve hareketli kamyon engelleri.",
+                  "reviewer": "agent",
+                  "sha256": "5db9fd7d25f7a2a75a7f00744ae3363c7f96dea5e5957f8ee832e94f6f6342ce"
+                },
+                {
+                  "path": "src/presentation/HUD.js",
+                  "criterion": 2,
+                  "note": "Dört kategori CRT sepeti, ödeme, ithal reyon ve müdür eşiği arayüzü.",
+                  "reviewer": "agent",
+                  "sha256": "b2520bc3da41bbcf152ae1909b6f3c89f92e33617baddccac511ac5d7a0db43f"
+                },
+                {
+                  "path": "src/style.css",
+                  "criterion": 2,
+                  "note": "Saf CSS yeşil fosfor/scanline CRT ve responsive terminal.",
+                  "reviewer": "agent",
+                  "sha256": "2596a75bd36276580b17afbd552e9351c4573b6d3ae69fecaf443faf14fc8ec3"
+                },
+                {
+                  "path": "tests/procurement.test.js",
+                  "criterion": 3,
+                  "note": "13 domain/application/sipariş/taşıma/legacy makbuz/güvenli ödeme ve işe alım testi.",
+                  "reviewer": "agent",
+                  "sha256": "a01732debc48ca6f0b53691af33bed9d3209d4b2fab33f34ef74d9a0834d7996"
+                },
+                {
+                  "path": "tests/procurement-hud.test.js",
+                  "criterion": 3,
+                  "note": "11 gerçek popup/delegation/ödeme/modal/otomasyon testi.",
+                  "reviewer": "agent",
+                  "sha256": "5c779c7e670629e84af374b23248e897ccbf0a787325ed0af148e66dc503ef31"
+                },
+                {
+                  "path": "tests/procurement-input.test.js",
+                  "criterion": 3,
+                  "note": "6 gerçek raycast/input/layout/etkileşim koruma testi.",
+                  "reviewer": "agent",
+                  "sha256": "dea4e655a9cc54ce2bc976ff0c815e2eaadbe271fab3ac56afa91f945eaa51a8"
+                },
+                {
+                  "path": "tests/procurement-visual.test.js",
+                  "criterion": 3,
+                  "note": "8 model/kamyon/dolu rampa/koli korunumu/engeller/temizlik testi.",
+                  "reviewer": "agent",
+                  "sha256": "b4b6bded0431b141745db090aab16cc6626ddf6303c99977c5161b54331734c5"
+                },
+                {
+                  "path": "tests/fixtures/procurement-verification.md",
+                  "criterion": 3,
+                  "note": "167/167 test, Vite pass, hedefli coverage ve somut browser gözlemleri; eski kanıt sınırları.",
+                  "reviewer": "agent",
+                  "sha256": "e7837dd06fdffc61ef35991dda22c24c2791df40fb5fde7b8eae38a4b2b87011"
+                },
+                {
+                  "path": "tests/fixtures/procurement-crt.jpg",
+                  "criterion": 3,
+                  "note": "Gerçek CRT tıklaması ardından ücretli sipariş terminali ekranı.",
+                  "reviewer": "agent",
+                  "sha256": "f98edf5ac4f482de80f26543ae5f0e3b6589d0ae35185bf9ee21e43012468c3e"
+                },
+                {
+                  "path": "tests/fixtures/procurement-dock.jpg",
+                  "criterion": 3,
+                  "note": "Sipariş teslimi sonrası rampada gerçek altı ürün ve kamyon ayrılışı.",
+                  "reviewer": "agent",
+                  "sha256": "b323e4be27d27ba903b01bb60ffba83a59f476cb1481995cc09125125eb2c78e"
+                }
+              ],
+              "input_snapshot": {
+                "sha256": "c53bd933580557ee3aa694b8968447535009ce74b823aea00b586b82bbdec58c",
+                "manifest": {
+                  "graph": {
+                    "inputs": [
+                      "mod-logistics-backend",
+                      "mod-supermarket"
+                    ],
+                    "objects": [
+                      {
+                        "id": "mod-logistics-backend",
+                        "type": "scene_module",
+                        "properties": {
+                          "name": "Logistics & Warehouse",
+                          "description": "Yükleme rampası, forklift, transpalet, palet rafları, atık ve geri dönüşüm merkezi",
+                          "phase": 5
+                        }
+                      },
+                      {
+                        "id": "mod-supermarket",
+                        "type": "scene_module",
+                        "properties": {
+                          "name": "Supermarket Interior",
+                          "description": "Cilalı fayans zemin, manav stantları, gondol reyonlar, içecek dolapları, kasa konveyör hattı",
+                          "phase": 1
+                        }
+                      }
+                    ],
+                    "object_types": [
+                      {
+                        "id": "scene_module",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "required": true,
+                            "enum": null
+                          },
+                          "description": {
+                            "type": "string",
+                            "required": true,
+                            "enum": null
+                          },
+                          "phase": {
+                            "type": "integer",
+                            "required": true,
+                            "enum": null
+                          }
+                        }
+                      }
+                    ],
+                    "relation_types": [
+                      {
+                        "id": "contains",
+                        "from_type": "scene_module",
+                        "to_type": "procedural_asset",
+                        "from_min": 0,
+                        "from_max": null,
+                        "to_min": 0,
+                        "to_max": null,
+                        "impact": "forward"
+                      }
+                    ],
+                    "relations": [],
+                    "files": []
+                  },
+                  "producer_generations": {},
+                  "contract": {
+                    "input_fields": {},
+                    "acceptance_rules": [],
+                    "support_groups": []
+                  }
+                }
+              },
+              "generation": 0,
+              "review_reasons": [],
+              "run_snapshot": {
+                "sha256": "c53bd933580557ee3aa694b8968447535009ce74b823aea00b586b82bbdec58c",
+                "manifest": {
+                  "graph": {
+                    "inputs": [
+                      "mod-logistics-backend",
+                      "mod-supermarket"
+                    ],
+                    "objects": [
+                      {
+                        "id": "mod-logistics-backend",
+                        "type": "scene_module",
+                        "properties": {
+                          "name": "Logistics & Warehouse",
+                          "description": "Yükleme rampası, forklift, transpalet, palet rafları, atık ve geri dönüşüm merkezi",
+                          "phase": 5
+                        }
+                      },
                       {
                         "id": "mod-supermarket",
                         "type": "scene_module",

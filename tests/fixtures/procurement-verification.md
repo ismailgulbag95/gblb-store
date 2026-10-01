@@ -18,3 +18,12 @@ Verification (2026-10-01):
 Limitations: imported containers and articulated people use the existing procedural models. The dock pickup target remains near the procedural arm's maximum reach; there is no skeletal clip/physics truck simulation. The bounded stock model uses at most 16 representative cartons with exact quantity metadata. No new 60-FPS/mobile performance guarantee is inferred from this smoke check.
 
 Project CLI is accessible through the verified Python 3.12.14 runtime because `py -3` is unavailable. The sandbox denies ordinary `.project` access; approved CLI access was used. General `project.py check .` remains `ok=false` because previous tasks' file hashes need renewed review (20 stale/dependency warnings), not because npm tests or Vite failed. Their human acceptances were not renewed. New task evidence is submitted in `review`, with no user acceptance inferred.
+
+Changed files:
+
+- Domain: `catalog.js`, `state.js`, `layout.js`, `simulation.js`, new `procurement.js`.
+- Application/input: `GameApplication.js`, `InputManager.js`, `main.js`.
+- Three.js: `MarketGrid.js`, `EnvironmentProps.js`, new `LogisticsModels.js`, `WorldScene.js`, `Item3DFactory.js`.
+- Interface: `HUD.js`, `index.html`, `style.css`.
+- Tests: `procurement.test.js`, `procurement-catalog.test.js`, `procurement-hud.test.js`, `procurement-input.test.js`, `procurement-visual.test.js`; isolated fixture, screenshots and this report.
+- Project record: new `T-EAST-LOGISTICS-PROCUREMENT` task and evidence applied at read revisions 93–95; final evidence revision 96.

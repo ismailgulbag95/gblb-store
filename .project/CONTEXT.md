@@ -1,6 +1,6 @@
 # GBLB Store 3D Procedural World Transformation — proje bağlamı
 
-Revision: 93 · Yetkili kaynak: .project/state.json
+Revision: 96 · Yetkili kaynak: .project/state.json
 
 Bu görünüm türetilmiştir. Güncel kanıt kontrolü için context komutunu çalıştır.
 
@@ -224,6 +224,7 @@ Türler ve bağlantı kuralları: `ontology` komutu / `ONTOLOJİ.md`.
   - Ürettiği nesneler: asset-farm-fields, asset-chicken-coop, asset-barn-silo-paddock
   - Etkin önkoşullar: yok
   - Kabul güncelliği: yeniden inceleme gerekli · tamamlanma sayısı: 3
+  - Kontrol: stale evidence: src/environment/EnvironmentProps.js
   - Kontrol: stale evidence: src/presentation/WorldScene.js
 - T-SUPERMARKET-FIXTURES-REDESIGN [done] Market Demirbaşlarının Referans Görsele Göre Yeniden Tasarlanması (Manav, Gondol, Soğuk Dolap, Pastane, Kasa, Restoran) (kayıt: done)
   - Ölçüt: Eğimli ahşap manav tezgâhı (3 kademeli meyve-sebze kasaları, elma fıçısı, kara tahta etiketler) ve gondol reyon rafları (metal şasi, ahşap bitiş panelleri, ürün istifleri, askılı cips reyonu) referans görsele göre Three.js ile modellendi.
@@ -246,7 +247,7 @@ Türler ve bağlantı kuralları: `ontology` komutu / `ONTOLOJİ.md`.
   - Kontrol: stale evidence: src/presentation/HumanoidFactory.js
   - Kontrol: stale evidence: src/presentation/CharacterAnimator.js
   - Kontrol: stale evidence: src/presentation/WorldScene.js
-- T-STAFF-WELFARE-FACILITIES [review] Personel adayları, yorulma ve kuzey sosyal tesisleri (kayıt: review)
+- T-STAFF-WELFARE-FACILITIES [needs_review] Personel adayları, yorulma ve kuzey sosyal tesisleri (kayıt: review)
   - Ölçüt: Beş arketipten üç aday, kişisel maaş ve ücretli seçim; v9 kayıtları güvenle v10 olarak yüklenir.
   - Ölçüt: Enerji ve ihtiyaçlar gerçek görevlerde azalır; tesislere mola ve işe dönüş, rezervasyon ve yumuşak tükenme modeliyle işler.
   - Ölçüt: Kuzey arsa ve WC, dinlenme alanı, mutfak satın alımı, layout ve prosedürel 3D/HUD gösterimi çalışır.
@@ -256,10 +257,25 @@ Türler ve bağlantı kuralları: `ontology` komutu / `ONTOLOJİ.md`.
   - Ürettiği nesneler: yok
   - Etkin önkoşullar: yok
   - Kabul güncelliği: henüz doğrulanmadı · tamamlanma sayısı: 0
+  - Kontrol: stale evidence: src/domain/state.js
+  - Kontrol: stale evidence: src/domain/simulation.js
+  - Kontrol: stale evidence: src/application/GameApplication.js
+  - Kontrol: stale evidence: src/environment/MarketGrid.js
+  - Kontrol: stale evidence: src/presentation/HUD.js
+- T-EAST-LOGISTICS-PROCUREMENT [review] Doğu lojistik ofisi, CRT toptan terminal ve kamyon teslimatı (kayıt: review)
+  - Ölçüt: Ücretli 22 ürün toptan kataloğu, sekiz ithal ürün ve reyon alımı; v2-v10 kayıtları v11 olarak korunur.
+  - Ölçüt: Sipariş kuyruğu, bir kez ödeme/teslimat, depocu ve oyuncu taşıması; müdür eşiği yolda/depo stoğunu sayar.
+  - Ölçüt: Doğu ofisi/cam/ahşap/CRT etkileşimi, CSS retro terminal ve tick tabanlı kamyon/rampa/palet modelleri çalışır.
+  - Ölçüt: Hedefli assert testleri, npm test, Vite build ve izole tarayıcı sahne kontrolü somut kanıt olarak kaydedilir.
+  - İlgili nesneler: mod-logistics-backend, mod-supermarket
+  - Girdiler: mod-logistics-backend, mod-supermarket
+  - Ürettiği nesneler: yok
+  - Etkin önkoşullar: yok
+  - Kabul güncelliği: henüz doğrulanmadı · tamamlanma sayısı: 0
 
 ## Çalışılabilir görevler
 
-T-STAFF-WELFARE-FACILITIES
+T-EAST-LOGISTICS-PROCUREMENT
 
 ## Uyarılar
 
@@ -273,10 +289,16 @@ T-STAFF-WELFARE-FACILITIES
 - T-NEOBRUTALISM-STATION-BADGES: stale evidence: src/presentation/WorldScene.js
 - T-NEOBRUTALISM-STATION-BADGES: dependency T-NEOBRUTALISM-ICONS-LOGOS: needs_review
 - T-PRODUCTION-STATIONS-REDESIGN: stale evidence: src/presentation/WorldScene.js
+- T-FARM-ASSETS-ANIMATIONS-REDESIGN: stale evidence: src/environment/EnvironmentProps.js
 - T-FARM-ASSETS-ANIMATIONS-REDESIGN: stale evidence: src/presentation/WorldScene.js
 - T-CHARACTERS-ANIMATIONS-LIVING-WORLD: stale evidence: src/presentation/HumanoidFactory.js
 - T-CHARACTERS-ANIMATIONS-LIVING-WORLD: stale evidence: src/presentation/CharacterAnimator.js
 - T-CHARACTERS-ANIMATIONS-LIVING-WORLD: stale evidence: src/presentation/WorldScene.js
+- T-STAFF-WELFARE-FACILITIES: stale evidence: src/domain/state.js
+- T-STAFF-WELFARE-FACILITIES: stale evidence: src/domain/simulation.js
+- T-STAFF-WELFARE-FACILITIES: stale evidence: src/application/GameApplication.js
+- T-STAFF-WELFARE-FACILITIES: stale evidence: src/environment/MarketGrid.js
+- T-STAFF-WELFARE-FACILITIES: stale evidence: src/presentation/HUD.js
 
 ## Onarım işlemleri
 
@@ -285,6 +307,6 @@ Bunlar öneridir; gerekçeyi değerlendir, actor ekle ve güncel revision ile uy
 - reopen_task → T-NEOBRUTALISM-ICONS-LOGOS: Recorded completion needs review: stale evidence: index.html; dependency T-NEOBRUTALISM-UI: needs_review
 - reopen_task → T-NEOBRUTALISM-STATION-BADGES: Recorded completion needs review: stale evidence: src/presentation/WorldScene.js; stale evidence: src/presentation/WorldScene.js; stale evidence: src/presentation/WorldScene.js; dependency T-NEOBRUTALISM-ICONS-LOGOS: needs_review
 - reopen_task → T-PRODUCTION-STATIONS-REDESIGN: Recorded completion needs review: stale evidence: src/presentation/WorldScene.js
-- reopen_task → T-FARM-ASSETS-ANIMATIONS-REDESIGN: Recorded completion needs review: stale evidence: src/presentation/WorldScene.js
+- reopen_task → T-FARM-ASSETS-ANIMATIONS-REDESIGN: Recorded completion needs review: stale evidence: src/environment/EnvironmentProps.js; stale evidence: src/presentation/WorldScene.js
 
 Kanıt hash'i dosya sürümünü denetler; kalite veya insan kabulünü ispatlamaz.
