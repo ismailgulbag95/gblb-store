@@ -1,0 +1,20 @@
+{
+  "action": "submit_evidence",
+  "actor": "agent",
+  "reason": "Faz 2 için 30+ 3D ürün varlığı lathe/box/cylinder/torus geometrileri ve PBR canvas materyalleriyle Item3DFactory içinde üretildi, raflara ve indirim sepetine yerleştirildi, unit test ile doğrulandı.",
+  "task_id": "T-PHASE-2",
+  "items": [
+    {
+      "path": "docs/FAZ_2_INSPECTION_REPORT.md",
+      "criterion": 0,
+      "note": "Meyve-sebze, unlu mamül, paketli gıda, içecek ve et-süt için 30+ procedural model oluşturuldu.",
+      "reviewer": "agent"
+    },
+    {
+      "path": "docs/FAZ_2_INSPECTION_REPORT.md",
+      "criterion": 1,
+      "note": "Ürünler reyon raflarına ve indirim tel sepetine düzenli istiflendi.",
+      "reviewer": "agent"
+    }
+  ]
+}

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { makeHumanoid, STAFF_PROFESSIONS, STAFF_PROFESSION_KEYS } from './HumanoidFactory.js';
 
 // Character meshes and walk animations are ported from the original player models.
 export class CharacterFactory {
@@ -15,6 +16,9 @@ export class CharacterFactory {
   }
 
   #build(type) {
+    if (STAFF_PROFESSION_KEYS.includes(type)) {
+      return this.createStaffMesh(type);
+    }
     const builders = {
       shopkeeper: this.createShopkeeperMesh,
       cat: this.createCatMesh,
@@ -23,6 +27,17 @@ export class CharacterFactory {
       penguin: this.createPenguinMesh,
     };
     return (builders[type] ?? builders.shopkeeper).call(this);
+  }
+
+  createStaffMesh(profession) {
+    const group = new THREE.Group();
+    const prof = STAFF_PROFESSIONS[profession] ?? STAFF_PROFESSIONS.cashier;
+    const body = makeHumanoid(group, prof.uniformColor, 0x4a2c11, profession.length, profession);
+    this.leftLeg = body.legs[0];
+    this.rightLeg = body.legs[1];
+    this.leftArm = body.arms[0];
+    this.rightArm = body.arms[1];
+    return group;
   }
 
   animate(delta, moving) {

@@ -1,0 +1,19 @@
+{
+  "action": "mutate_graph",
+  "actor": "agent",
+  "reason": "Faz 1 tamamlandığı için ms-phase1 durumu completed olarak güncellendi.",
+  "operations": [
+    {
+      "op": "replace_object",
+      "object": {
+        "id": "ms-phase1",
+        "type": "milestone",
+        "label": "Faz 1: Market İç Mekanı",
+        "properties": {
+          "phase_number": 1,
+          "verdict": "completed"
+        }
+      }
+    }
+  ]
+}

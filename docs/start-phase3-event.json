@@ -1,0 +1,6 @@
+{
+  "action": "start_task",
+  "actor": "agent",
+  "reason": "Faz 3 Dış Mekan, Otopark, Yollar ve Araç Filosu geliştirilmesine başlanıyor.",
+  "task_id": "T-PHASE-3"
+}

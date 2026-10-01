@@ -1,0 +1,72 @@
+{
+  "action": "extend_model",
+  "actor": "agent",
+  "reason": "Faz 6: 10 Personel Mesleği ve 20+ Zengin Müşteri Tipi model ve görev tanımı ekleniyor.",
+  "objects": [
+    {
+      "id": "asset-staff-roster",
+      "type": "procedural_asset",
+      "label": "10 Personel Mesleği Kadrosu",
+      "properties": {
+        "name": "10 Staff Professions Roster",
+        "category": "character",
+        "file_ref": "src/presentation/HumanoidFactory.js"
+      }
+    },
+    {
+      "id": "asset-customer-archetypes",
+      "type": "procedural_asset",
+      "label": "20+ Zengin Müşteri Arketipi",
+      "properties": {
+        "name": "20+ Diverse Customer Archetypes",
+        "category": "character",
+        "file_ref": "src/presentation/HumanoidFactory.js"
+      }
+    }
+  ],
+  "relations": [
+    {
+      "id": "rel-sup-staff",
+      "from": "mod-supermarket",
+      "type": "contains",
+      "to": "asset-staff-roster"
+    },
+    {
+      "id": "rel-sup-customers",
+      "from": "mod-supermarket",
+      "type": "contains",
+      "to": "asset-customer-archetypes"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "T-PHASE-6",
+      "title": "Faz 6: 10 Personel Mesleği ve 20+ Zengin Müşteri Tipi",
+      "status": "todo",
+      "object_ids": [
+        "asset-staff-roster",
+        "asset-customer-archetypes",
+        "mod-supermarket"
+      ],
+      "input_ids": [
+        "mod-supermarket"
+      ],
+      "output_ids": [
+        "asset-staff-roster",
+        "asset-customer-archetypes"
+      ],
+      "depends_on": [
+        "T-PHASE-1"
+      ],
+      "decision_ids": [],
+      "acceptance": [
+        "10 farklı personel mesleği (Kasiyer, Reyon Görevlisi, Depocu, Müdür, Temizlikçi, Güvenlik, Aşçı, Teknisyen, Kurye, Bahçıvan) özgün üniforma ve aksesuarlarıyla modellendi.",
+        "20+ müşteri arketipi (çocuk, yaşlı, iş insanı, genç, alışveriş arabası/sepeti kullananlar, çeşitli ten ve saç renkleri) oluşturuldu."
+      ],
+      "evidence": [],
+      "input_snapshot": null,
+      "generation": 0,
+      "review_reasons": []
+    }
+  ]
+}

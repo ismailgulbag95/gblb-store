@@ -1,0 +1,6 @@
+{
+  "action": "complete_task",
+  "actor": "agent",
+  "reason": "Faz 3 Dış mekan, otopark, yol altyapısı ve araç filosu başarıyla tamamlandı ve test edildi.",
+  "task_id": "T-PHASE-3"
+}

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 
-const material = (color, roughness = 0.78, metalness = 0) => new THREE.MeshStandardMaterial({ color, roughness, metalness });
+const material = (color, roughness = 0.76, metalness = 0) => new THREE.MeshStandardMaterial({ color, roughness, metalness });
 
 function add(parent, geometry, surface, position, rotation = undefined, scale = undefined) {
   const mesh = new THREE.Mesh(geometry, surface);
@@ -16,20 +16,20 @@ function add(parent, geometry, surface, position, rotation = undefined, scale = 
 
 function box(parent, size, surface, position, radius = 0.045, rotation = undefined) {
   const geometry = new RoundedBoxGeometry(size[0], size[1], size[2], 3,
-    Math.min(radius, size[0] * 0.23, size[1] * 0.23, size[2] * 0.23));
+    Math.min(radius, size[0] * 0.24, size[1] * 0.24, size[2] * 0.24));
   return add(parent, geometry, surface, position, rotation);
 }
 
-function cylinder(parent, radiusTop, radiusBottom, height, surface, position, segments = 10, rotation = undefined, openEnded = false) {
+function cylinder(parent, radiusTop, radiusBottom, height, surface, position, segments = 12, rotation = undefined, openEnded = false) {
   return add(parent, new THREE.CylinderGeometry(radiusTop, radiusBottom, height, segments, 1, openEnded), surface, position, rotation);
 }
 
-function sphere(parent, radius, surface, position, scale = [1, 1, 1], segments = 9) {
+function sphere(parent, radius, surface, position, scale = [1, 1, 1], segments = 10) {
   return add(parent, new THREE.SphereGeometry(radius, segments, Math.max(6, segments - 2)), surface, position, undefined, scale);
 }
 
 function tube(parent, points, radius, surface, segments = 14) {
-  const curve = new THREE.CatmullRomCurve3(points.map((point) => new THREE.Vector3(...point)));
+  const curve = new THREE.CatmullRomCurve3(points.map((p) => new THREE.Vector3(...p)));
   return add(parent, new THREE.TubeGeometry(curve, segments, radius, 7, false), surface, [0, 0, 0]);
 }
 
@@ -40,19 +40,19 @@ function anchor(group, position) {
   return display;
 }
 
-function baseIsland(group, m, width = 3.05, depth = 2.7) {
-  box(group, [width, 0.2, depth], m.sand, [0, 0.13, 0], 0.1);
-  box(group, [width - 0.12, 0.09, depth - 0.12], m.grass, [0, 0.275, 0], 0.07);
-  for (const [x, z] of [[-width * 0.39, depth * 0.36], [width * 0.34, depth * 0.37], [-width * 0.4, -depth * 0.35], [width * 0.39, -depth * 0.36]]) {
-    const paver = add(group, new THREE.DodecahedronGeometry(0.16, 0), m.stoneLight,
-      [x, 0.34, z], undefined, [1.45, 0.32, 0.83]);
+function baseIsland(group, m, width = 3.1, depth = 2.8) {
+  box(group, [width, 0.2, depth], m.sand, [0, 0.1, 0], 0.1);
+  box(group, [width - 0.12, 0.09, depth - 0.12], m.grass, [0, 0.24, 0], 0.07);
+  for (const [x, z] of [[-width * 0.38, depth * 0.36], [width * 0.36, depth * 0.37], [-width * 0.4, -depth * 0.35], [width * 0.39, -depth * 0.36]]) {
+    const paver = add(group, new THREE.DodecahedronGeometry(0.15, 0), m.stoneLight,
+      [x, 0.3, z], undefined, [1.4, 0.3, 0.8]);
     paver.rotation.y = x + z;
   }
-  for (const [x, z] of [[-width * 0.47, 0.02], [width * 0.46, -0.06]]) {
+  for (const [x, z] of [[-width * 0.46, 0.04], [width * 0.44, -0.06]]) {
     for (let blade = 0; blade < 3; blade += 1) {
       const leaf = sphere(group, 0.08, blade % 2 ? m.leafBright : m.leaf,
-        [x + (blade - 1) * 0.055, 0.38 + blade * 0.04, z], [0.52, 1.35, 0.4], 7);
-      leaf.rotation.z = (blade - 1) * 0.45;
+        [x + (blade - 1) * 0.055, 0.34 + blade * 0.04, z], [0.5, 1.3, 0.4], 7);
+      leaf.rotation.z = (blade - 1) * 0.42;
       leaf.castShadow = false;
     }
   }
@@ -61,71 +61,47 @@ function baseIsland(group, m, width = 3.05, depth = 2.7) {
 function crate(group, m, position, size, wood = m.wood, plank = m.woodLight) {
   const [w, h, d] = size;
   const [x, y, z] = position;
-  box(group, [w, 0.1, d], wood, [x, y + 0.05, z], 0.025);
+  box(group, [w, 0.08, d], wood, [x, y + 0.04, z], 0.02);
   for (const side of [-1, 1]) {
     for (let row = 0; row < 3; row += 1) {
-      const boardY = y + 0.15 + row * (h - 0.17) / 3;
-      box(group, [w, (h - 0.17) / 3 - 0.018, 0.055], row % 2 ? plank : wood,
-        [x, boardY, z + side * (d / 2 - 0.03)], 0.014);
-      box(group, [0.055, (h - 0.17) / 3 - 0.018, d - 0.08], wood,
-        [x + side * (w / 2 - 0.03), boardY, z], 0.014);
+      const boardY = y + 0.12 + row * (h - 0.14) / 3;
+      box(group, [w, (h - 0.15) / 3 - 0.015, 0.05], row % 2 ? plank : wood,
+        [x, boardY, z + side * (d / 2 - 0.028)], 0.012);
+      box(group, [0.05, (h - 0.15) / 3 - 0.015, d - 0.07], wood,
+        [x + side * (w / 2 - 0.028), boardY, z], 0.012);
     }
   }
   for (const dx of [-1, 1]) for (const dz of [-1, 1]) {
-    box(group, [0.075, h + 0.02, 0.075], m.woodDark, [x + dx * (w / 2 - 0.045), y + h / 2, z + dz * (d / 2 - 0.045)], 0.018);
+    box(group, [0.07, h + 0.02, 0.07], m.woodDark, [x + dx * (w / 2 - 0.04), y + h / 2, z + dz * (d / 2 - 0.04)], 0.015);
   }
   return anchor(group, [x, y + h - 0.04, z]);
 }
 
-function crateStack(group, m, position, size, count = 2) {
-  const [w, h, d] = size;
-  for (let row = 0; row < count; row += 1) {
-    const x = position[0] + (row % 2) * w * 0.12;
-    const y = position[1] + row * (h * 0.82);
-    const z = position[2] - Math.floor(row / 2) * d * 0.1;
-    crate(group, m, [x, y, z], [w, h, d]);
-  }
-}
-
 function fruit(group, m, type, position, radius = 0.13) {
-  const color = type === 'orange' ? m.orange : type === 'corn' ? m.corn : type === 'tomato' ? m.tomato : type === 'apple' ? m.tomato : m.leaf;
-  const body = sphere(group, radius, color, position, [1, 0.9, 0.92], 8);
-  if (type === 'orange' || type === 'apple') {
-    cylinder(group, 0.018, 0.023, 0.075, m.woodDark, [position[0], position[1] + radius * 0.78, position[2]], 5);
-    sphere(group, 0.06, m.leafBright, [position[0] + 0.05, position[1] + radius, position[2]], [1.2, 0.4, 0.55], 6);
+  const color = type === 'orange' ? m.orange : type === 'corn' ? m.corn : type === 'tomato' ? m.tomato : m.leaf;
+  const body = sphere(group, radius, color, position, [1, 0.94, 0.94], 9);
+  if (type === 'orange') {
+    cylinder(group, 0.016, 0.02, 0.06, m.woodDark, [position[0], position[1] + radius * 0.8, position[2]], 5);
+    sphere(group, 0.05, m.leafBright, [position[0] + 0.04, position[1] + radius * 0.92, position[2]], [1.2, 0.4, 0.55], 6);
+  } else if (type === 'tomato') {
+    sphere(group, 0.045, m.leafBright, [position[0], position[1] + radius * 0.9, position[2]], [1.4, 0.35, 1.4], 6);
   }
   return body;
 }
 
-function tileRoof(group, m, center, width, depth, color = m.roof) {
-  const [x, y, z] = center;
-  const pitch = 0.54;
-  for (const side of [-1, 1]) {
-    const panel = box(group, [width * 0.56, 0.15, depth], color,
-      [x + side * width * 0.24, y, z], 0.025, [0, 0, side * pitch]);
-    panel.castShadow = true;
-    for (const row of [0, 1, 2, 3]) {
-      const rowZ = z - depth * 0.42 + row * depth * 0.28;
-      box(group, [width * 0.53, 0.045, 0.055], m.roofLight,
-        [x + side * width * 0.25, y + 0.1, rowZ], 0.015, [0, 0, side * pitch]);
-    }
-    for (const strip of [0, 1, 2]) {
-      const stripX = x + side * (0.07 + strip * width * 0.18);
-      box(group, [0.055, 0.045, depth * 0.95], m.roofDark, [stripX, y + 0.09, z], 0.012, [0, 0, side * pitch]);
-    }
+function orangeSlice(group, m, position, rotation = [0, 0, 0]) {
+  const root = new THREE.Group();
+  root.position.set(...position);
+  root.rotation.set(...rotation);
+  cylinder(root, 0.14, 0.14, 0.04, m.orangeDark, [0, 0, 0], 12);
+  cylinder(root, 0.13, 0.13, 0.042, m.white, [0, 0, 0], 12);
+  cylinder(root, 0.115, 0.115, 0.044, m.orange, [0, 0, 0], 12);
+  for (let s = 0; s < 6; s += 1) {
+    const angle = (s * Math.PI) / 3;
+    box(root, [0.012, 0.045, 0.22], m.white, [0, 0, 0], 0.005, [0, angle, 0]);
   }
-  cylinder(group, 0.075, 0.075, depth + 0.08, m.roofLight, [x, y + 0.2, z], 8, [Math.PI / 2, 0, 0]);
-}
-
-function archShape(width, height) {
-  const shape = new THREE.Shape();
-  shape.moveTo(-width / 2, 0);
-  shape.lineTo(-width / 2, height * 0.56);
-  shape.quadraticCurveTo(-width / 2, height, 0, height);
-  shape.quadraticCurveTo(width / 2, height, width / 2, height * 0.56);
-  shape.lineTo(width / 2, 0);
-  shape.closePath();
-  return new THREE.ShapeGeometry(shape);
+  group.add(root);
+  return root;
 }
 
 function statusJewel(group, m, position = [1.25, 0.63, 0.84]) {
@@ -147,367 +123,784 @@ function addLogPile(group, m, x, z, count = 4) {
   }
 }
 
+// -------------------------------------------------------------
+// 1. SALÇA KAZANI (Tomato Paste Cooker)
+// -------------------------------------------------------------
 function tomatoPaste(group, m) {
   baseIsland(group, m, 3.15, 2.75);
 
-  // Red copper kettle over a little brick firebox, with the feed chute overhead.
-  box(group, [1.28, 0.38, 1.12], m.brick, [-0.16, 0.58, -0.08], 0.08);
-  box(group, [0.42, 0.3, 0.04], m.dark, [-0.16, 0.55, 0.51], 0.035);
-  sphere(group, 0.18, m.fireGlow, [-0.16, 0.53, 0.55], [1, 0.85, 0.16], 8);
-  for (const x of [-0.54, -0.34, 0.02, 0.22]) cylinder(group, 0.06, 0.07, 0.22, m.log,
-    [x, 0.34, 0.72], 7, [Math.PI / 2, 0, 0]);
+  // Front access steps
+  box(group, [0.72, 0.1, 0.46], m.stoneDark, [-0.16, 0.27, 0.84], 0.04);
+  box(group, [0.62, 0.1, 0.36], m.stone, [-0.16, 0.37, 0.72], 0.03);
 
-  cylinder(group, 0.58, 0.56, 0.98, m.kettle, [-0.16, 1.19, -0.08], 12);
-  cylinder(group, 0.61, 0.61, 0.09, m.steel, [-0.16, 1.68, -0.08], 12);
-  cylinder(group, 0.53, 0.53, 0.025, m.paste, [-0.16, 1.735, -0.08], 12);
-  cylinder(group, 0.62, 0.62, 0.08, m.steel, [-0.16, 0.75, -0.08], 12);
-  for (const y of [0.86, 1.2, 1.53]) {
-    const hoop = add(group, new THREE.TorusGeometry(0.59, 0.025, 6, 18), m.rivetSteel, [-0.16, y, -0.08], [Math.PI / 2, 0, 0]);
-    hoop.castShadow = false;
+  // Main cooker boiler
+  cylinder(group, 0.64, 0.68, 0.16, m.steelDark, [-0.16, 0.42, -0.08], 16);
+  for (const angle of [0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2]) {
+    box(group, [0.12, 0.32, 0.14], m.steelDark,
+      [-0.16 + Math.cos(angle) * 0.62, 0.36, -0.08 + Math.sin(angle) * 0.62], 0.02, [0, angle, 0]);
   }
-  const chimney = cylinder(group, 0.12, 0.15, 0.78, m.steel, [-0.77, 1.68, -0.42], 8);
-  cylinder(group, 0.2, 0.18, 0.08, m.rivetSteel, [-0.77, 2.08, -0.42], 8);
-  tube(group, [[-0.68, 1.52, -0.08], [-0.88, 1.52, -0.08], [-0.88, 1.83, -0.08]], 0.045, m.steel);
-  crate(group, m, [-0.98, 0.36, -0.84], [0.82, 0.65, 0.7]);
-  for (const [x, z] of [[-1.22, -0.68], [-0.98, -0.75], [-0.78, -0.66]]) fruit(group, m, 'tomato', [x, 0.96, z], 0.16);
+  cylinder(group, 0.62, 0.62, 0.96, m.kettle, [-0.16, 0.98, -0.08], 16);
+  cylinder(group, 0.66, 0.66, 0.1, m.steel, [-0.16, 1.48, -0.08], 16);
+  cylinder(group, 0.63, 0.63, 0.06, m.rivetSteel, [-0.16, 0.98, -0.08], 16);
 
-  // An open jar shelf makes the finished paste part of the model, not a detached tray.
-  box(group, [0.78, 0.1, 0.78], m.wood, [0.94, 0.55, 0.19], 0.025);
-  box(group, [0.08, 0.55, 0.78], m.woodDark, [1.29, 0.79, 0.19], 0.02);
-  for (const y of [0.68, 1.06]) box(group, [0.76, 0.06, 0.72], m.woodLight, [0.94, y, 0.19], 0.02);
-  const output = anchor(group, [0.66, 0.77, 0.19]);
-  const input = anchor(group, [-1.02, 0.97, -0.82]);
-  for (const x of [0.71, 0.94, 1.17]) {
-    cylinder(group, 0.075, 0.082, 0.24, m.glass, [x, 0.84, 0.25], 8);
-    cylinder(group, 0.068, 0.068, 0.025, m.gold, [x, 0.97, 0.25], 8);
-    cylinder(group, 0.064, 0.064, 0.12, m.paste, [x, 0.78, 0.25], 8);
+  // White front badge with tomato motif
+  box(group, [0.38, 0.38, 0.04], m.white, [-0.16, 0.98, 0.55], 0.03);
+  sphere(group, 0.12, m.tomato, [-0.16, 0.98, 0.58], [1, 0.92, 0.5], 10);
+  sphere(group, 0.04, m.leafBright, [-0.16, 1.1, 0.59], [1.3, 0.4, 0.5], 6);
+
+  // Vat boiling paste surface
+  cylinder(group, 0.58, 0.58, 0.02, m.paste, [-0.16, 1.5, -0.08], 16);
+
+  // Dynamic animated boiling bubbles
+  const bubbleList = [];
+  const bubbleOffsets = [
+    [-0.2, 0.15, 0.09], [0.18, 0.12, 0.11], [-0.08, -0.22, 0.08],
+    [0.16, -0.16, 0.1], [-0.28, -0.06, 0.07], [0.02, 0.24, 0.09], [0, 0, 0.12],
+  ];
+  for (let i = 0; i < bubbleOffsets.length; i += 1) {
+    const [dx, dz, r] = bubbleOffsets[i];
+    const b = sphere(group, r, m.paste, [-0.16 + dx, 1.51, -0.08 + dz], [1, 0.65, 1], 8);
+    bubbleList.push({ mesh: b, baseScale: 1, phase: i * 0.9, baseR: r });
   }
-  const lamp = statusJewel(group, m, [0.26, 0.82, 0.92]);
-  return { input, output, lamp, badgeY: 2.75 };
+
+  // Side piping and pressure gauges
+  tube(group, [[-0.78, 0.7, -0.08], [-0.88, 1.3, -0.08], [-0.88, 1.62, -0.08], [-0.62, 1.62, -0.08]], 0.05, m.red);
+  tube(group, [[0.46, 0.7, -0.08], [0.58, 1.25, -0.08], [0.58, 1.55, -0.08], [0.34, 1.55, -0.08]], 0.045, m.red);
+  // Dial gauge & needle
+  cylinder(group, 0.09, 0.09, 0.05, m.steelLight, [-0.89, 1.45, -0.08], 10, [0, 0, Math.PI / 2]);
+  cylinder(group, 0.08, 0.08, 0.02, m.white, [-0.92, 1.45, -0.08], 10, [0, 0, Math.PI / 2]);
+  const needle = box(group, [0.015, 0.065, 0.015], m.redDark, [-0.93, 1.45, -0.08], 0.005);
+  // Valve wheel
+  cylinder(group, 0.08, 0.08, 0.03, m.brass, [0.59, 1.42, -0.08], 8, [0, 0, Math.PI / 2]);
+
+  // Dispenser chute in front
+  const chute = box(group, [0.22, 0.12, 0.28], m.steel, [-0.16, 0.72, 0.58], 0.02, [0.22, 0, 0]);
+  const pasteDrip = sphere(group, 0.055, m.paste, [-0.16, 0.62, 0.72], [1, 1.4, 0.8], 8);
+
+  // Left tomato crate (input)
+  crate(group, m, [-0.98, 0.35, -0.65], [0.82, 0.58, 0.72]);
+  for (const [x, z] of [[-1.22, -0.56], [-0.98, -0.52], [-0.76, -0.56], [-1.1, -0.74], [-0.86, -0.76]]) {
+    fruit(group, m, 'tomato', [x, 0.94, z], 0.14);
+  }
+
+  // Right jar table (output)
+  box(group, [0.85, 0.1, 0.76], m.woodDark, [0.92, 0.54, 0.24], 0.03);
+  box(group, [0.8, 0.07, 0.7], m.woodLight, [0.92, 0.62, 0.24], 0.02);
+  for (const [x, z] of [[0.72, 0.12], [0.94, 0.12], [1.16, 0.12], [0.83, 0.36], [1.05, 0.36]]) {
+    cylinder(group, 0.075, 0.082, 0.22, m.glass, [x, 0.75, z], 8);
+    cylinder(group, 0.068, 0.068, 0.12, m.paste, [x, 0.72, z], 8);
+    cylinder(group, 0.072, 0.072, 0.03, m.gold, [x, 0.88, z], 8);
+  }
+
+  const input = anchor(group, [-0.98, 0.96, -0.65]);
+  const output = anchor(group, [0.92, 0.64, 0.24]);
+  const lamp = statusJewel(group, m, [0.28, 0.82, 0.92]);
+
+  return {
+    input, output, lamp, badgeY: 2.75,
+    update(time, frameDelta, isWorking) {
+      const speed = isWorking ? 6.5 : 1.8;
+      for (const b of bubbleList) {
+        const s = Math.sin(time * speed + b.phase);
+        b.mesh.position.y = 1.5 + Math.max(0, s) * 0.045;
+        b.mesh.scale.set(1 + s * 0.25, 0.8 + s * 0.4, 1 + s * 0.25);
+      }
+      needle.rotation.x = Math.sin(time * (isWorking ? 18 : 2)) * 0.4;
+      pasteDrip.scale.setScalar(isWorking ? 1 + Math.sin(time * 8) * 0.3 : 0.8);
+      chute.rotation.x = 0.22 + (isWorking ? Math.sin(time * 12) * 0.015 : 0);
+    },
+  };
 }
 
+// -------------------------------------------------------------
+// 2. MEYVE SIKACAĞI (Juicer / Citrus Press)
+// -------------------------------------------------------------
 function citrusPress(group, m) {
-  baseIsland(group, m, 3.08, 2.65);
-  crate(group, m, [-0.65, 0.35, -0.63], [1.05, 0.62, 0.82]);
-  for (const [x, z] of [[-0.98, -0.5], [-0.67, -0.5], [-0.38, -0.5], [-0.82, -0.76]]) fruit(group, m, 'orange', [x, 1.02, z], 0.15);
-  for (const x of [-0.95, -0.35]) box(group, [0.09, 1.08, 0.09], m.woodDark, [x, 0.9, -0.16], 0.02);
-  box(group, [0.88, 0.13, 0.8], m.wood, [-0.65, 1.5, -0.16], 0.04);
+  baseIsland(group, m, 3.1, 2.7);
 
-  // Hand-driven citrus press with a visible cone, clear juice chamber and cup.
-  cylinder(group, 0.43, 0.46, 0.12, m.steel, [0.13, 0.92, -0.1], 11);
-  cylinder(group, 0.36, 0.39, 0.57, m.glass, [0.13, 1.25, -0.1], 10);
-  cylinder(group, 0.34, 0.34, 0.24, m.juice, [0.13, 1.12, -0.1], 10);
-  cylinder(group, 0.2, 0.29, 0.19, m.gold, [0.13, 1.66, -0.1], 9);
-  cylinder(group, 0.26, 0.26, 0.06, m.woodDark, [0.13, 1.79, -0.1], 9);
-  cylinder(group, 0.055, 0.06, 0.72, m.steel, [0.13, 2.13, -0.1], 8);
-  box(group, [0.85, 0.1, 0.12], m.wood, [0.36, 2.39, -0.1], 0.035, [0, 0, -0.12]);
-  sphere(group, 0.1, m.woodLight, [0.81, 2.39, -0.1], [1.25, 0.85, 1], 8);
-  tube(group, [[0.49, 1.03, 0.1], [0.68, 0.98, 0.1], [0.68, 0.72, 0.1]], 0.035, m.steel);
-  cylinder(group, 0.13, 0.14, 0.25, m.glass, [0.68, 0.58, 0.1], 8);
-  cylinder(group, 0.12, 0.12, 0.13, m.juice, [0.68, 0.56, 0.1], 8);
-  crate(group, m, [0.91, 0.35, -0.63], [0.83, 0.53, 0.75]);
-  for (const [x, z] of [[0.65, -0.55], [0.9, -0.69], [1.13, -0.52]]) fruit(group, m, 'orange', [x, 0.9, z], 0.14);
-  box(group, [0.62, 0.1, 0.5], m.woodDark, [0.96, 0.45, 0.48], 0.025);
-  box(group, [0.58, 0.06, 0.46], m.woodLight, [0.96, 0.53, 0.48], 0.02);
-  const input = anchor(group, [-0.65, 0.96, -0.63]);
-  const output = anchor(group, [0.96, 0.55, 0.48]);
-  const lamp = statusJewel(group, m, [0.91, 0.67, 0.25]);
-  return { input, output, lamp, badgeY: 3.05 };
+  // Sturdy timber frame
+  for (const x of [-0.58, 0.58]) {
+    box(group, [0.14, 1.45, 0.14], m.woodDark, [x, 1.05, -0.15], 0.03);
+  }
+  box(group, [1.36, 0.14, 0.16], m.wood, [0, 1.76, -0.15], 0.035);
+
+  // Central brass press tank
+  cylinder(group, 0.45, 0.48, 0.14, m.brass, [0, 0.62, -0.15], 14);
+  cylinder(group, 0.42, 0.42, 0.7, m.gold, [0, 1.04, -0.15], 14);
+  cylinder(group, 0.44, 0.44, 0.08, m.brass, [0, 1.42, -0.15], 14);
+
+  // Overhead lever & piston group
+  const leverGroup = new THREE.Group();
+  leverGroup.position.set(0, 1.78, -0.15);
+  box(leverGroup, [0.98, 0.09, 0.11], m.wood, [0.46, 0, 0], 0.03);
+  cylinder(leverGroup, 0.065, 0.07, 0.18, m.woodLight, [0.92, 0, 0], 8, [Math.PI / 2, 0, 0]);
+  group.add(leverGroup);
+
+  const piston = cylinder(group, 0.06, 0.06, 0.62, m.steel, [0, 1.52, -0.15], 10);
+  cylinder(group, 0.36, 0.36, 0.08, m.steelDark, [0, 1.25, -0.15], 12);
+
+  // Juice spout and pouring decanter
+  tube(group, [[0.28, 0.85, -0.15], [0.48, 0.85, 0.02], [0.48, 0.68, 0.02]], 0.035, m.steel);
+  cylinder(group, 0.14, 0.16, 0.3, m.glass, [0.48, 0.52, 0.02], 10);
+  cylinder(group, 0.13, 0.13, 0.18, m.juice, [0.48, 0.48, 0.02], 10);
+  const juiceStream = cylinder(group, 0.015, 0.018, 0.18, m.juice, [0.48, 0.67, 0.02], 6);
+
+  // Left orange crate (input)
+  crate(group, m, [-0.85, 0.35, -0.58], [0.86, 0.58, 0.78]);
+  for (const [x, z] of [[-1.1, -0.48], [-0.86, -0.44], [-0.62, -0.48], [-0.98, -0.72], [-0.74, -0.72]]) {
+    fruit(group, m, 'orange', [x, 0.94, z], 0.14);
+  }
+
+  // Front cut orange slices on grass
+  orangeSlice(group, m, [-0.44, 0.32, 0.72], [-0.2, 0.3, 0.1]);
+  orangeSlice(group, m, [-0.12, 0.32, 0.82], [0.1, -0.4, 0.25]);
+
+  // Right juice bottles on table (output)
+  box(group, [0.78, 0.1, 0.68], m.woodDark, [0.92, 0.52, 0.25], 0.03);
+  box(group, [0.72, 0.06, 0.62], m.woodLight, [0.92, 0.6, 0.25], 0.02);
+  for (const [x, z] of [[0.76, 0.15], [0.96, 0.15], [1.14, 0.15], [0.86, 0.38], [1.06, 0.38]]) {
+    cylinder(group, 0.065, 0.07, 0.25, m.glass, [x, 0.74, z], 8);
+    cylinder(group, 0.06, 0.06, 0.16, m.juice, [x, 0.7, z], 8);
+    cylinder(group, 0.04, 0.04, 0.04, m.gold, [x, 0.88, z], 8);
+  }
+
+  const input = anchor(group, [-0.85, 0.94, -0.58]);
+  const output = anchor(group, [0.92, 0.62, 0.25]);
+  const lamp = statusJewel(group, m, [0.86, 0.72, -0.35]);
+
+  return {
+    input, output, lamp, badgeY: 3.05,
+    update(time, frameDelta, isWorking) {
+      if (isWorking) {
+        const pressCycle = Math.sin(time * 4);
+        leverGroup.rotation.z = -0.15 + pressCycle * 0.22;
+        piston.position.y = 1.52 - Math.max(0, -pressCycle) * 0.18;
+        juiceStream.scale.y = 1 + Math.sin(time * 12) * 0.3;
+        juiceStream.visible = true;
+      } else {
+        leverGroup.rotation.z = -0.06;
+        piston.position.y = 1.52;
+        juiceStream.visible = false;
+      }
+    },
+  };
 }
 
+// -------------------------------------------------------------
+// 3. PATLAMIŞ MISIR MAKİNESİ (Popcorn Machine)
+// -------------------------------------------------------------
 function popcornPopper(group, m) {
-  baseIsland(group, m, 3.12, 2.8);
-  // Red carnival cart and glass case under a bright, tiled awning.
-  box(group, [1.47, 0.76, 1.12], m.red, [-0.1, 0.7, -0.13], 0.08);
-  box(group, [1.52, 0.12, 1.18], m.gold, [-0.1, 1.09, -0.13], 0.025);
-  for (const x of [-0.82, 0.62]) for (const z of [-0.62, 0.42]) {
-    cylinder(group, 0.045, 0.055, 1.04, m.woodDark, [x, 1.66, z], 7);
-  }
-  for (const z of [-0.62, 0.42]) box(group, [1.4, 0.04, 0.04], m.gold, [-0.1, 1.92, z], 0.012);
-  box(group, [1.54, 0.12, 1.23], m.redDark, [-0.1, 2.08, -0.13], 0.04);
-  box(group, [1.65, 0.1, 1.34], m.red, [-0.1, 2.18, -0.13], 0.045);
-  for (const x of [-0.53, 0.34]) {
-    const wheel = cylinder(group, 0.34, 0.34, 0.14, m.woodDark, [x, 0.53, 0.56], 10, [Math.PI / 2, 0, 0]);
-    cylinder(group, 0.12, 0.12, 0.16, m.brass, [x, 0.53, 0.56], 8, [Math.PI / 2, 0, 0]);
-    for (let spoke = 0; spoke < 8; spoke += 1) {
-      const angle = spoke * Math.PI / 4;
-      box(group, [0.045, 0.55, 0.045], m.woodLight,
-        [x, 0.53, 0.56], 0.01, [0, 0, angle]);
-    }
-    wheel.castShadow = true;
+  baseIsland(group, m, 3.15, 2.8);
+
+  // Vintage red carnival cart body
+  box(group, [1.42, 0.76, 1.08], m.red, [-0.12, 0.68, -0.1], 0.08);
+  box(group, [1.46, 0.08, 1.12], m.gold, [-0.12, 1.08, -0.1], 0.03);
+
+  // Vintage spoke wheel on the right
+  const wheelHub = cylinder(group, 0.35, 0.35, 0.1, m.redDark, [0.46, 0.52, 0.54], 14, [Math.PI / 2, 0, 0]);
+  cylinder(group, 0.33, 0.33, 0.11, m.gold, [0.46, 0.52, 0.54], 14, [Math.PI / 2, 0, 0]);
+  cylinder(group, 0.12, 0.12, 0.13, m.brass, [0.46, 0.52, 0.54], 10, [Math.PI / 2, 0, 0]);
+  for (let spoke = 0; spoke < 8; spoke += 1) {
+    const angle = (spoke * Math.PI) / 4;
+    box(group, [0.035, 0.62, 0.035], m.woodDark, [0.46, 0.52, 0.54], 0.01, [0, 0, angle]);
   }
 
-  // Glass-sided warmer with a brass kettle and fluffy piles of popcorn.
-  box(group, [1.18, 0.06, 0.9], m.steel, [-0.1, 1.15, -0.13], 0.025);
-  for (const x of [-0.66, 0.46]) box(group, [0.045, 0.82, 0.045], m.brass, [x, 1.58, -0.13], 0.01);
-  for (const z of [-0.56, 0.3]) box(group, [1.15, 0.045, 0.045], m.brass, [-0.1, 1.58, z], 0.01);
-  for (const z of [-0.55, 0.28]) box(group, [1.12, 0.72, 0.025], m.glass, [-0.1, 1.57, z], 0.008);
-  for (const x of [-0.65, 0.45]) box(group, [0.025, 0.72, 0.8], m.glass, [x, 1.57, -0.13], 0.008);
-  cylinder(group, 0.31, 0.37, 0.32, m.brass, [-0.1, 1.42, -0.13], 10);
-  cylinder(group, 0.36, 0.36, 0.045, m.gold, [-0.1, 1.61, -0.13], 10);
-  for (let puff = 0; puff < 18; puff += 1) {
-    const x = -0.54 + (puff % 6) * 0.17;
-    const z = -0.43 + Math.floor(puff / 6) * 0.22;
-    const popcorn = add(group, new THREE.DodecahedronGeometry(0.095, 0), m.popcorn, [x, 1.18 + (puff % 3) * 0.035, z]);
-    popcorn.scale.set(1, 1.12, 0.92);
+  // Clear glass showcase cabinet
+  box(group, [1.16, 0.06, 0.88], m.steelLight, [-0.12, 1.14, -0.1], 0.02);
+  for (const x of [-0.66, 0.42]) for (const z of [-0.5, 0.3]) {
+    cylinder(group, 0.035, 0.035, 0.95, m.brass, [x, 1.62, z], 8);
   }
-  box(group, [0.52, 0.12, 0.46], m.wood, [0.84, 0.82, 0.26], 0.025);
-  for (const x of [0.72, 0.9, 1.08]) cylinder(group, 0.08, 0.08, 0.18, m.paperRed, [x, 0.98, 0.25], 8);
-  box(group, [0.66, 0.12, 0.48], m.woodDark, [0.88, 0.61, 0.62], 0.03);
-  box(group, [0.62, 0.06, 0.44], m.woodLight, [0.88, 0.7, 0.62], 0.02);
-  const input = anchor(group, [-0.1, 1.18, -0.13]);
-  const output = anchor(group, [0.88, 0.72, 0.62]);
-  const lamp = statusJewel(group, m, [0.75, 0.67, -0.52]);
-  return { input, output, lamp, badgeY: 2.85 };
+  // Glass panels
+  for (const z of [-0.49, 0.29]) box(group, [1.08, 0.86, 0.02], m.glass, [-0.12, 1.62, z], 0.01);
+  for (const x of [-0.65, 0.41]) box(group, [0.02, 0.86, 0.78], m.glass, [x, 1.62, -0.1], 0.01);
+
+  // Suspended brass popping kettle inside
+  const kettle = cylinder(group, 0.28, 0.32, 0.28, m.brass, [-0.12, 1.68, -0.1], 10);
+  cylinder(group, 0.32, 0.32, 0.04, m.gold, [-0.12, 1.83, -0.1], 10);
+
+  // Fluffy popcorn base bed
+  box(group, [1.04, 0.14, 0.74], m.popcorn, [-0.12, 1.22, -0.1], 0.06);
+
+  // Jumping animated popcorn kernels
+  const poppers = [];
+  for (let i = 0; i < 9; i += 1) {
+    const p = add(group, new THREE.DodecahedronGeometry(0.065, 0), i % 2 ? m.popcornLight : m.popcorn,
+      [-0.45 + (i % 3) * 0.32, 1.32, -0.35 + Math.floor(i / 3) * 0.25]);
+    poppers.push({ mesh: p, baseX: p.position.x, baseZ: p.position.z, seed: i * 1.37 });
+  }
+
+  // Striped awning canopy roof
+  const canopyY = 2.15;
+  box(group, [1.44, 0.1, 1.15], m.redDark, [-0.12, canopyY, -0.1], 0.04);
+  for (let stripe = 0; stripe < 8; stripe += 1) {
+    const sx = -0.7 + stripe * 0.175;
+    box(group, [0.175, 0.12, 1.2], stripe % 2 === 0 ? m.red : m.white, [-0.12 + sx + 0.087, canopyY + 0.08, -0.1], 0.03);
+  }
+
+  // Dispenser chute & popcorn buckets (output)
+  box(group, [0.24, 0.1, 0.34], m.steel, [0.44, 1.15, 0.26], 0.02, [-0.35, 0, 0]);
+  box(group, [0.65, 0.1, 0.55], m.woodDark, [0.88, 0.62, 0.52], 0.03);
+  box(group, [0.6, 0.06, 0.5], m.woodLight, [0.88, 0.7, 0.52], 0.02);
+  // Red & white striped buckets
+  for (const [bx, bz] of [[0.74, 0.42], [0.98, 0.42], [0.86, 0.62]]) {
+    cylinder(group, 0.11, 0.08, 0.22, m.red, [bx, 0.82, bz], 10);
+    cylinder(group, 0.112, 0.082, 0.04, m.white, [bx, 0.86, bz], 10);
+    add(group, new THREE.DodecahedronGeometry(0.12, 0), m.popcorn, [bx, 0.95, bz]);
+  }
+
+  // Left corn crate (input)
+  crate(group, m, [-0.92, 0.35, 0.28], [0.72, 0.54, 0.72]);
+  for (const [x, z] of [[-1.1, 0.22], [-0.88, 0.25], [-0.68, 0.22], [-0.98, 0.42], [-0.78, 0.42]]) {
+    fruit(group, m, 'corn', [x, 0.88, z], 0.12);
+  }
+
+  const input = anchor(group, [-0.92, 0.88, 0.28]);
+  const output = anchor(group, [0.88, 0.72, 0.52]);
+  const lamp = statusJewel(group, m, [0.76, 0.68, -0.48]);
+
+  return {
+    input, output, lamp, badgeY: 2.85,
+    update(time, frameDelta, isWorking) {
+      if (isWorking) {
+        kettle.rotation.z = Math.sin(time * 15) * 0.06;
+        for (const p of poppers) {
+          const jump = Math.abs(Math.sin(time * 9 + p.seed));
+          p.mesh.position.y = 1.32 + jump * 0.38;
+          p.mesh.rotation.x = time * 8 + p.seed;
+          p.mesh.rotation.y = time * 6 + p.seed;
+        }
+      } else {
+        kettle.rotation.z = 0;
+        for (const p of poppers) {
+          p.mesh.position.y = 1.32;
+        }
+      }
+    },
+  };
 }
 
+// -------------------------------------------------------------
+// 4. YEM DEĞİRMENİ (Feed Mill)
+// -------------------------------------------------------------
 function feedMill(group, m) {
-  baseIsland(group, m, 3.1, 2.72);
-  // Open oak frame carries the dark hopper, exposed wheel and descending grain spout.
-  for (const x of [-0.74, 0.55]) {
-    for (const z of [-0.52, 0.38]) box(group, [0.16, 1.36, 0.16], m.woodDark, [x, 0.95, z], 0.035);
+  baseIsland(group, m, 3.12, 2.75);
+
+  // Timber post frame and fence rails
+  for (const x of [-0.76, 0.56]) for (const z of [-0.54, 0.38]) {
+    box(group, [0.15, 1.45, 0.15], m.woodDark, [x, 1.0, z], 0.03);
   }
-  box(group, [1.54, 0.14, 1.1], m.wood, [-0.1, 0.48, -0.08], 0.045);
-  const hopper = add(group, new THREE.CylinderGeometry(0.53, 0.2, 0.75, 8, 1, false), m.darkMetal, [-0.1, 1.82, -0.1]);
-  cylinder(group, 0.55, 0.55, 0.08, m.steel, [-0.1, 2.2, -0.1], 8);
-  box(group, [1.2, 0.07, 0.88], m.steelDark, [-0.1, 2.29, -0.1], 0.035);
-  for (const z of [-0.33, 0.18]) {
-    const gear = cylinder(group, 0.42, 0.42, 0.14, m.gear, [0.75, 0.98, z], 12, [0, 0, Math.PI / 2]);
-    cylinder(group, 0.16, 0.16, 0.18, m.brass, [0.85, 0.98, z], 8, [0, 0, Math.PI / 2]);
-    for (let tooth = 0; tooth < 10; tooth += 1) {
-      const angle = tooth * Math.PI / 5;
-      box(group, [0.08, 0.15, 0.15], m.steelDark,
-        [0.81, 0.98 + Math.cos(angle) * 0.42, z + Math.sin(angle) * 0.42], 0.014, [angle, 0, 0]);
-    }
-    gear.castShadow = true;
+  for (const z of [-0.54, 0.38]) {
+    box(group, [1.4, 0.08, 0.06], m.wood, [-0.1, 1.25, z], 0.02);
+    box(group, [1.4, 0.08, 0.06], m.wood, [-0.1, 0.75, z], 0.02);
   }
-  const chute = cylinder(group, 0.15, 0.22, 0.5, m.gold, [0.43, 0.68, 0.48], 8, [Math.PI / 2, 0, 0]);
-  chute.castShadow = true;
-  crate(group, m, [-0.91, 0.35, 0.58], [0.74, 0.54, 0.72]);
-  for (const [x, z] of [[-1.1, 0.53], [-0.87, 0.58], [-0.66, 0.5]]) fruit(group, m, 'corn', [x, 0.88, z], 0.12);
-  for (const x of [0.58, 1.02]) {
-    sphere(group, 0.23, m.sack, [x, 0.63, 0.55], [0.85, 1.23, 0.8], 8);
-    cylinder(group, 0.15, 0.17, 0.08, m.sackLight, [x, 0.88, 0.55], 8);
-    box(group, [0.25, 0.035, 0.04], m.rope, [x, 0.94, 0.55], 0.008);
+  box(group, [1.55, 0.14, 1.12], m.wood, [-0.1, 0.48, -0.08], 0.04);
+
+  // Bright yellow feed hopper on top
+  const hopper = cylinder(group, 0.56, 0.22, 0.75, m.goldLight, [-0.1, 1.88, -0.08], 10);
+  cylinder(group, 0.58, 0.58, 0.08, m.gold, [-0.1, 2.26, -0.08], 10);
+  // Feed corn kernels inside hopper
+  cylinder(group, 0.5, 0.5, 0.04, m.corn, [-0.1, 2.22, -0.08], 10);
+
+  // Central milling crusher drum
+  const drum = cylinder(group, 0.4, 0.4, 0.85, m.steelDark, [-0.1, 1.12, -0.08], 12, [0, 0, Math.PI / 2]);
+  for (let ridge = 0; ridge < 8; ridge += 1) {
+    const angle = (ridge * Math.PI) / 4;
+    box(group, [0.82, 0.05, 0.08], m.steel,
+      [-0.1, 1.12 + Math.cos(angle) * 0.4, -0.08 + Math.sin(angle) * 0.4], 0.015, [angle, 0, 0]);
   }
-  const input = anchor(group, [-0.91, 0.87, 0.58]);
-  const output = anchor(group, [0.8, 0.9, 0.58]);
-  const lamp = statusJewel(group, m, [-0.83, 1.25, -0.55]);
-  hopper.castShadow = true;
-  return { input, output, lamp, badgeY: 3.15 };
+
+  // Side yellow motor gearbox & gear wheel
+  box(group, [0.28, 0.38, 0.38], m.goldLight, [0.55, 1.12, -0.08], 0.04);
+  const gear = cylinder(group, 0.22, 0.22, 0.08, m.darkMetal, [0.72, 1.12, -0.08], 10, [0, 0, Math.PI / 2]);
+  for (let c = 0; c < 8; c += 1) {
+    const a = (c * Math.PI) / 4;
+    box(group, [0.06, 0.08, 0.08], m.gold,
+      [0.72, 1.12 + Math.cos(a) * 0.22, -0.08 + Math.sin(a) * 0.22], 0.01, [a, 0, 0]);
+  }
+
+  // Downward chute & wooden feed trough (output)
+  cylinder(group, 0.16, 0.24, 0.52, m.gold, [0.28, 0.72, 0.35], 8, [Math.PI / 3, 0, 0]);
+  box(group, [0.88, 0.24, 0.52], m.woodDark, [0.45, 0.45, 0.58], 0.03);
+  box(group, [0.82, 0.18, 0.46], m.woodLight, [0.45, 0.48, 0.58], 0.02);
+  // Feed pellets in trough
+  const feedSurface = box(group, [0.76, 0.08, 0.4], m.goldLight, [0.45, 0.52, 0.58], 0.02);
+
+  // Left burlap feed sacks (input)
+  for (const [x, z] of [[-0.88, 0.48], [-1.15, 0.28]]) {
+    sphere(group, 0.24, m.sack, [x, 0.62, z], [0.85, 1.25, 0.85], 8);
+    cylinder(group, 0.16, 0.18, 0.09, m.sackLight, [x, 0.88, z], 8);
+    box(group, [0.24, 0.035, 0.04], m.rope, [x, 0.94, z], 0.008);
+  }
+
+  const input = anchor(group, [-0.1, 2.3, -0.08]);
+  const output = anchor(group, [0.55, 0.62, 0.58]);
+  const lamp = statusJewel(group, m, [-0.84, 1.25, -0.52]);
+
+  return {
+    input, output, lamp, badgeY: 3.15,
+    update(time, frameDelta, isWorking) {
+      if (isWorking) {
+        drum.rotation.x += frameDelta * 7;
+        gear.rotation.x += frameDelta * 14;
+        hopper.position.x = -0.1 + Math.sin(time * 30) * 0.006;
+        feedSurface.scale.y = 1 + Math.sin(time * 12) * 0.08;
+      } else {
+        hopper.position.x = -0.1;
+        feedSurface.scale.y = 1;
+      }
+    },
+  };
 }
 
-function flourMill(group, m) {
-  baseIsland(group, m, 3.05, 2.68);
-  // Timber gantry, square grain bin and the paired grindstones are the whole silhouette.
-  for (const x of [-0.72, 0.6]) {
-    box(group, [0.15, 1.5, 0.15], m.woodDark, [x, 0.94, -0.22], 0.03);
-    box(group, [0.17, 0.16, 1.18], m.wood, [x, 1.44, -0.22], 0.025);
-  }
-  box(group, [1.48, 0.14, 1.34], m.wood, [-0.06, 0.48, -0.12], 0.04);
-  crate(group, m, [-0.06, 1.72, -0.22], [1.02, 0.62, 0.92], m.woodDark, m.woodLight);
-  for (let grain = 0; grain < 12; grain += 1) {
-    sphere(group, 0.052, m.wheat, [-0.43 + (grain % 4) * 0.24, 2.39 + (Math.floor(grain / 4) % 2) * 0.03, -0.5 + Math.floor(grain / 4) * 0.24], [0.8, 1.25, 0.8], 6);
-  }
-  cylinder(group, 0.54, 0.57, 0.22, m.stone, [-0.06, 0.82, -0.12], 12);
-  cylinder(group, 0.48, 0.48, 0.18, m.stoneLight, [-0.06, 1.03, -0.12], 12);
-  cylinder(group, 0.29, 0.36, 0.46, m.woodDark, [-0.06, 1.35, -0.12], 9);
-  cylinder(group, 0.4, 0.4, 0.07, m.woodLight, [-0.06, 1.59, -0.12], 10);
-  cylinder(group, 0.38, 0.38, 0.04, m.stoneLight, [-0.06, 1.06, -0.12], 12);
-  for (const x of [-0.84, 0.73]) {
-    sphere(group, 0.23, m.sack, [x, 0.58, 0.55], [0.85, 1.15, 0.8], 8);
-    cylinder(group, 0.15, 0.17, 0.08, m.sackLight, [x, 0.83, 0.55], 8);
-  }
-  box(group, [0.63, 0.09, 0.46], m.wood, [0.58, 0.37, 0.62], 0.025);
-  sphere(group, 0.16, m.flour, [0.58, 0.44, 0.62], [1.3, 0.22, 0.9], 8);
-  const crank = cylinder(group, 0.19, 0.19, 0.1, m.steelDark, [0.48, 1.02, -0.12], 8, [0, 0, Math.PI / 2]);
-  box(group, [0.48, 0.06, 0.06], m.woodLight, [0.71, 1.17, -0.12], 0.02);
-  const input = anchor(group, [-0.06, 2.3, -0.22]);
-  const output = anchor(group, [0.58, 0.48, 0.62]);
-  const lamp = statusJewel(group, m, [0.93, 1.0, -0.62]);
-  crank.castShadow = true;
-  return { input, output, lamp, badgeY: 3.1 };
-}
-
+// -------------------------------------------------------------
+// 5. TAŞ FIRIN (Bakery Bread Oven)
+// -------------------------------------------------------------
 function breadOven(group, m) {
-  baseIsland(group, m, 3.12, 2.86);
-  // Large stone oven with a true open arch, tiled roof, smoke stack and front work pad.
-  box(group, [1.72, 1.08, 1.3], m.stoneDark, [-0.22, 0.82, -0.23], 0.12);
-  box(group, [1.6, 0.1, 1.22], m.stoneLight, [-0.22, 1.38, -0.23], 0.04);
-  add(group, new THREE.SphereGeometry(0.84, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), m.brick,
-    [-0.22, 1.38, -0.28], undefined, [1.04, 0.82, 0.92]);
-  box(group, [0.92, 0.72, 0.1], m.stone, [-0.22, 0.77, 0.47], 0.06);
-  add(group, archShape(0.68, 0.55), m.dark, [-0.22, 0.5, 0.53]);
-  sphere(group, 0.12, m.fireGlow, [-0.22, 0.61, 0.58], [1.1, 1, 0.22], 8);
-  const loaf = sphere(group, 0.19, m.bread, [-0.22, 0.67, 0.67], [1.28, 0.74, 0.8], 9);
-  for (const x of [-0.31, -0.22, -0.13]) box(group, [0.025, 0.025, 0.15], m.breadLight, [x, 0.81, 0.69], 0.01, [0.1, 0, 0.4]);
-  tileRoof(group, m, [-0.22, 1.92, -0.26], 2.15, 1.66, m.roof);
-  const chimney = box(group, [0.42, 0.95, 0.42], m.stoneDark, [-0.75, 2.17, -0.51], 0.035);
-  box(group, [0.58, 0.12, 0.58], m.stoneLight, [-0.75, 2.68, -0.51], 0.035);
-  for (const y of [1.95, 2.18, 2.4]) box(group, [0.44, 0.035, 0.44], m.stone, [-0.75, y, -0.51], 0.01);
-  addLogPile(group, m, -0.9, 0.82, 4);
-  box(group, [0.92, 0.12, 0.68], m.wood, [0.85, 0.48, 0.15], 0.04);
-  box(group, [0.78, 0.06, 0.58], m.woodLight, [0.85, 0.57, 0.15], 0.025);
-  for (const x of [0.62, 0.85, 1.08]) {
-    const bread = sphere(group, 0.13, m.bread, [x, 0.72, 0.17], [1.2, 0.85, 0.9], 8);
-    bread.rotation.z = 0.16;
+  baseIsland(group, m, 3.15, 2.85);
+
+  // Stone path leading to hearth
+  for (const [x, z] of [[-0.2, 0.78], [0.15, 0.82], [-0.05, 1.02]]) {
+    add(group, new THREE.DodecahedronGeometry(0.18, 0), m.stoneLight, [x, 0.28, z], undefined, [1.3, 0.25, 0.9]);
   }
-  cylinder(group, 0.026, 0.026, 0.8, m.wood, [0.65, 0.78, 0.66], 6, [0, 0, 0.63]);
-  const peel = add(group, new THREE.CircleGeometry(0.18, 8), m.woodLight, [0.43, 0.56, 0.74], [-0.2, 0, 0]);
-  crate(group, m, [0.95, 0.35, 0.72], [0.58, 0.42, 0.5]);
-  const input = anchor(group, [0.95, 0.73, 0.72]);
-  const output = anchor(group, [0.85, 0.64, 0.15]);
-  const lamp = statusJewel(group, m, [0.77, 1.26, 0.53]);
-  loaf.castShadow = true;
-  chimney.castShadow = true;
-  peel.castShadow = false;
-  return { input, output, lamp, badgeY: 3.35 };
+
+  // Rounded masonry stone dome oven
+  box(group, [1.55, 0.72, 1.3], m.stoneDark, [-0.2, 0.68, -0.2], 0.12);
+  sphere(group, 0.85, m.stone, [-0.2, 1.15, -0.2], [1.06, 0.88, 1.02], 14);
+
+  // Square stone chimney with layered cap
+  box(group, [0.38, 0.85, 0.38], m.stoneDark, [-0.2, 2.05, -0.2], 0.03);
+  box(group, [0.46, 0.1, 0.46], m.stoneLight, [-0.2, 2.48, -0.2], 0.02);
+
+  // Arched hearth opening
+  box(group, [0.86, 0.64, 0.1], m.stoneLight, [-0.2, 0.76, 0.46], 0.05);
+  box(group, [0.62, 0.46, 0.25], m.brickDark, [-0.2, 0.64, 0.35], 0.04);
+  // Glowing fire inside hearth
+  const firebed = sphere(group, 0.16, m.fireGlow, [-0.2, 0.58, 0.42], [1.2, 0.8, 0.4], 8);
+  firebed.material.emissive = new THREE.Color(0xff6600);
+  firebed.material.emissiveIntensity = 0.8;
+
+  // Firewood logs under oven
+  addLogPile(group, m, -0.2, 0.15, 4);
+
+  // Baker's peel sliding into the oven
+  const peelGroup = new THREE.Group();
+  peelGroup.position.set(-0.2, 0.66, 0.45);
+  cylinder(peelGroup, 0.022, 0.022, 1.1, m.woodDark, [0, 0, 0.45], 6, [Math.PI / 2, 0, 0]);
+  box(peelGroup, [0.38, 0.03, 0.34], m.woodLight, [0, 0, -0.05], 0.015);
+  // Freshly baked loaves on peel
+  for (const bx of [-0.09, 0.09]) {
+    sphere(peelGroup, 0.08, m.bread, [bx, 0.05, -0.05], [1.3, 0.85, 0.95], 8);
+    box(peelGroup, [0.015, 0.015, 0.09], m.breadLight, [bx, 0.09, -0.05], 0.005);
+  }
+  group.add(peelGroup);
+
+  // Left bread cooling rack (output)
+  for (const x of [-1.15, -0.72]) for (const z of [-0.45, 0.25]) {
+    box(group, [0.08, 1.35, 0.08], m.woodDark, [x, 0.95, z], 0.02);
+  }
+  for (const y of [0.55, 0.88, 1.22]) {
+    box(group, [0.52, 0.05, 0.72], m.wood, [-0.94, y, -0.1], 0.02);
+    // Artisan loaves on rack
+    for (const [lx, lz] of [[-1.04, -0.25], [-0.84, -0.25], [-1.04, 0.05], [-0.84, 0.05]]) {
+      sphere(group, 0.09, m.bread, [lx, y + 0.09, lz], [1.3, 0.8, 0.9], 8);
+      box(group, [0.02, 0.015, 0.08], m.breadLight, [lx, y + 0.14, lz], 0.006);
+    }
+  }
+
+  // Front dough prep table (input)
+  box(group, [0.82, 0.1, 0.52], m.woodDark, [0.65, 0.48, 0.45], 0.03);
+  box(group, [0.76, 0.06, 0.46], m.woodLight, [0.65, 0.56, 0.45], 0.02);
+  for (const [dx, dz] of [[0.45, 0.38], [0.65, 0.38], [0.85, 0.38], [0.55, 0.52], [0.75, 0.52]]) {
+    sphere(group, 0.065, m.dough, [dx, 0.63, dz], [1.1, 0.75, 1.1], 8);
+  }
+
+  // Right flour sack
+  sphere(group, 0.22, m.sack, [0.95, 0.58, -0.35], [0.9, 1.25, 0.9], 8);
+  cylinder(group, 0.15, 0.16, 0.08, m.sackLight, [0.95, 0.82, -0.35], 8);
+
+  const input = anchor(group, [0.65, 0.68, 0.45]);
+  const output = anchor(group, [-0.94, 0.95, -0.1]);
+  const lamp = statusJewel(group, m, [0.82, 0.95, 0.45]);
+
+  return {
+    input, output, lamp, badgeY: 3.35,
+    update(time, frameDelta, isWorking) {
+      const flicker = Math.sin(time * 8) * 0.2 + Math.sin(time * 23) * 0.1;
+      firebed.material.emissiveIntensity = isWorking ? 0.9 + flicker : 0.4 + flicker * 0.3;
+      peelGroup.position.z = 0.45 + (isWorking ? Math.sin(time * 2) * 0.12 : 0);
+    },
+  };
 }
 
+// -------------------------------------------------------------
+// 6. UN DEĞİRMENİ (Flour Mill)
+// -------------------------------------------------------------
+function flourMill(group, m) {
+  baseIsland(group, m, 3.1, 2.7);
+
+  // Heavy timber A-frame and gantry
+  for (const x of [-0.68, 0.58]) {
+    box(group, [0.15, 1.6, 0.15], m.woodDark, [x, 1.05, -0.15], 0.03);
+    box(group, [0.16, 0.16, 1.18], m.wood, [x, 1.55, -0.15], 0.025);
+  }
+  box(group, [1.46, 0.14, 1.34], m.wood, [-0.05, 0.48, -0.1], 0.04);
+
+  // Square wooden hopper box on top
+  crate(group, m, [-0.05, 1.82, -0.15], [0.98, 0.58, 0.88], m.woodDark, m.woodLight);
+  // Golden wheat grains in hopper
+  for (let g = 0; g < 9; g += 1) {
+    sphere(group, 0.05, m.wheat,
+      [-0.3 + (g % 3) * 0.25, 2.44, -0.35 + Math.floor(g / 3) * 0.22], [0.8, 1.25, 0.8], 6);
+  }
+
+  // Paired circular stone millstones
+  cylinder(group, 0.56, 0.58, 0.22, m.stoneDark, [-0.05, 0.78, -0.1], 16);
+  const topStone = cylinder(group, 0.52, 0.52, 0.2, m.stoneLight, [-0.05, 0.99, -0.1], 16);
+  cylinder(group, 0.12, 0.12, 0.48, m.darkMetal, [-0.05, 1.25, -0.1], 10);
+
+  // Side drive shaft & wooden hand crank
+  const crank = cylinder(group, 0.18, 0.18, 0.1, m.steelDark, [0.55, 1.02, -0.1], 8, [0, 0, Math.PI / 2]);
+  box(crank, [0.06, 0.45, 0.06], m.woodLight, [0, 0.22, 0], 0.02);
+
+  // Angled white flour chute & collection box (output)
+  box(group, [0.22, 0.12, 0.48], m.white, [0.28, 0.68, 0.35], 0.02, [-0.4, 0, 0]);
+  box(group, [0.72, 0.22, 0.52], m.woodDark, [0.55, 0.42, 0.58], 0.03);
+  box(group, [0.66, 0.16, 0.46], m.woodLight, [0.55, 0.45, 0.58], 0.02);
+  // Flour heap in collection box
+  sphere(group, 0.24, m.flour, [0.55, 0.55, 0.58], [1.25, 0.35, 0.9], 10);
+
+  // Left wheat crate with standing stalks (input)
+  crate(group, m, [-0.92, 0.35, 0.15], [0.65, 0.54, 0.68]);
+  for (let s = 0; s < 7; s += 1) {
+    const sx = -1.05 + (s % 3) * 0.14;
+    const sz = 0.02 + Math.floor(s / 3) * 0.15;
+    cylinder(group, 0.015, 0.015, 0.52, m.wheat, [sx, 1.08, sz], 6);
+    sphere(group, 0.045, m.wheatLight, [sx, 1.34, sz], [0.8, 1.8, 0.8], 6);
+  }
+
+  // Right flour sacks
+  for (const [fx, fz] of [[0.92, -0.35], [1.14, 0.05]]) {
+    sphere(group, 0.22, m.sack, [fx, 0.58, fz], [0.9, 1.25, 0.9], 8);
+    cylinder(group, 0.14, 0.16, 0.08, m.sackLight, [fx, 0.82, fz], 8);
+  }
+
+  const input = anchor(group, [-0.05, 2.4, -0.15]);
+  const output = anchor(group, [0.55, 0.58, 0.58]);
+  const lamp = statusJewel(group, m, [0.94, 0.96, -0.55]);
+
+  return {
+    input, output, lamp, badgeY: 3.15,
+    update(time, frameDelta, isWorking) {
+      if (isWorking) {
+        topStone.rotation.y += frameDelta * 3.8;
+        crank.rotation.x += frameDelta * 3.8;
+      }
+    },
+  };
+}
+
+// -------------------------------------------------------------
+// 7. PASTANE TEZGÂHI (Orange Tart / Pastry Showcase)
+// -------------------------------------------------------------
 function orangeTartKitchen(group, m) {
   baseIsland(group, m, 3.15, 2.8);
-  // An open-front cottage bakery rather than a freestanding rectangular appliance.
-  for (const x of [-0.88, 0.5]) {
-    for (const z of [-0.58, 0.34]) box(group, [0.13, 1.6, 0.13], m.woodDark, [x, 1.03, z], 0.025);
+
+  // Elegant wooden counter base with brass trim
+  box(group, [1.58, 0.68, 1.15], m.woodDark, [-0.08, 0.58, -0.05], 0.06);
+  box(group, [1.64, 0.08, 1.22], m.woodLight, [-0.08, 0.94, -0.05], 0.03);
+
+  // Modern angled glass bakery showcase counter
+  const showcaseGroup = new THREE.Group();
+  showcaseGroup.position.set(-0.08, 0.98, -0.05);
+  // Corner brass posts
+  for (const x of [-0.72, 0.72]) for (const z of [-0.48, 0.48]) {
+    cylinder(showcaseGroup, 0.025, 0.025, 0.72, m.brass, [x, 0.36, z], 8);
   }
-  box(group, [1.48, 0.12, 1.02], m.wood, [-0.18, 0.85, -0.1], 0.035);
-  box(group, [1.62, 0.08, 1.12], m.cream, [-0.18, 1.27, 0.04], 0.03);
-  tileRoof(group, m, [-0.18, 2.05, -0.13], 2.05, 1.52, m.roof);
-  box(group, [0.72, 0.58, 0.58], m.brick, [-0.21, 0.57, -0.4], 0.05);
-  box(group, [0.57, 0.42, 0.045], m.stoneDark, [-0.21, 0.53, -0.09], 0.03);
-  add(group, archShape(0.42, 0.32), m.fireGlow, [-0.21, 0.32, -0.062]);
-  cylinder(group, 0.1, 0.13, 0.57, m.stoneDark, [-0.43, 1.55, -0.42], 7);
-  box(group, [0.42, 0.07, 0.42], m.stoneLight, [-0.43, 1.85, -0.42], 0.02);
-  for (const x of [-0.83, -0.53, 0.38]) {
-    const bottle = cylinder(group, 0.055, 0.07, 0.3, x < -0.7 ? m.orange : m.glass,
-      [x, 1.47, 0.37], 8);
-    cylinder(group, 0.025, 0.035, 0.07, m.gold, [x, 1.65, 0.37], 7);
-    bottle.castShadow = true;
+  // Glass panels
+  box(showcaseGroup, [1.44, 0.68, 0.02], m.glass, [0, 0.36, 0.47], 0.01);
+  box(showcaseGroup, [1.44, 0.02, 0.96], m.glass, [0, 0.72, 0], 0.01);
+  for (const x of [-0.71, 0.71]) box(showcaseGroup, [0.02, 0.68, 0.94], m.glass, [x, 0.36, 0], 0.01);
+
+  // 3 Display shelves inside glass
+  for (const y of [0.18, 0.42]) {
+    box(showcaseGroup, [1.38, 0.025, 0.88], m.glass, [0, y, 0], 0.01);
   }
-  box(group, [0.82, 0.1, 0.68], m.woodDark, [0.71, 0.51, 0.1], 0.03);
-  box(group, [0.78, 0.07, 0.62], m.cream, [0.71, 0.61, 0.1], 0.025);
-  for (const x of [0.42, 0.68, 0.94]) {
-    box(group, [0.075, 0.64, 0.075], m.wood, [x, 0.89, 0.34], 0.02);
+
+  // Top Shelf: Cupcakes with frosting swirl & chocolate
+  for (let c = 0; c < 5; c += 1) {
+    const cx = -0.52 + c * 0.26;
+    cylinder(showcaseGroup, 0.06, 0.045, 0.07, m.breadLight, [cx, 0.48, -0.15], 8);
+    sphere(showcaseGroup, 0.055, c % 2 === 0 ? m.cupcakeFrostingPink : m.cupcakeFrosting, [cx, 0.53, -0.15], [1, 1.1, 1], 8);
   }
-  for (let stripe = 0; stripe < 6; stripe += 1) {
-    box(group, [0.12, 0.34, 0.018], stripe % 2 ? m.red : m.cream, [0.42 + stripe * 0.12, 0.69, 0.46], 0.008);
+
+  // Middle Shelf: Glazed ring donuts
+  for (let d = 0; d < 4; d += 1) {
+    const dx = -0.42 + d * 0.28;
+    add(showcaseGroup, new THREE.TorusGeometry(0.065, 0.03, 8, 16), d % 2 === 0 ? m.donutPink : m.donutChoc,
+      [dx, 0.24, 0.05], [Math.PI / 2, 0, 0]);
   }
-  // Full orange tart on the counter; dynamic orders collect at the same pastry stand.
-  cylinder(group, 0.36, 0.38, 0.12, m.tartCrust, [0.71, 0.74, 0.03], 12);
-  cylinder(group, 0.31, 0.31, 0.045, m.tart, [0.71, 0.82, 0.03], 12);
-  add(group, new THREE.TorusGeometry(0.28, 0.025, 6, 16), m.cream, [0.71, 0.85, 0.03]);
-  for (let slice = 0; slice < 10; slice += 1) {
-    const angle = slice * Math.PI / 5;
-    sphere(group, 0.05, m.orange, [0.71 + Math.cos(angle) * 0.2, 0.855, 0.03 + Math.sin(angle) * 0.2], [1, 0.55, 0.72], 7);
+
+  // Bottom Shelf: Flaky golden croissants & orange fruit tarts
+  for (let cr = 0; cr < 3; cr += 1) {
+    const rx = -0.42 + cr * 0.32;
+    add(showcaseGroup, new THREE.TorusGeometry(0.08, 0.035, 6, 12, Math.PI * 0.9), m.bread,
+      [rx, 0.06, 0.2], [Math.PI / 2, 0, 0.3]);
   }
-  box(group, [0.52, 0.09, 0.46], m.woodDark, [1.12, 0.52, 0.49], 0.03);
-  box(group, [0.48, 0.06, 0.42], m.woodLight, [1.12, 0.6, 0.49], 0.02);
-  const input = anchor(group, [-0.18, 1.32, 0.04]);
-  const output = anchor(group, [1.12, 0.62, 0.49]);
-  const lamp = statusJewel(group, m, [1.15, 0.73, -0.4]);
-  return { input, output, lamp, badgeY: 3.2 };
+  // Signature Orange Tart
+  const tartTurnTable = new THREE.Group();
+  tartTurnTable.position.set(0.38, 0.06, 0.15);
+  cylinder(tartTurnTable, 0.14, 0.15, 0.05, m.tartCrust, [0, 0.02, 0], 12);
+  cylinder(tartTurnTable, 0.12, 0.12, 0.02, m.tart, [0, 0.05, 0], 12);
+  for (let s = 0; s < 5; s += 1) {
+    const a = (s * Math.PI * 2) / 5;
+    sphere(tartTurnTable, 0.03, m.orange, [Math.cos(a) * 0.07, 0.065, Math.sin(a) * 0.07], [1, 0.5, 1], 6);
+  }
+  showcaseGroup.add(tartTurnTable);
+  group.add(showcaseGroup);
+
+  // Top chalkboard menu & potted plant
+  box(group, [0.38, 0.28, 0.03], m.woodDark, [-0.45, 1.86, -0.05], 0.02, [-0.15, 0, 0]);
+  box(group, [0.32, 0.22, 0.015], m.chalkboard, [-0.45, 1.86, -0.04], 0.01, [-0.15, 0, 0]);
+  cylinder(group, 0.07, 0.05, 0.12, m.brick, [0.45, 1.76, -0.05], 8);
+  sphere(group, 0.08, m.leafBright, [0.45, 1.86, -0.05], [1.1, 1.2, 1.1], 8);
+
+  // Left stacked bakery pastry boxes
+  for (let b = 0; b < 3; b += 1) {
+    box(group, [0.42, 0.12, 0.42], m.cream, [-0.98, 0.42 + b * 0.13, 0.35], 0.02);
+    box(group, [0.43, 0.02, 0.04], m.red, [-0.98, 0.48 + b * 0.13, 0.35], 0.01);
+  }
+
+  const input = anchor(group, [-0.92, 0.85, -0.05]);
+  const output = anchor(group, [0.95, 0.72, 0.35]);
+  const lamp = statusJewel(group, m, [1.02, 0.85, -0.38]);
+
+  return {
+    input, output, lamp, badgeY: 3.2,
+    update(time, frameDelta, isWorking) {
+      tartTurnTable.rotation.y += frameDelta * (isWorking ? 1.8 : 0.6);
+    },
+  };
 }
 
+// -------------------------------------------------------------
+// 8. BURGER MUTFAĞI (Burger Kitchen / Grill)
+// -------------------------------------------------------------
 function burgerGrill(group, m) {
   baseIsland(group, m, 3.15, 2.8);
-  // Compact stainless grill, extractor hood and a side counter stocked with produce.
-  box(group, [1.38, 0.95, 1.08], m.steel, [-0.34, 0.79, -0.12], 0.1);
-  box(group, [1.22, 0.12, 0.9], m.steelDark, [-0.34, 1.31, -0.08], 0.045);
-  for (const x of [-0.78, 0.12]) box(group, [0.06, 0.8, 0.06], m.steelDark, [x, 1.83, -0.48], 0.02);
-  box(group, [1.58, 0.18, 1.13], m.steelLight, [-0.34, 2.27, -0.48], 0.06);
-  box(group, [1.38, 0.07, 0.92], m.steelDark, [-0.34, 2.14, -0.48], 0.025);
-  cylinder(group, 0.17, 0.2, 0.48, m.steelDark, [-0.34, 2.63, -0.48], 8);
-  cylinder(group, 0.24, 0.24, 0.06, m.steelLight, [-0.34, 2.88, -0.48], 8);
-  for (const x of [-0.75, -0.46, -0.17, 0.12]) {
-    cylinder(group, 0.15, 0.15, 0.045, m.patty, [x, 1.44, 0.02], 10);
-    if (x === -0.46 || x === 0.12) cylinder(group, 0.15, 0.15, 0.035, m.cheese, [x, 1.48, 0.02], 10);
+
+  // Professional stainless steel & red canopy kitchen
+  box(group, [1.45, 0.88, 1.05], m.steel, [-0.18, 0.74, -0.1], 0.08);
+
+  // Red & white striped front counter facade with burger logo medallion
+  box(group, [1.25, 0.65, 0.04], m.woodDark, [-0.18, 0.58, 0.44], 0.03);
+  for (let stripe = 0; stripe < 7; stripe += 1) {
+    const sx = -0.54 + stripe * 0.18;
+    box(group, [0.18, 0.63, 0.02], stripe % 2 === 0 ? m.red : m.white, [-0.18 + sx + 0.09, 0.58, 0.47], 0.01);
   }
-  for (const x of [-0.7, -0.34, 0.02]) {
-    cylinder(group, 0.05, 0.06, 0.25, x === -0.7 ? m.red : m.gold, [x, 0.87, 0.55], 8);
-    cylinder(group, 0.04, 0.04, 0.05, m.steelDark, [x, 1.02, 0.55], 8);
+  // Burger medallion on front
+  cylinder(group, 0.16, 0.16, 0.03, m.gold, [-0.18, 0.58, 0.49], 12, [Math.PI / 2, 0, 0]);
+  sphere(group, 0.08, m.bread, [-0.18, 0.58, 0.51], [1.3, 0.7, 0.5], 8);
+
+  // Overhead red exhaust range hood with chimney flue
+  box(group, [1.56, 0.22, 1.15], m.red, [-0.18, 2.25, -0.38], 0.05);
+  box(group, [1.35, 0.08, 0.95], m.redDark, [-0.18, 2.12, -0.38], 0.03);
+  cylinder(group, 0.18, 0.2, 0.48, m.steelDark, [-0.18, 2.58, -0.38], 8);
+  cylinder(group, 0.24, 0.24, 0.06, m.steel, [-0.18, 2.82, -0.38], 8);
+
+  // Central heavy iron flat-top grill
+  box(group, [0.86, 0.08, 0.62], m.darkMetal, [-0.18, 1.22, -0.05], 0.02);
+
+  // 4 Sizzling burger patties on grill
+  const pattyList = [];
+  const pattyPositions = [[-0.42, 0.08], [-0.18, 0.08], [0.06, 0.08], [-0.3, -0.15]];
+  for (let i = 0; i < pattyPositions.length; i += 1) {
+    const [px, pz] = pattyPositions[i];
+    const p = cylinder(group, 0.12, 0.12, 0.045, m.patty, [-0.18 + px, 1.28, -0.05 + pz], 10);
+    if (i % 2 === 1) cylinder(group, 0.12, 0.12, 0.03, m.cheese, [-0.18 + px, 1.32, -0.05 + pz], 10);
+    pattyList.push({ mesh: p, seed: i * 2.1 });
   }
-  // Wooden produce counter and assembled burger make this station read as a kitchen.
-  box(group, [1.03, 0.13, 0.95], m.woodDark, [0.84, 0.68, 0.1], 0.04);
-  box(group, [1.08, 0.1, 1.0], m.woodLight, [0.84, 0.79, 0.1], 0.035);
-  crate(group, m, [0.58, 0.9, -0.39], [0.55, 0.42, 0.45]);
-  for (const [x, z, type] of [[0.43, -0.3, 'tomato'], [0.64, -0.36, 'lettuce'], [0.82, -0.29, 'tomato']]) {
-    if (type === 'lettuce') sphere(group, 0.12, m.leafBright, [x, 1.38, z], [1.1, 0.65, 1], 7);
-    else fruit(group, m, type, [x, 1.38, z], 0.11);
+
+  // Steam/smoke puffs rising from grill
+  const smokePuffs = [];
+  for (let s = 0; s < 3; s += 1) {
+    const puff = sphere(group, 0.06, m.white, [-0.3 + s * 0.22, 1.45, -0.05], [1, 1, 1], 6);
+    puff.material.transparent = true;
+    puff.material.opacity = 0.4;
+    smokePuffs.push(puff);
   }
-  cylinder(group, 0.25, 0.27, 0.05, m.cream, [0.86, 0.89, 0.11], 12);
-  cylinder(group, 0.19, 0.2, 0.12, m.bread, [0.86, 0.98, 0.11], 10);
-  cylinder(group, 0.2, 0.2, 0.04, m.leafBright, [0.86, 1.06, 0.11], 10);
-  cylinder(group, 0.18, 0.19, 0.08, m.patty, [0.86, 1.12, 0.11], 10);
-  cylinder(group, 0.2, 0.2, 0.11, m.bread, [0.86, 1.21, 0.11], 10);
-  sphere(group, 0.2, m.breadLight, [0.86, 1.28, 0.11], [1, 0.45, 1], 8);
-  box(group, [0.45, 0.09, 0.4], m.steelLight, [1.16, 0.54, 0.53], 0.025);
-  const input = anchor(group, [0.58, 1.3, -0.39]);
-  const output = anchor(group, [1.16, 0.59, 0.53]);
-  const lamp = statusJewel(group, m, [0.52, 1.05, 0.53]);
-  return { input, output, lamp, badgeY: 3.25 };
+
+  // Right side stainless condiment & topping station
+  box(group, [0.65, 0.82, 0.95], m.steelLight, [0.88, 0.72, -0.05], 0.04);
+  // Inset gastro pans with fresh ingredients
+  for (const [ix, iz, col] of [[0.74, -0.25, m.lettuce], [0.98, -0.25, m.cheese], [0.86, 0.08, m.tomato]]) {
+    box(group, [0.22, 0.08, 0.28], m.steelDark, [ix, 1.15, iz], 0.02);
+    box(group, [0.18, 0.06, 0.24], col, [ix, 1.17, iz], 0.015);
+  }
+  // Ketchup and mustard squeeze bottles
+  for (const [kx, kz, kCol] of [[0.76, 0.32, m.ketchup], [0.96, 0.32, m.mustard]]) {
+    cylinder(group, 0.05, 0.06, 0.24, kCol, [kx, 1.26, kz], 8);
+    cylinder(group, 0.02, 0.04, 0.08, m.white, [kx, 1.4, kz], 6);
+  }
+
+  // Front cutting board with gourmet hamburgers (output)
+  box(group, [0.62, 0.05, 0.38], m.woodLight, [-0.18, 1.21, 0.46], 0.02);
+  for (const bx of [-0.32, -0.04]) {
+    cylinder(group, 0.12, 0.13, 0.04, m.bread, [bx, 1.25, 0.46], 10); // bottom bun
+    cylinder(group, 0.13, 0.13, 0.02, m.lettuce, [bx, 1.28, 0.46], 8); // lettuce
+    cylinder(group, 0.12, 0.12, 0.045, m.patty, [bx, 1.32, 0.46], 10); // patty
+    cylinder(group, 0.125, 0.125, 0.02, m.cheese, [bx, 1.36, 0.46], 8); // cheese
+    sphere(group, 0.125, m.bread, [bx, 1.41, 0.46], [1, 0.65, 1], 10); // top bun
+  }
+
+  // Left golden burger bun basket (input)
+  box(group, [0.55, 0.18, 0.52], m.woodDark, [-1.02, 0.48, 0.15], 0.03);
+  for (const [ux, uz] of [[-1.12, 0.05], [-0.92, 0.05], [-1.02, 0.25]]) {
+    sphere(group, 0.09, m.bread, [ux, 0.62, uz], [1.1, 0.75, 1.1], 8);
+  }
+
+  const input = anchor(group, [-1.02, 0.85, 0.15]);
+  const output = anchor(group, [-0.18, 1.35, 0.46]);
+  const lamp = statusJewel(group, m, [0.88, 1.05, 0.45]);
+
+  return {
+    input, output, lamp, badgeY: 3.25,
+    update(time, frameDelta, isWorking) {
+      if (isWorking) {
+        for (const p of pattyList) {
+          p.mesh.scale.y = 1 + Math.sin(time * 26 + p.seed) * 0.14;
+        }
+        for (let s = 0; s < smokePuffs.length; s += 1) {
+          const puff = smokePuffs[s];
+          const progress = ((time * 1.6 + s * 0.33) % 1);
+          puff.position.y = 1.35 + progress * 0.7;
+          puff.scale.setScalar(0.5 + progress * 1.1);
+          puff.material.opacity = Math.sin(progress * Math.PI) * 0.45;
+          puff.visible = true;
+        }
+      } else {
+        for (const p of pattyList) p.mesh.scale.y = 1;
+        for (const puff of smokePuffs) puff.visible = false;
+      }
+    },
+  };
 }
 
+// -------------------------------------------------------------
+// 9. PİZZA FIRINI (Pizza Oven)
+// -------------------------------------------------------------
 function pizzaOven(group, m) {
   baseIsland(group, m, 3.15, 2.85);
-  // Broad masonry dome with a red tile cap, chimney, wood store and prep counter.
-  box(group, [1.64, 0.88, 1.35], m.brick, [-0.24, 0.76, -0.23], 0.08);
-  add(group, new THREE.SphereGeometry(0.83, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), m.brickLight,
-    [-0.24, 1.18, -0.28], undefined, [1.04, 0.95, 0.98]);
-  box(group, [1.03, 0.66, 0.08], m.stoneDark, [-0.24, 0.72, 0.46], 0.04);
-  add(group, archShape(0.76, 0.48), m.dark, [-0.24, 0.43, 0.51]);
-  sphere(group, 0.16, m.fireGlow, [-0.24, 0.53, 0.54], [1.15, 0.82, 0.25], 8);
-  cylinder(group, 0.18, 0.22, 0.7, m.brickDark, [0.35, 1.73, -0.44], 7);
-  box(group, [0.49, 0.09, 0.46], m.brickLight, [0.35, 2.09, -0.44], 0.03);
-  for (const y of [1.58, 1.83]) box(group, [0.42, 0.04, 0.4], m.brick, [0.35, y, -0.44], 0.012);
-  tileRoof(group, m, [-0.24, 1.94, -0.25], 1.95, 1.6, m.roof);
-  addLogPile(group, m, -0.88, 0.86, 6);
 
-  box(group, [1.2, 0.14, 0.76], m.woodDark, [0.78, 0.51, 0.2], 0.04);
-  box(group, [1.13, 0.07, 0.7], m.woodLight, [0.78, 0.62, 0.2], 0.025);
-  for (const x of [0.39, 0.66, 0.93, 1.2]) {
-    box(group, [0.05, 0.48, 0.06], m.wood, [x, 0.31, 0.45], 0.015);
+  // Red terracotta brick domed pizza oven
+  box(group, [1.58, 0.76, 1.35], m.brick, [-0.22, 0.72, -0.22], 0.08);
+  sphere(group, 0.85, m.roof, [-0.22, 1.18, -0.22], [1.05, 0.94, 1.02], 16);
+
+  // Black stovepipe chimney on top
+  cylinder(group, 0.16, 0.18, 0.72, m.darkMetal, [-0.22, 2.12, -0.22], 10);
+  cylinder(group, 0.22, 0.22, 0.08, m.steelDark, [-0.22, 2.52, -0.22], 10);
+
+  // Arched portal opening with glowing fire hearth
+  box(group, [0.88, 0.65, 0.1], m.brickDark, [-0.22, 0.74, 0.46], 0.04);
+  box(group, [0.65, 0.48, 0.22], m.darkMetal, [-0.22, 0.65, 0.38], 0.04);
+  const pizzaFire = sphere(group, 0.18, m.fireGlow, [-0.22, 0.6, 0.42], [1.2, 0.85, 0.35], 8);
+  pizzaFire.material.emissive = new THREE.Color(0xff4400);
+  pizzaFire.material.emissiveIntensity = 0.9;
+
+  // Stacked firewood logs under oven
+  addLogPile(group, m, -0.92, 0.78, 6);
+
+  // Pizza peel with baking pizza entering the oven
+  const peelGroup = new THREE.Group();
+  peelGroup.position.set(-0.22, 0.66, 0.46);
+  cylinder(peelGroup, 0.022, 0.022, 1.15, m.woodDark, [0, 0, 0.48], 6, [Math.PI / 2, 0, 0]);
+  cylinder(peelGroup, 0.22, 0.22, 0.02, m.woodLight, [0, 0, -0.05], 12);
+  // Pizza on peel
+  cylinder(peelGroup, 0.2, 0.2, 0.025, m.pizzaCrust, [0, 0.02, -0.05], 12);
+  cylinder(peelGroup, 0.18, 0.18, 0.028, m.pizzaSauce, [0, 0.025, -0.05], 12);
+  cylinder(peelGroup, 0.16, 0.16, 0.032, m.pizzaCheese, [0, 0.028, -0.05], 12);
+  group.add(peelGroup);
+
+  // Front rustic table with fresh whole sliced pizza (output)
+  box(group, [1.05, 0.12, 0.75], m.woodDark, [0.72, 0.52, 0.24], 0.04);
+  box(group, [0.98, 0.07, 0.68], m.woodLight, [0.72, 0.62, 0.24], 0.025);
+  // Round wooden pizza board & whole pizza
+  cylinder(group, 0.32, 0.32, 0.03, m.woodLight, [0.72, 0.67, 0.24], 14);
+  cylinder(group, 0.28, 0.28, 0.035, m.pizzaCrust, [0.72, 0.7, 0.24], 14);
+  cylinder(group, 0.25, 0.25, 0.04, m.pizzaCheese, [0.72, 0.72, 0.24], 14);
+  // Toppings: pepperoni slices & green peppers
+  for (let top = 0; top < 6; top += 1) {
+    const angle = (top * Math.PI) / 3;
+    cylinder(group, 0.04, 0.04, 0.015, m.tomato,
+      [0.72 + Math.cos(angle) * 0.15, 0.74, 0.24 + Math.sin(angle) * 0.15], 8);
+    cylinder(group, 0.035, 0.035, 0.018, m.leafBright,
+      [0.72 + Math.cos(angle + 0.5) * 0.11, 0.74, 0.24 + Math.sin(angle + 0.5) * 0.11], 6);
   }
-  sphere(group, 0.29, m.dough, [0.78, 0.76, 0.16], [1, 0.24, 0.84], 10);
-  cylinder(group, 0.25, 0.25, 0.035, m.cheese, [0.78, 0.79, 0.16], 12);
-  for (const [x, z] of [[0.63, 0.1], [0.9, 0.22], [0.77, 0.04], [0.96, 0.04], [0.59, 0.25]]) {
-    sphere(group, 0.055, m.tomato, [x, 0.82, z], [1, 0.44, 0.8], 7);
+
+  // Left prep station with 3 topping trays & olive oil bottle (input)
+  for (const [tx, tz, tCol] of [[0.42, -0.45, m.leafBright], [0.66, -0.45, m.cheese], [0.9, -0.45, m.tomato]]) {
+    box(group, [0.2, 0.08, 0.24], m.steelLight, [tx, 0.72, tz], 0.02);
+    box(group, [0.16, 0.06, 0.2], tCol, [tx, 0.74, tz], 0.015);
   }
-  for (const x of [0.6, 0.91]) fruit(group, m, 'tomato', [x, 0.4, 0.72], 0.12);
-  crate(group, m, [1.04, 0.35, 0.75], [0.5, 0.38, 0.44]);
-  box(group, [0.5, 0.09, 0.42], m.woodDark, [1.03, 0.49, -0.78], 0.025);
-  box(group, [0.46, 0.06, 0.38], m.woodLight, [1.03, 0.57, -0.78], 0.02);
-  const peel = cylinder(group, 0.025, 0.025, 0.86, m.woodDark, [0.98, 0.86, 0.67], 6, [0, 0, 0.62]);
-  add(group, new THREE.CircleGeometry(0.18, 9), m.woodLight, [0.73, 0.6, 0.73], [-0.15, 0, 0]);
-  const input = anchor(group, [1.04, 0.69, 0.75]);
-  const output = anchor(group, [1.03, 0.59, -0.78]);
-  const lamp = statusJewel(group, m, [1.02, 1.05, -0.55]);
-  peel.castShadow = true;
-  return { input, output, lamp, badgeY: 3.45 };
+  // Olive oil bottle
+  cylinder(group, 0.04, 0.05, 0.22, m.glass, [0.38, 0.82, -0.22], 8);
+  cylinder(group, 0.035, 0.04, 0.16, m.oliveOil, [0.38, 0.78, -0.22], 8);
+  cylinder(group, 0.018, 0.022, 0.06, m.woodDark, [0.38, 0.95, -0.22], 6);
+
+  // Right stack of cardboard pizza delivery boxes
+  for (let boxIdx = 0; boxIdx < 4; boxIdx += 1) {
+    box(group, [0.55, 0.08, 0.55], m.sackLight, [1.05, 0.42 + boxIdx * 0.085, -0.15], 0.02);
+  }
+
+  const input = anchor(group, [0.66, 0.85, -0.45]);
+  const output = anchor(group, [0.72, 0.75, 0.24]);
+  const lamp = statusJewel(group, m, [1.05, 1.05, -0.45]);
+
+  return {
+    input, output, lamp, badgeY: 3.45,
+    update(time, frameDelta, isWorking) {
+      const flicker = Math.sin(time * 9) * 0.2 + Math.sin(time * 21) * 0.1;
+      pizzaFire.material.emissiveIntensity = isWorking ? 1.0 + flicker : 0.45 + flicker * 0.3;
+      peelGroup.position.z = 0.46 + (isWorking ? Math.sin(time * 1.8) * 0.14 : 0);
+    },
+  };
 }
 
+// -------------------------------------------------------------
+// Model Factory Export
+// -------------------------------------------------------------
 export function createProductionBuildModel(group, id) {
   const m = {
     sand: material(0xdcb976), grass: material(0x69c843), leaf: material(0x329544),
     leafBright: material(0x69c849), wood: material(0xa86a35), woodLight: material(0xd59a54),
-    woodDark: material(0x744629), rope: material(0x90704d), red: material(0xe94131),
-    redDark: material(0xb92f27), roof: material(0xe94332), roofLight: material(0xff6a42),
-    roofDark: material(0xc52e28), gold: material(0xe5a52c, 0.42), brass: material(0xb7822c, 0.42, 0.34),
+    woodDark: material(0x744629), rope: material(0x90704d), red: material(0xe83a2d),
+    redDark: material(0xb92f27), white: material(0xf8f9fa), roof: material(0xe94332),
+    roofLight: material(0xff6a42), roofDark: material(0xc52e28), gold: material(0xe5a52c, 0.42),
+    goldLight: material(0xffcd50, 0.4), brass: material(0xc49339, 0.42, 0.34),
     steel: material(0xb6c3c4, 0.34, 0.46), steelLight: material(0xe0e6e5, 0.28, 0.48),
-    steelDark: material(0x586466, 0.42, 0.38), rivetSteel: material(0x778686, 0.3, 0.5),
-    darkMetal: material(0x333f40, 0.45, 0.32), glass: new THREE.MeshPhysicalMaterial({
-      color: 0xdffbff, transparent: true, opacity: 0.28, roughness: 0.13, metalness: 0.08, side: THREE.DoubleSide,
+    steelDark: material(0x485254, 0.42, 0.38), rivetSteel: material(0x778686, 0.3, 0.5),
+    darkMetal: material(0x2b3334, 0.45, 0.32), glass: new THREE.MeshPhysicalMaterial({
+      color: 0xdffbff, transparent: true, opacity: 0.32, roughness: 0.12, metalness: 0.08, side: THREE.DoubleSide,
     }),
-    kettle: material(0xd93c2b, 0.5), paste: material(0xb93527), fireGlow: new THREE.MeshBasicMaterial({ color: 0xff8132 }),
+    kettle: material(0xd93c2b, 0.5), paste: material(0xb93527),
+    fireGlow: new THREE.MeshBasicMaterial({ color: 0xff7020 }),
+    fireYellow: new THREE.MeshBasicMaterial({ color: 0xffd030 }),
     brick: material(0x9b4936), brickLight: material(0xd39d7f), brickDark: material(0x733e34),
     stone: material(0xc2b197), stoneLight: material(0xe2d3b7), stoneDark: material(0x70645b),
-    orange: material(0xff951e), tomato: material(0xe84731), corn: material(0xffd355),
-    goldLight: material(0xffcd50), juice: material(0xffaa25), popcorn: material(0xfff0ae),
-    woodGrain: material(0xc18a4b), gear: material(0x424b4c, 0.45, 0.34), sack: material(0xc9a77d),
-    sackLight: material(0xe1c69c), wheat: material(0xf1c24b), wheatLight: material(0xffdc74),
-    log: material(0x83502f), logCut: material(0xc18a51), bread: material(0xb96c36),
-    breadLight: material(0xf4d398), tartCrust: material(0xd59842), tart: material(0xf4b538),
-    cream: material(0xffe8b4), red: material(0xe94131), paperRed: material(0xd94532),
-    patty: material(0x633920), cheese: material(0xffca45), dough: material(0xf0ddad),
+    orange: material(0xff951e), orangeDark: material(0xe67e22), tomato: material(0xe84731),
+    corn: material(0xffd355), cornHusk: material(0x7eb338), juice: material(0xffaa25),
+    popcorn: material(0xfff6cf), popcornLight: material(0xfffbee),
+    sack: material(0xc9a77d), sackLight: material(0xe1c69c),
+    wheat: material(0xf1c24b), wheatLight: material(0xffdc74),
+    flour: material(0xfdfdfc), flourPile: material(0xf6f6f2),
+    log: material(0x83502f), logCut: material(0xc18a51),
+    bread: material(0xb96c36), breadLight: material(0xf4d398), dough: material(0xf2dfbe),
+    cupcakeFrosting: material(0x6d4022), cupcakeFrostingPink: material(0xff8fab),
+    donutPink: material(0xff70a6), donutChoc: material(0x582f1b),
+    tartCrust: material(0xd59842), tart: material(0xf4b538), cream: material(0xffe8b4),
+    patty: material(0x522f1b), cheese: material(0xffca45), lettuce: material(0x48b835),
+    ketchup: material(0xd92d20), mustard: material(0xfdb022),
+    pizzaCrust: material(0xdca462), pizzaSauce: material(0xc92a1e), pizzaCheese: material(0xffe066),
+    basil: material(0x2f855a), oliveOil: material(0x85992c), chalkboard: material(0x222a28),
     signal: material(0x4dcc65),
   };
 
@@ -527,4 +920,3 @@ export function createProductionBuildModel(group, id) {
 
   return { ...result, trayMaterial: m.woodLight };
 }
-

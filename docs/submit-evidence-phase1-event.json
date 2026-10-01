@@ -1,0 +1,26 @@
+{
+  "action": "submit_evidence",
+  "actor": "agent",
+  "reason": "Faz 1 için cilalı fayans zemin, manav ve gondol reyonları, dikey cam kapaklı içecek dolabı, kasa bankosu impuls standı ve market arabaları yerleştirilip incelendi.",
+  "task_id": "T-PHASE-1",
+  "items": [
+    {
+      "path": "docs/FAZ_1_INSPECTION_REPORT.md",
+      "criterion": 0,
+      "note": "Cilalı porselen fayans zemin, vitrin camları ve otomatik kapı kontrol edildi.",
+      "reviewer": "agent"
+    },
+    {
+      "path": "docs/FAZ_1_INSPECTION_REPORT.md",
+      "criterion": 1,
+      "note": "Manav rafları, dikey cam içecek dolabı, ada dondurucu ve reyon tabelaları kontrol edildi.",
+      "reviewer": "agent"
+    },
+    {
+      "path": "docs/FAZ_1_INSPECTION_REPORT.md",
+      "criterion": 2,
+      "note": "Konveyörlü kasa bankosu, impuls standı, market arabaları ve el sepetleri kontrol edildi.",
+      "reviewer": "agent"
+    }
+  ]
+}

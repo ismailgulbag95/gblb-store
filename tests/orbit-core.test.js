@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { GameApplication } from '../src/application/GameApplication.js';
-import { advanceSimulation, findCustomerMarketRoute } from '../src/domain/simulation.js';
+import { advanceSimulation, findCustomerMarketRoute, routeCustomerToShelf } from '../src/domain/simulation.js';
 import { createInitialState, hydrateState } from '../src/domain/state.js';
 import { createFarmState } from '../src/domain/farm.js';
 import {
@@ -15,7 +15,7 @@ import {
 import { EconomyLedger, InsufficientBalanceError } from '../src/domain/ledger.js';
 import { SaveRecoveryError, SaveService } from '../src/infrastructure/SaveService.js';
 import { getStaffCount, SHELVES, STATIONS } from '../src/domain/catalog.js';
-import { canPlaceStation, getDecorationDimensions, getMarketCollisionBoxes, getStationDimensions } from '../src/domain/layout.js';
+import { canPlaceStation, getDecorationDimensions, getMarketCollisionBoxes, getShelfLocations, getStationDimensions } from '../src/domain/layout.js';
 import { CharacterFactory } from '../src/presentation/CharacterFactory.js';
 import { customerMood, saleMoodMultiplier, tipForMood } from '../src/domain/customerExperience.js';
 import { decorationPrice, nextOrder, orderProgress } from '../src/domain/orders.js';
@@ -668,6 +668,7 @@ test('stations and items adhere to exact visual footprints and boundaries during
   assert.equal(moveSafe.ok, true);
   assert.equal(app.getState().layout.tomatoShelf.x, 12.0);
   assert.equal(app.getState().layout.tomatoShelf.z, 0);
+  app.moveStation('tomatoShelf', 3, 2);
 });
 
 test('customers navigate around foreground shelves when heading to background shelves without getting stuck', () => {
@@ -734,6 +735,41 @@ test('customers navigate around foreground shelves when heading to background sh
     'Customer successfully reached the background shelf without bugging'
   );
 });
+
+test('customers can route from entrance door to all unlocked market shelves without blocking', () => {
+  const state = createInitialState(1234);
+  const products = [
+    'TOMATO', 'TOMATO_PASTE', 'ORANGE', 'ORANGE_JUICE',
+    'CORN', 'POPCORN', 'EGG', 'BREAD', 'FLOUR', 'ORANGE_TART'
+  ];
+  state.unlockedProducts = [...products];
+
+  for (const prod of products) {
+    const shelves = getShelfLocations(state, prod);
+    assert.ok(shelves.length > 0, `Shelf for ${prod} should exist`);
+    const shelf = shelves[0];
+    const customer = {
+      id: `test-shopper-${prod}`,
+      kind: 'shopper',
+      x: 5,
+      z: 6.6,
+      phase: 'to-shelf',
+      demand: prod,
+      shoppingList: [prod],
+      shoppingIndex: 0,
+      basket: [],
+      route: [],
+      routeIndex: 0,
+      checkoutOrder: 1,
+      targetShelfId: shelf.id,
+      shelfQueueIndex: 0,
+    };
+    routeCustomerToShelf(state, customer, prod, 0);
+    assert.equal(customer.routeBlocked, false, `Customer for ${prod} should not be route-blocked`);
+    assert.ok(customer.route.length > 0, `Customer for ${prod} should have a non-empty route`);
+  }
+});
+
 
 test('adjacent shelves block gaps when less than 1 grid apart and allow passage when at least 1 grid apart', () => {
   const state = createInitialState(101);

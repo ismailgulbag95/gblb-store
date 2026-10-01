@@ -1,0 +1,6 @@
+{
+  "action": "start_task",
+  "actor": "agent",
+  "reason": "Faz 5 Arka Alan, Depo ve Lojistik Tesisleri geliştirilmeye başlanıyor.",
+  "task_id": "T-PHASE-5"
+}

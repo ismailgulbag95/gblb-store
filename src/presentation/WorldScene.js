@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { animate } from 'animejs';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { Engine } from '../core/Engine.js';
@@ -379,34 +380,334 @@ export class WorldScene {
 
 
 
-  #statusBadge(group, label, tone, visible, height = 2.45) {
+  #drawBadgeIcon(context, iconId, x, y, size) {
+    if (iconId && drawAssetIcon(context, iconId, x, y, size, size)) {
+      return;
+    }
+    const itemEntry = Object.values(ITEMS).find((it) => it.icon === iconId || it.id === iconId);
+    const colorHex = itemEntry ? `#${itemEntry.color.toString(16).padStart(6, '0')}` : '#ffd35e';
+    context.save();
+    context.beginPath();
+    context.arc(x + size / 2, y + size / 2, size * 0.44, 0, Math.PI * 2);
+    context.fillStyle = colorHex;
+    context.fill();
+    context.lineWidth = 2.2;
+    context.strokeStyle = '#000000';
+    context.stroke();
+    context.fillStyle = '#000000';
+    context.font = `bold ${Math.round(size * 0.38)}px Fredoka, sans-serif`;
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    const initial = (itemEntry?.name || iconId || '?').slice(0, 2).toUpperCase();
+    context.fillText(initial, x + size / 2, y + size / 2 + 1);
+    context.restore();
+  }
+
+  #statusBadge(group, optionsOrLabel, legacyTone = '#ffd35e', legacyVisible = true, legacyHeight = 2.45) {
+    const opts = typeof optionsOrLabel === 'object' && optionsOrLabel !== null
+      ? optionsOrLabel
+      : {
+        label: String(optionsOrLabel ?? ''),
+        tone: legacyTone,
+        visible: legacyVisible,
+        height: legacyHeight,
+        type: String(optionsOrLabel ?? '').includes('HAZIR') || String(optionsOrLabel ?? '').includes('READY') ? 'ready'
+          : String(optionsOrLabel ?? '').includes('MALZEME') || String(optionsOrLabel ?? '').includes('EMPTY') || String(optionsOrLabel ?? '').includes('BOŞ') ? 'missing'
+          : String(optionsOrLabel ?? '').includes('ÜRETİYOR') || String(optionsOrLabel ?? '').includes('WORKING') || String(optionsOrLabel ?? '').includes('BÜYÜYOR') ? 'working'
+          : 'custom',
+        distance: 8,
+      };
+
     let sprite = group.getObjectByName('status-badge');
-    if (!visible) { if (sprite) sprite.visible = false; return; }
+    if (!opts.visible) {
+      if (sprite) sprite.visible = false;
+      return;
+    }
+
+    const height = opts.height ?? 2.45;
     if (!sprite) {
       const canvas = document.createElement('canvas');
-      canvas.width = 384; canvas.height = 96;
+      canvas.width = 256;
+      canvas.height = 128;
       const texture = new THREE.CanvasTexture(canvas);
       texture.colorSpace = THREE.SRGBColorSpace;
       sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: false }));
       sprite.name = 'status-badge';
       sprite.userData.canvas = canvas;
       sprite.position.y = height;
-      sprite.scale.set(3.1, 0.78, 1);
+      sprite.scale.set(1.5, 0.75, 1);
       group.add(sprite);
     }
+
     sprite.visible = true;
     sprite.position.y = height;
-    const signature = `${label}:${tone}`;
+
+    const type = opts.type ?? 'custom';
+    const count = opts.count ?? 0;
+    const maxCount = opts.maxCount;
+    const progress = Math.max(0, Math.min(1, opts.progress ?? 0));
+    const itemIcon = opts.itemIcon ?? '';
+    const label = opts.label ?? '';
+    const tone = opts.tone ?? '#ffd35e';
+    const isClose = (opts.distance ?? 10) < 4.5;
+
+    const signature = `${type}:${itemIcon}:${count}:${maxCount}:${Math.round(progress * 20)}:${tone}:${isClose}:${label}`;
     if (sprite.userData.signature === signature) return;
     sprite.userData.signature = signature;
-    const context = sprite.userData.canvas.getContext('2d');
-    context.clearRect(0, 0, 384, 96);
-    context.fillStyle = '#ffffff';
-    context.beginPath(); context.roundRect(5, 7, 374, 77, 29); context.fill();
-    context.lineWidth = 8; context.strokeStyle = tone; context.stroke();
-    context.fillStyle = '#405264'; context.textAlign = 'center'; context.textBaseline = 'middle';
-    context.font = 'bold 35px Fredoka, sans-serif';
-    context.fillText(label, 192, 45, 340);
+
+    const canvas = sprite.userData.canvas;
+    const context = canvas.getContext('2d');
+    context.clearRect(0, 0, 256, 128);
+
+    const bx = 36;
+    const by = 10;
+    const bw = 184;
+    const bh = 54;
+    const radius = 12;
+    const arrowW = 11;
+    const arrowH = 15;
+    const stemH = 10;
+    const cx = bx + bw / 2;
+
+    const drawPath = (ctx) => {
+      ctx.beginPath();
+      ctx.moveTo(bx + radius, by);
+      ctx.lineTo(bx + bw - radius, by);
+      ctx.arcTo(bx + bw, by, bx + bw, by + radius, radius);
+      ctx.lineTo(bx + bw, by + bh - radius);
+      ctx.arcTo(bx + bw, by + bh, bx + bw - radius, by + bh, radius);
+      ctx.lineTo(cx + arrowW, by + bh);
+      ctx.lineTo(cx, by + bh + arrowH);
+      ctx.lineTo(cx - arrowW, by + bh);
+      ctx.lineTo(bx + radius, by + bh);
+      ctx.arcTo(bx, by + bh, bx, by + bh - radius, radius);
+      ctx.lineTo(bx, by + radius);
+      ctx.arcTo(bx, by, bx + radius, by, radius);
+      ctx.closePath();
+    };
+
+    // 1. Drop-shadow (+4px, +4px)
+    context.save();
+    context.translate(4, 4);
+    drawPath(context);
+    context.fillStyle = '#000000';
+    context.fill();
+    context.beginPath();
+    context.moveTo(cx, by + bh + arrowH);
+    context.lineTo(cx, by + bh + arrowH + stemH);
+    context.lineWidth = 4;
+    context.strokeStyle = '#000000';
+    context.stroke();
+    context.restore();
+
+    // 2. Main Neobrutalist Badge Body (Warm Cream #fffdf5)
+    drawPath(context);
+    context.fillStyle = '#fffdf5';
+    context.fill();
+    context.lineWidth = 3.5;
+    context.strokeStyle = '#000000';
+    context.stroke();
+
+    // Downward stem line linking the badge to the building
+    context.beginPath();
+    context.moveTo(cx, by + bh + arrowH);
+    context.lineTo(cx, by + bh + arrowH + stemH);
+    context.lineWidth = 3.5;
+    context.strokeStyle = '#000000';
+    context.stroke();
+    context.beginPath();
+    context.arc(cx, by + bh + arrowH + stemH, 3, 0, Math.PI * 2);
+    context.fillStyle = '#000000';
+    context.fill();
+
+    // 3. Left Indicator Pill
+    const px = bx + 8;
+    const py = by + 7;
+    const pw = 40;
+    const ph = 40;
+    const pradius = 8;
+    const pillColor = type === 'ready' ? '#2ed573'
+      : type === 'missing' ? '#ff4757'
+      : type === 'working' ? '#ffd35e'
+      : tone;
+
+    // Pill Shadow
+    context.fillStyle = '#000000';
+    context.beginPath();
+    context.roundRect(px + 2, py + 2, pw, ph, pradius);
+    context.fill();
+
+    // Pill Body
+    context.fillStyle = pillColor;
+    context.beginPath();
+    context.roundRect(px, py, pw, ph, pradius);
+    context.fill();
+    context.lineWidth = 2.5;
+    context.strokeStyle = '#000000';
+    context.stroke();
+
+    // Inside the Pill
+    const pcx = px + pw / 2;
+    const pcy = py + ph / 2;
+    if (type === 'ready') {
+      // Bold black checkmark ✓
+      context.beginPath();
+      context.moveTo(pcx - 9, pcy);
+      context.lineTo(pcx - 3, pcy + 7);
+      context.lineTo(pcx + 10, pcy - 7);
+      context.lineWidth = 3.8;
+      context.lineCap = 'round';
+      context.lineJoin = 'round';
+      context.strokeStyle = '#000000';
+      context.stroke();
+    } else if (type === 'missing') {
+      // Bold white exclamation !
+      context.beginPath();
+      context.moveTo(pcx, pcy - 10);
+      context.lineTo(pcx, pcy + 3);
+      context.lineWidth = 4.2;
+      context.lineCap = 'round';
+      context.strokeStyle = '#ffffff';
+      context.stroke();
+      context.beginPath();
+      context.arc(pcx, pcy + 9, 2.5, 0, Math.PI * 2);
+      context.fillStyle = '#ffffff';
+      context.fill();
+    } else if (type === 'working') {
+      // Circular progress ring
+      context.beginPath();
+      context.arc(pcx, pcy, 12, 0, Math.PI * 2);
+      context.lineWidth = 3.5;
+      context.strokeStyle = 'rgba(0, 0, 0, 0.2)';
+      context.stroke();
+
+      const startAngle = -Math.PI / 2;
+      const endAngle = startAngle + Math.PI * 2 * Math.max(0.08, Math.min(1, progress));
+      context.beginPath();
+      context.arc(pcx, pcy, 12, startAngle, endAngle);
+      context.lineWidth = 4;
+      context.strokeStyle = '#000000';
+      context.stroke();
+      context.beginPath();
+      context.arc(pcx, pcy, 2.5, 0, Math.PI * 2);
+      context.fillStyle = '#000000';
+      context.fill();
+    } else {
+      this.#drawBadgeIcon(context, itemIcon || 'goal', px + 4, py + 4, 32);
+    }
+
+    // 4. Content Area
+    if (type === 'ready') {
+      const iconX = bx + 56;
+      const iconY = by + 9;
+      this.#drawBadgeIcon(context, itemIcon, iconX, iconY, 36);
+
+      context.fillStyle = '#000000';
+      context.font = '900 28px Fredoka, sans-serif';
+      context.textAlign = 'left';
+      context.textBaseline = 'middle';
+      const countText = maxCount ? `${count}/${maxCount}` : `×${count}`;
+      context.fillText(countText, iconX + 42, by + bh / 2 + 1);
+
+      if (isClose) {
+        context.save();
+        context.fillStyle = '#2ed573';
+        context.beginPath();
+        context.roundRect(bx + bw - 52, by - 7, 46, 15, 4);
+        context.fill();
+        context.lineWidth = 1.8;
+        context.strokeStyle = '#000000';
+        context.stroke();
+        context.fillStyle = '#000000';
+        context.font = '900 10px Fredoka, sans-serif';
+        context.textAlign = 'center';
+        context.textBaseline = 'middle';
+        context.fillText('HAZIR', bx + bw - 29, by);
+        context.restore();
+      }
+    } else if (type === 'missing') {
+      const iconX = bx + 56;
+      const iconY = by + 9;
+      this.#drawBadgeIcon(context, itemIcon, iconX, iconY, 36);
+
+      context.fillStyle = '#000000';
+      context.font = '900 28px Fredoka, sans-serif';
+      context.textAlign = 'left';
+      context.textBaseline = 'middle';
+      const countText = maxCount !== undefined ? `${count}/${maxCount}` : `×${count}`;
+      context.fillText(countText, iconX + 42, by + bh / 2 + 1);
+
+      if (isClose) {
+        context.save();
+        context.fillStyle = '#ff4757';
+        context.beginPath();
+        context.roundRect(bx + bw - 52, by - 7, 46, 15, 4);
+        context.fill();
+        context.lineWidth = 1.8;
+        context.strokeStyle = '#000000';
+        context.stroke();
+        context.fillStyle = '#ffffff';
+        context.font = '900 10px Fredoka, sans-serif';
+        context.textAlign = 'center';
+        context.textBaseline = 'middle';
+        context.fillText(label || 'EKSİK', bx + bw - 29, by);
+        context.restore();
+      }
+    } else if (type === 'working') {
+      const barX = bx + 56;
+      const barY = by + 20;
+      const barW = 72;
+      const barH = 14;
+
+      context.fillStyle = '#ffffff';
+      context.beginPath();
+      context.roundRect(barX, barY, barW, barH, 4);
+      context.fill();
+      context.lineWidth = 2;
+      context.strokeStyle = '#000000';
+      context.stroke();
+
+      const fillW = Math.max(0, Math.min(barW, barW * progress));
+      if (fillW > 0) {
+        context.fillStyle = '#ffd35e';
+        context.beginPath();
+        context.roundRect(barX, barY, fillW, barH, 4);
+        context.fill();
+        context.lineWidth = 2;
+        context.strokeStyle = '#000000';
+        context.stroke();
+      }
+
+      context.fillStyle = '#000000';
+      context.font = '900 16px Fredoka, sans-serif';
+      context.textAlign = 'left';
+      context.textBaseline = 'middle';
+      context.fillText(`${Math.round(progress * 100)}%`, barX + barW + 8, by + bh / 2 + 1);
+
+      if (isClose) {
+        context.save();
+        context.fillStyle = '#ffd35e';
+        context.beginPath();
+        context.roundRect(bx + bw - 62, by - 7, 56, 15, 4);
+        context.fill();
+        context.lineWidth = 1.8;
+        context.strokeStyle = '#000000';
+        context.stroke();
+        context.fillStyle = '#000000';
+        context.font = '900 9px Fredoka, sans-serif';
+        context.textAlign = 'center';
+        context.textBaseline = 'middle';
+        context.fillText(label || 'ÜRETİYOR', bx + bw - 34, by);
+        context.restore();
+      }
+    } else {
+      context.fillStyle = '#000000';
+      context.font = 'bold 22px Fredoka, sans-serif';
+      context.textAlign = 'center';
+      context.textBaseline = 'middle';
+      context.fillText(label, bx + 56 + (bw - 56) / 2, by + bh / 2 + 1, bw - 64);
+    }
+
     sprite.material.map.needsUpdate = true;
   }
 
@@ -470,7 +771,7 @@ export class WorldScene {
     group.position.set(pos?.x ?? station.x ?? 0, 0, pos?.z ?? station.z ?? 0);
     const baseId = station.baseType ?? id.split('_')[0];
 
-    const { lamp, input, output, badgeY } = createProductionBuildModel(group, baseId);
+    const { lamp, input, output, badgeY, update } = createProductionBuildModel(group, baseId);
 
     const inputMeshes = [];
     for (const [itemId, quantity] of Object.entries(recipe.inputs)) {
@@ -485,7 +786,7 @@ export class WorldScene {
     }
 
     this.scene.add(group);
-    this.machines.set(id, { group, inputMeshes, output, outputItem: recipe.output, lamp, badgeY });
+    this.machines.set(id, { group, inputMeshes, output, outputItem: recipe.output, lamp, badgeY, update });
   }
 
   #addShelf(itemId) {
@@ -543,7 +844,7 @@ export class WorldScene {
     const position = state ? stationPosition(state, id) : station;
     if (!position) return;
 
-    const group = createDiningTableModel(this.itemFactory);
+    const group = createDiningTableModel(this.itemFactory, id);
     group.position.set(position.x, 0, position.z);
     this.scene.add(group);
     this.tables.set(id, group);
@@ -613,6 +914,7 @@ export class WorldScene {
     const moving = !['paying', 'waiting-stock', 'waiting-meal', 'waiting-table', 'eating', 'ready-tip'].includes(customer.phase);
 
     if (isSitting) {
+      if (actor.inspectMesh) actor.inspectMesh.visible = false;
       // 1. Leg posture: Bent 90 degrees forward over chair seat
       actor.legs[0].rotation.x = THREE.MathUtils.lerp(actor.legs[0].rotation.x, -Math.PI / 2.15, frameDelta * 12);
       actor.legs[1].rotation.x = THREE.MathUtils.lerp(actor.legs[1].rotation.x, -Math.PI / 2.15, frameDelta * 12);
@@ -643,37 +945,95 @@ export class WorldScene {
         actor.group.position.y += Math.sin(time * 2.5 + customer.id.length) * 0.006;
       }
     } else if (moving) {
+      if (actor.inspectMesh) actor.inspectMesh.visible = false;
       actor.walkCycle += frameDelta * 12;
       actor.legs[0].rotation.x = Math.sin(actor.walkCycle) * 0.5;
       actor.legs[1].rotation.x = -Math.sin(actor.walkCycle) * 0.5;
 
       if (actor.hasCart) {
-        // Subtle natural push sway on cart handle
-        actor.arms[0].rotation.x = -0.55 + Math.sin(actor.walkCycle) * 0.06;
-        actor.arms[1].rotation.x = -0.55 - Math.sin(actor.walkCycle) * 0.06;
+        // Market Arabası Sürme: Pushing shopping cart with hands on handle
+        actor.arms[0].rotation.set(-0.55 + Math.sin(actor.walkCycle) * 0.05, 0, 0.08);
+        actor.arms[1].rotation.set(-0.55 - Math.sin(actor.walkCycle) * 0.05, 0, -0.08);
+        if (actor.cartMesh) {
+          actor.cartMesh.rotation.z = Math.sin(actor.walkCycle * 2) * 0.015;
+          actor.cartMesh.position.y = Math.abs(Math.sin(actor.walkCycle * 4)) * 0.006;
+        }
       } else if (actor.hasBasket) {
-        // Free left arm swings, right arm holding basket stays steady
-        actor.arms[0].rotation.x = -Math.sin(actor.walkCycle) * 0.34;
-        actor.arms[1].rotation.x = THREE.MathUtils.lerp(actor.arms[1].rotation.x, 0.08, frameDelta * 8);
+        // Sepet Taşıma: Arm holding basket with pendulum sway, free arm swinging
+        actor.arms[0].rotation.set(-Math.sin(actor.walkCycle) * 0.35, 0, 0);
+        actor.arms[1].rotation.set(0.08 + Math.sin(actor.walkCycle) * 0.08, 0, -0.15);
+        if (actor.basketMesh) {
+          actor.basketMesh.rotation.z = Math.sin(actor.walkCycle) * 0.06;
+        }
+        actor.group.rotation.z = Math.sin(actor.walkCycle) * 0.018;
+      } else if (actor.archetype === 'elderly') {
+        const caneWalk = Math.sin(actor.walkCycle);
+        actor.arms[1].rotation.set(-0.35 + caneWalk * 0.22, 0, -0.1);
+        actor.arms[0].rotation.set(-caneWalk * 0.28, 0, 0.1);
+        actor.group.rotation.x = 0.12;
       } else {
-        actor.arms[0].rotation.x = -Math.sin(actor.walkCycle) * 0.32;
-        actor.arms[1].rotation.x = Math.sin(actor.walkCycle) * 0.32;
+        actor.arms[0].rotation.set(-Math.sin(actor.walkCycle) * 0.32, 0, 0);
+        actor.arms[1].rotation.set(Math.sin(actor.walkCycle) * 0.32, 0, 0);
+        actor.group.rotation.x = 0;
+        actor.group.rotation.z = 0;
       }
       actor.group.position.y = Math.abs(Math.sin(actor.walkCycle * 2)) * 0.05;
     } else {
       actor.legs[0].rotation.x = THREE.MathUtils.lerp(actor.legs[0].rotation.x, 0, frameDelta * 10);
       actor.legs[1].rotation.x = THREE.MathUtils.lerp(actor.legs[1].rotation.x, 0, frameDelta * 10);
-      if (actor.hasCart) {
-        actor.arms[0].rotation.x = THREE.MathUtils.lerp(actor.arms[0].rotation.x, -0.55, frameDelta * 10);
-        actor.arms[1].rotation.x = THREE.MathUtils.lerp(actor.arms[1].rotation.x, -0.55, frameDelta * 10);
-      } else if (actor.hasBasket) {
-        actor.arms[0].rotation.x = THREE.MathUtils.lerp(actor.arms[0].rotation.x, 0.04, frameDelta * 8);
-        actor.arms[1].rotation.x = THREE.MathUtils.lerp(actor.arms[1].rotation.x, 0.08, frameDelta * 8);
+      actor.group.rotation.z = THREE.MathUtils.lerp(actor.group.rotation.z, 0, frameDelta * 10);
+      actor.group.rotation.x = THREE.MathUtils.lerp(actor.group.rotation.x, 0, frameDelta * 10);
+
+      if (customer.phase === 'waiting-stock') {
+        // Ürün İnceleme (Inspecting product held up in both hands)
+        if (actor.inspectMesh) {
+          actor.inspectMesh.visible = true;
+          actor.inspectMesh.rotation.y = Math.sin(time * 2.8) * 0.45;
+          actor.inspectMesh.position.y = 0.76 + Math.sin(time * 2.8) * 0.02;
+        }
+        actor.arms[0].rotation.set(-0.76, 0.22, 0.18);
+        actor.arms[1].rotation.set(-0.76, -0.22, -0.18);
+        if (actor.head) actor.head.rotation.set(0.24 + Math.sin(time * 2.8) * 0.06, 0, 0);
+        actor.group.position.y += Math.sin(time * 2) * 0.005;
+      } else if (customer.phase === 'paying') {
+        // Kasa Ödeme (Paying with contactless card / mobile tap)
+        if (actor.inspectMesh) actor.inspectMesh.visible = false;
+        actor.arms[1].rotation.set(-0.85 + Math.sin(time * 3.5) * 0.15, 0, -0.12);
+        actor.arms[0].rotation.set(-0.25, 0, 0.08);
+        if (actor.head) actor.head.rotation.set(0.12 + Math.sin(time * 3.5) * 0.08, 0, 0);
+      } else if (customer.phase === 'waiting-table' || customer.phase === 'queueing') {
+        if (actor.inspectMesh) actor.inspectMesh.visible = false;
+        if (actor.hasCart) {
+          actor.arms[0].rotation.set(-0.55, 0, 0.08);
+          actor.arms[1].rotation.set(-0.55, 0, -0.08);
+        } else if (actor.hasBasket) {
+          actor.arms[0].rotation.set(0.04, 0, 0);
+          actor.arms[1].rotation.set(0.08, 0, -0.15);
+        } else if (actor.archetype === 'elderly') {
+          actor.arms[1].rotation.set(-0.35, 0, -0.1);
+          actor.arms[0].rotation.set(0.04, 0, 0);
+          actor.group.rotation.x = 0.1;
+        } else {
+          actor.arms[0].rotation.set(0.04, 0, 0);
+          actor.arms[1].rotation.set(-0.04, 0, 0);
+        }
+        actor.group.rotation.z = Math.sin(time * 1.5) * 0.015;
+        if (actor.head) actor.head.rotation.set(0.05, Math.sin(time * 1.2) * 0.22, 0);
       } else {
-        actor.arms[0].rotation.x = THREE.MathUtils.lerp(actor.arms[0].rotation.x, 0.04, frameDelta * 8);
-        actor.arms[1].rotation.x = THREE.MathUtils.lerp(actor.arms[1].rotation.x, -0.04, frameDelta * 8);
+        if (actor.inspectMesh) actor.inspectMesh.visible = false;
+        if (actor.hasCart) {
+          actor.arms[0].rotation.set(-0.55, 0, 0.08);
+          actor.arms[1].rotation.set(-0.55, 0, -0.08);
+        } else if (actor.hasBasket) {
+          actor.arms[0].rotation.set(0.04, 0, 0);
+          actor.arms[1].rotation.set(0.08, 0, -0.15);
+        } else {
+          actor.arms[0].rotation.set(0.04, 0, 0);
+          actor.arms[1].rotation.set(-0.04, 0, 0);
+        }
+        actor.group.position.y += Math.sin(time * 3 + customer.id.length) * 0.008;
+        if (actor.head) actor.head.rotation.set(0, THREE.MathUtils.lerp(actor.head.rotation.y, 0, frameDelta * 5), 0);
       }
-      actor.group.position.y += Math.sin(time * 3 + customer.id.length) * 0.012;
     }
 
     const wish = customer.reaction ? (customer.reaction === 'happy' ? 'satisfied' : 'unhappy') : customer.kind === 'diner'
@@ -681,18 +1041,20 @@ export class WorldScene {
       : (['entering', 'to-shelf', 'waiting-stock', 'to-next-shelf'].includes(customer.phase)
         ? customer.shoppingList?.[customer.shoppingIndex ?? 0] ?? customer.demand : null);
     if (wish !== actor.lastWish) {
-      const context = actor.bubbleCanvas.getContext('2d');
-      context.clearRect(0, 0, 128, 128);
-      if (wish) {
-        context.beginPath();
-        context.arc(64, 60, 48, 0, Math.PI * 2);
-        context.fillStyle = '#fff';
-        context.fill();
-        context.lineWidth = 6;
-        context.strokeStyle = '#2c3e50';
-        context.stroke();
-        drawAssetIcon(context, ITEMS[wish]?.icon ?? wish, 32, 28, 64, 64);
-        actor.bubbleTexture.needsUpdate = true;
+      if (actor.bubbleCanvas) {
+        const context = actor.bubbleCanvas.getContext('2d');
+        context.clearRect(0, 0, 128, 128);
+        if (wish) {
+          context.beginPath();
+          context.arc(64, 60, 48, 0, Math.PI * 2);
+          context.fillStyle = '#fff';
+          context.fill();
+          context.lineWidth = 6;
+          context.strokeStyle = '#2c3e50';
+          context.stroke();
+          drawAssetIcon(context, ITEMS[wish]?.icon ?? wish, 32, 28, 64, 64);
+          actor.bubbleTexture.needsUpdate = true;
+        }
       }
       actor.bubble.visible = Boolean(wish);
       actor.lastWish = wish;
@@ -783,8 +1145,40 @@ export class WorldScene {
         mesh.visible = farmState?.plants?.[index]?.ready ?? index < count;
       });
       const distance = Math.hypot(state.player.x - farm.group.position.x, state.player.z - farm.group.position.z);
-      this.#statusBadge(farm.group, count ? (state.settings.language === 'en' ? `READY ${count}` : `HAZIR ${count}`)
-        : (state.settings.language === 'en' ? 'GROWING' : 'BÜYÜYOR'), count ? '#58cc02' : '#1cb0f6', distance < 10, farm.badgeY ?? 3.05);
+      const station = STATIONS[farmId];
+      const cropItem = station?.item ?? 'TOMATO';
+      const cropIcon = ITEMS[cropItem]?.icon ?? cropItem.toLowerCase();
+      const unready = farmState?.plants?.filter((p) => !p.ready) ?? [];
+      let growProgress = 0.5;
+      if (unready.length > 0) {
+        const nextReady = Math.min(...unready.map((p) => p.nextReadyTick ?? (state.tick + 45)));
+        const remaining = Math.max(0, nextReady - state.tick);
+        growProgress = Math.max(0.08, Math.min(0.95, 1 - remaining / 45));
+      }
+      farm.update?.(time, frameDelta, growProgress, count > 0);
+      if (count > 0) {
+        this.#statusBadge(farm.group, {
+          type: 'ready',
+          itemIcon: cropIcon,
+          count,
+          tone: '#2ed573',
+          visible: distance < 11,
+          height: farm.badgeY ?? 3.05,
+          distance,
+          label: state.settings.language === 'en' ? 'READY' : 'HAZIR',
+        });
+      } else {
+        this.#statusBadge(farm.group, {
+          type: 'working',
+          itemIcon: cropIcon,
+          progress: growProgress,
+          tone: '#ffd35e',
+          visible: distance < 11,
+          height: farm.badgeY ?? 3.05,
+          distance,
+          label: state.settings.language === 'en' ? 'GROWING' : 'BÜYÜYOR',
+        });
+      }
     }
     this.#syncCollection(this.machines, Object.keys(state.machines), (id) => this.#addMachine(id), (entry) => this.#disposeVisual(entry));
     const shelfItems = state.unlockedProducts.filter((item) => SHELVES[item]);
@@ -891,18 +1285,51 @@ export class WorldScene {
 
     for (const [itemId, shelf] of this.shelves) {
       const count = state.stock[shelf.id]?.items[itemId] ?? 0;
+      const capacity = SHELVES[itemId]?.capacity ?? 8;
       this.#drawShelfLabel(shelf, itemId, state.settings.language);
       shelf.productMeshes.forEach((mesh, index) => { mesh.visible = index < count; });
       const distance = Math.hypot(state.player.x - shelf.group.position.x, state.player.z - shelf.group.position.z);
-      this.#statusBadge(shelf.group, count ? `${count}/${SHELVES[itemId].capacity}`
-        : (state.settings.language === 'en' ? 'EMPTY' : 'BOŞ'), count ? '#58cc02' : '#ff4b4b', distance < 8, 2.65);
+      const iconId = ITEMS[itemId]?.icon ?? itemId.toLowerCase();
+      if (count > 0) {
+        this.#statusBadge(shelf.group, {
+          type: 'ready',
+          itemIcon: iconId,
+          count,
+          maxCount: capacity,
+          tone: '#2ed573',
+          visible: distance < 8.5,
+          height: 2.65,
+          distance,
+          label: `${count}/${capacity}`,
+        });
+      } else {
+        this.#statusBadge(shelf.group, {
+          type: 'missing',
+          itemIcon: iconId,
+          count: 0,
+          maxCount: capacity,
+          tone: '#ff4757',
+          visible: distance < 8.5,
+          height: 2.65,
+          distance,
+          label: state.settings.language === 'en' ? 'EMPTY' : 'BOŞ',
+        });
+      }
     }
     for (const [machineId, machine] of this.machines) {
       const count = state.stock[`machine:${machineId}:output`]?.items[machine.outputItem] ?? 0;
       const shown = Math.min(count, 5);
       while (machine.output.children.length < shown) {
         const mesh = new THREE.Mesh(this.itemFactory.getItemGeometry(machine.outputItem), this.itemFactory.getItemMaterial(machine.outputItem));
+        mesh.scale.set(0.01, 0.01, 0.01);
         machine.output.add(mesh);
+        animate(mesh.scale, {
+          x: [0.01, 1.25, 1],
+          y: [0.01, 1.35, 1],
+          z: [0.01, 1.25, 1],
+          duration: 380,
+          ease: 'outBack',
+        });
       }
       machine.output.children.forEach((mesh, index) => {
         mesh.visible = index < shown;
@@ -916,11 +1343,65 @@ export class WorldScene {
       machine.lamp.material.color.setHex(entry?.blocked === 'output-full' ? 0xff4b4b
         : entry?.progressTicks ? 0xffc800 : 0x58cc02);
       machine.group.rotation.y = Math.sin(time * 1.5) * (entry && entry.progressTicks ? 0.025 : 0);
+      const isWorking = Boolean(entry && entry.progressTicks);
+      machine.update?.(time, frameDelta, isWorking);
       const distance = Math.hypot(state.player.x - machine.group.position.x, state.player.z - machine.group.position.z);
-      const status = count ? (state.settings.language === 'en' ? `READY ${count}` : `HAZIR ${count}`)
-        : entry?.progressTicks ? (state.settings.language === 'en' ? 'WORKING' : 'ÜRETİYOR')
-          : (state.settings.language === 'en' ? 'NEEDS STOCK' : 'MALZEME GEREK');
-      this.#statusBadge(machine.group, status, count ? '#58cc02' : entry?.progressTicks ? '#ffc800' : '#ff9600', distance < 10, machine.badgeY ?? 3.25);
+      const recipe = RECIPES[STATIONS[machineId]?.recipe];
+      const prodThreshold = (recipe?.seconds ?? 3) * 10;
+      const workProgress = entry?.progressTicks ? Math.min(0.99, entry.progressTicks / prodThreshold) : 0;
+      const outputDef = ITEMS[machine.outputItem];
+      const outputIconId = outputDef?.icon ?? machine.outputItem?.toLowerCase();
+
+      if (count > 0) {
+        this.#statusBadge(machine.group, {
+          type: 'ready',
+          itemIcon: outputIconId,
+          count,
+          tone: '#2ed573',
+          visible: distance < 11,
+          height: machine.badgeY ?? 3.25,
+          distance,
+          label: state.settings.language === 'en' ? 'READY' : 'HAZIR',
+        });
+      } else if (entry?.progressTicks) {
+        this.#statusBadge(machine.group, {
+          type: 'working',
+          itemIcon: outputIconId,
+          progress: workProgress,
+          tone: '#ffd35e',
+          visible: distance < 11,
+          height: machine.badgeY ?? 3.25,
+          distance,
+          label: state.settings.language === 'en' ? 'WORKING' : 'ÜRETİYOR',
+        });
+      } else {
+        const missing = [];
+        if (recipe?.inputs) {
+          const currentInputs = state.stock[`machine:${machineId}:input`]?.items ?? {};
+          for (const [inItem, needCount] of Object.entries(recipe.inputs)) {
+            const has = currentInputs[inItem] ?? 0;
+            if (has < needCount) {
+              const inDef = ITEMS[inItem];
+              missing.push({
+                item: inItem,
+                icon: inDef?.icon ?? inItem.toLowerCase(),
+                count: needCount - has,
+              });
+            }
+          }
+        }
+        const primary = missing[0];
+        this.#statusBadge(machine.group, {
+          type: 'missing',
+          itemIcon: primary?.icon ?? 'tomato',
+          count: primary?.count ?? 1,
+          tone: '#ff4757',
+          visible: distance < 11,
+          height: machine.badgeY ?? 3.25,
+          distance,
+          label: state.settings.language === 'en' ? 'NEEDS STOCK' : 'EKSİK',
+        });
+      }
     }
 
     for (const [id, table] of this.tables) {
@@ -949,9 +1430,33 @@ export class WorldScene {
       }
 
       const distance = Math.hypot(state.player.x - table.position.x, state.player.z - table.position.z);
-      this.#statusBadge(table, ready ? (state.settings.language === 'en' ? 'TIP READY' : 'BAHŞİŞ HAZIR')
-        : waiting ? (state.settings.language === 'en' ? 'ORDER' : 'SİPARİŞ') : '',
-      ready ? '#58cc02' : '#ff9600', (ready || waiting) && distance < 12, 2.1);
+      if (ready) {
+        this.#statusBadge(table, {
+          type: 'ready',
+          itemIcon: 'tip',
+          count: 1,
+          tone: '#2ed573',
+          visible: distance < 12,
+          height: 2.1,
+          distance,
+          label: state.settings.language === 'en' ? 'TIP READY' : 'BAHŞİŞ',
+        });
+      } else if (waiting) {
+        const mealItem = customer?.meal ?? customer?.demand;
+        const itemDef = ITEMS[mealItem];
+        this.#statusBadge(table, {
+          type: 'missing',
+          itemIcon: itemDef?.icon ?? 'orders',
+          count: 1,
+          tone: '#ffa502',
+          visible: distance < 12,
+          height: 2.1,
+          distance,
+          label: state.settings.language === 'en' ? 'ORDER' : 'SİPARİŞ',
+        });
+      } else {
+        this.#statusBadge(table, { visible: false });
+      }
     }
 
     for (let index = this.effects.length - 1; index >= 0; index -= 1) {
@@ -989,29 +1494,147 @@ export class WorldScene {
       const x = worker.x ?? -8 + (index % 3) * 0.65;
       const z = worker.z ?? (index % 2 ? 0.7 : -0.7);
       const moving = Math.hypot(x - actor.group.position.x, z - actor.group.position.z) > 0.025;
-      if (moving) {
-        actor.walkCycle += frameDelta * 12;
-        actor.legs[0].rotation.x = Math.sin(actor.walkCycle) * 0.48;
-        actor.legs[1].rotation.x = -Math.sin(actor.walkCycle) * 0.48;
-        actor.arms[0].rotation.x = -Math.sin(actor.walkCycle) * 0.3;
-        actor.arms[1].rotation.x = Math.sin(actor.walkCycle) * 0.3;
-        actor.group.position.y = Math.abs(Math.sin(actor.walkCycle * 2)) * 0.045;
-      } else {
-        actor.legs[0].rotation.x = THREE.MathUtils.lerp(actor.legs[0].rotation.x, 0, frameDelta * 10);
-        actor.legs[1].rotation.x = THREE.MathUtils.lerp(actor.legs[1].rotation.x, 0, frameDelta * 10);
-        actor.arms[0].rotation.x = THREE.MathUtils.lerp(actor.arms[0].rotation.x, 0.04, frameDelta * 8);
-        actor.arms[1].rotation.x = THREE.MathUtils.lerp(actor.arms[1].rotation.x, -0.08, frameDelta * 8);
-        actor.group.position.y = THREE.MathUtils.lerp(actor.group.position.y, 0, frameDelta * 10);
-      }
-      actor.group.position.x = x;
-      actor.group.position.z = z;
-      actor.group.rotation.y = worker.facing ?? 0;
       const stock = state.stock[`worker:${worker.id}`]?.items ?? {};
       const carriedItem = Object.keys(stock)[0];
       actor.cargo.visible = Boolean(carriedItem);
       if (carriedItem) {
         actor.cargo.geometry = this.itemFactory.getItemGeometry(carriedItem);
         actor.cargo.material = this.itemFactory.getItemMaterial(carriedItem);
+      }
+
+      if (moving) {
+        actor.walkCycle += frameDelta * 12;
+        actor.legs[0].rotation.x = Math.sin(actor.walkCycle) * 0.48;
+        actor.legs[1].rotation.x = -Math.sin(actor.walkCycle) * 0.48;
+        actor.group.position.y = Math.abs(Math.sin(actor.walkCycle * 2)) * 0.045;
+        actor.group.rotation.x = 0;
+        actor.group.rotation.z = 0;
+
+        if (carriedItem) {
+          // Taşıma (Carrying Cargo Box with both hands wrapped forward)
+          actor.arms[0].rotation.set(-0.76, 0.22, 0.15);
+          actor.arms[1].rotation.set(-0.76, -0.22, -0.15);
+          actor.cargo.position.set(0, 0.72 + Math.abs(Math.sin(actor.walkCycle * 2)) * 0.035, 0.34);
+          actor.cargo.rotation.set(Math.sin(actor.walkCycle) * 0.04, 0, 0);
+          if (actor.propObjects?.box) actor.propObjects.box.visible = false;
+        } else {
+          // Normal walking arm swing
+          actor.arms[0].rotation.set(-Math.sin(actor.walkCycle) * 0.35, 0, 0);
+          actor.arms[1].rotation.set(Math.sin(actor.walkCycle) * 0.35, 0, 0);
+          if (actor.propObjects?.box) actor.propObjects.box.visible = (actor.profession === 'stockClerk' || actor.profession === 'factoryFeeder');
+        }
+      } else {
+        actor.legs[0].rotation.x = THREE.MathUtils.lerp(actor.legs[0].rotation.x, 0, frameDelta * 10);
+        actor.legs[1].rotation.x = THREE.MathUtils.lerp(actor.legs[1].rotation.x, 0, frameDelta * 10);
+        actor.group.position.y = THREE.MathUtils.lerp(actor.group.position.y, 0, frameDelta * 10);
+
+        if (carriedItem) {
+          // Taşıma (Holding Cargo at rest)
+          actor.arms[0].rotation.set(-0.76, 0.18, 0.1);
+          actor.arms[1].rotation.set(-0.76, -0.18, -0.1);
+          actor.cargo.position.set(0, 0.72 + Math.sin(time * 3) * 0.012, 0.34);
+          if (actor.propObjects?.box) actor.propObjects.box.visible = false;
+        } else {
+          // Role-specific idle workstation animations
+          const prof = actor.profession ?? worker.type;
+          if (prof === 'cashier') {
+            const scan = Math.sin(time * 3.5);
+            actor.arms[1].rotation.set(-0.75 + scan * 0.22, 0.15, 0);
+            actor.arms[0].rotation.set(-0.55 + Math.cos(time * 5) * 0.12, -0.1, 0);
+            if (actor.head) actor.head.rotation.set(0.18 + scan * 0.08, Math.sin(time * 1.8) * 0.15, 0);
+            if (actor.propObjects?.laser?.material?.color) {
+              actor.propObjects.laser.material.color.setHex(Math.sin(time * 8) > 0 ? 0x2ed573 : 0xff4757);
+            }
+          } else if (prof === 'stockClerk' || prof === 'factoryFeeder') {
+            // Raf Düzenleme (Shelf facing & stocking)
+            actor.arms[0].rotation.set(-0.88 + Math.sin(time * 3.2) * 0.18, 0.15, 0);
+            actor.arms[1].rotation.set(-0.76 + Math.cos(time * 3.2) * 0.18, -0.15, 0);
+            if (actor.head) actor.head.rotation.set(0.14, Math.sin(time * 2) * 0.2, 0);
+            actor.group.rotation.x = Math.sin(time * 1.5) * 0.04;
+          } else if (prof === 'janitor') {
+            // Temizlik (Floor mopping sweep)
+            const sweep = Math.sin(time * 2.8);
+            actor.arms[1].rotation.set(-0.65, 0.2, 0);
+            actor.arms[0].rotation.set(-0.45, -0.2, 0);
+            if (actor.propObjects?.mop) {
+              actor.propObjects.mop.rotation.z = sweep * 0.35;
+              actor.propObjects.mop.rotation.y = Math.cos(time * 2.8) * 0.2;
+            }
+            actor.group.rotation.y = (worker.facing ?? 0) + sweep * 0.22;
+            if (actor.head) actor.head.rotation.set(0.2, -sweep * 0.15, 0);
+          } else if (prof === 'chef' || prof === 'chefWaiter') {
+            // Yemek Hazırlama (Cooking & pan tossing)
+            const toss = (time * 2.5) % (Math.PI * 2);
+            const flick = Math.max(0, Math.sin(toss)) ** 4;
+            actor.arms[1].rotation.set(-0.68 - flick * 0.42, 0, -0.1);
+            actor.arms[0].rotation.set(-0.45 + Math.sin(time * 3.5) * 0.12, 0.2, 0.1);
+            if (actor.propObjects?.egg) {
+              actor.propObjects.egg.position.y = 0.02 + flick * 0.35;
+              actor.propObjects.egg.rotation.x = flick * Math.PI * 2;
+            }
+            if (actor.head) actor.head.rotation.set(0.22 - flick * 0.1, 0, 0);
+          } else if (prof === 'technician') {
+            // Onarım (Machinery Repair)
+            actor.legs[0].rotation.x = -0.38;
+            actor.legs[1].rotation.x = -0.38;
+            actor.group.position.y = -0.09;
+            const turn = Math.sin(time * 5.5);
+            actor.arms[1].rotation.set(-0.85 + turn * 0.25, 0, -0.1);
+            if (actor.propObjects?.wrench) actor.propObjects.wrench.rotation.z = turn * 0.55;
+            actor.arms[0].rotation.set(-0.4, 0.2, 0);
+            if (actor.head) actor.head.rotation.set(0.3, 0, 0);
+          } else if (prof === 'waiter') {
+            // Servis (Serving tray balance)
+            actor.arms[1].rotation.set(-1.38, 0, -0.18);
+            actor.arms[0].rotation.set(0.25, 0, 0.15);
+            if (actor.propObjects?.tray) {
+              actor.propObjects.tray.rotation.x = 1.38;
+              actor.propObjects.tray.position.y = 0.24 + Math.sin(time * 2) * 0.015;
+            }
+            if (actor.head) actor.head.rotation.set(0.04, Math.sin(time * 1.5) * 0.18, 0);
+          } else if (prof === 'butcher') {
+            // Et Doğrama (Cleaver chopping)
+            const chop = Math.max(0, Math.sin(time * 5.5));
+            actor.arms[1].rotation.set(-0.35 - chop * 0.75, 0, 0);
+            actor.arms[0].rotation.set(-0.7, 0.15, 0.1);
+            if (actor.head) actor.head.rotation.set(0.25, 0, 0);
+          } else if (prof === 'baker') {
+            // Ekmek Pişirme (Peel sliding)
+            const slide = Math.sin(time * 2.6) * 0.22;
+            actor.arms[0].rotation.set(-0.72 + slide, 0.1, 0);
+            actor.arms[1].rotation.set(-0.72 + slide, -0.1, 0);
+            if (actor.propObjects?.peel) actor.propObjects.peel.position.z = 0.28 + slide * 0.35;
+          } else if (prof === 'security') {
+            // Devriye & Telsiz
+            if (actor.head) actor.head.rotation.set(0, Math.sin(time * 0.9) * 0.48, 0);
+            const radioCheck = Math.sin(time * 0.6) > 0.55;
+            if (radioCheck) {
+              actor.arms[1].rotation.set(-1.3, -0.25, -0.35);
+            } else {
+              actor.arms[1].rotation.set(0.05, 0, -0.05);
+            }
+            actor.arms[0].rotation.set(0.05, 0, 0.05);
+          } else if (prof === 'storeManager' || prof === 'driver') {
+            actor.arms[0].rotation.set(0.06, 0, 0.08);
+            actor.arms[1].rotation.set(-0.3 + Math.sin(time * 2) * 0.12, 0, 0);
+            if (actor.head) actor.head.rotation.set(0.12 + Math.sin(time * 2.2) * 0.08, Math.sin(time * 1.1) * 0.24, 0);
+          } else if (prof === 'gardener' || prof === 'harvester' || prof === 'caretaker') {
+            actor.group.rotation.x = 0.12;
+            actor.arms[0].rotation.set(-0.75 + Math.sin(time * 3) * 0.14, 0.12, 0);
+            actor.arms[1].rotation.set(-0.75 - Math.sin(time * 3) * 0.14, -0.12, 0);
+            if (actor.head) actor.head.rotation.set(0.3, Math.sin(time * 1.8) * 0.15, 0);
+          } else {
+            actor.arms[0].rotation.set(Math.sin(time * 1.5) * 0.04, 0, 0.04);
+            actor.arms[1].rotation.set(-Math.sin(time * 1.5) * 0.04, 0, -0.04);
+            if (actor.head) actor.head.rotation.set(0.06, Math.sin(time * 1.2) * 0.18, 0);
+          }
+        }
+      }
+
+      actor.group.position.x = x;
+      actor.group.position.z = z;
+      if (actor.profession !== 'janitor' || moving) {
+        actor.group.rotation.y = worker.facing ?? 0;
       }
     });
 

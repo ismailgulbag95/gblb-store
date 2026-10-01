@@ -1,0 +1,20 @@
+{
+  "action": "submit_evidence",
+  "actor": "agent",
+  "reason": "Faz 5 Arka Alan, Depo ve Lojistik Tesisleri için yükleme iskelesi, sarı forklift, hidrolik transpalet, palet istifleri, depo hangarı, soğuk hava deposu ve geri dönüşüm konteynerleri inşa edildi ve test edildi.",
+  "task_id": "T-PHASE-5",
+  "items": [
+    {
+      "path": "docs/FAZ_5_INSPECTION_REPORT.md",
+      "criterion": 0,
+      "note": "Yükleme iskelesi, sarı forklift, hidrolik transpalet ve barkodlu ahşap palet istifleri kuruldu.",
+      "reviewer": "agent"
+    },
+    {
+      "path": "docs/FAZ_5_INSPECTION_REPORT.md",
+      "criterion": 1,
+      "note": "Depo hangarı binası, dijital göstergeli soğuk hava deposu ve 3 bölümlü geri dönüşüm konteynerleri yerleştirildi.",
+      "reviewer": "agent"
+    }
+  ]
+}

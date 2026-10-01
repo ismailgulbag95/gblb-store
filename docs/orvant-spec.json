@@ -1,0 +1,316 @@
+{
+  "schema_version": 3,
+  "revision": 0,
+  "project": {
+    "id": "gblb-store-3d",
+    "name": "GBLB Store 3D Procedural World Transformation",
+    "goal": "Transform current game scene into the full isometric supermarket world with interior equipment, product assets, logistics, agriculture, vehicles, and characters matching the design reference sheet.",
+    "audience": "Game developers and players of Tohumdan Sofraya / GBLB Store",
+    "scope": [
+      "Supermarket interior equipment and aisles",
+      "Low-poly 3D product assets for shelves",
+      "Outdoor parking lot, road, and vehicles",
+      "Agricultural farm zone with greenhouse and animals",
+      "Backstage logistics yard and industrial machines",
+      "10 staff professions and diverse customer archetypes",
+      "Office, staff breakroom, and utility areas"
+    ],
+    "out_of_scope": [
+      "Heavy external GLTF photogrammetry downloads (all assets are procedural Three.js)",
+      "Unrelated backend server infrastructure"
+    ],
+    "constraints": [
+      "Pure procedural Three.js models (img2threejs style)",
+      "Maintain 60 FPS performance on web/mobile browsers",
+      "Compatible with existing GameApplication and WorldScene architecture"
+    ],
+    "open_questions": []
+  },
+  "ontology": {
+    "object_types": [
+      {
+        "id": "scene_module",
+        "label": "Sahne Modülü",
+        "properties": {
+          "name": { "type": "string", "required": true, "enum": null },
+          "description": { "type": "string", "required": true, "enum": null },
+          "phase": { "type": "integer", "required": true, "enum": null }
+        }
+      },
+      {
+        "id": "procedural_asset",
+        "label": "Prosedürel 3D Varlık",
+        "properties": {
+          "name": { "type": "string", "required": true, "enum": null },
+          "category": { "type": "string", "required": true, "enum": ["interior", "exterior", "vehicle", "character", "logistics", "farm", "utility"] },
+          "file_ref": { "type": "string", "required": true, "enum": null }
+        }
+      },
+      {
+        "id": "product_item",
+        "label": "Ürün Varlığı",
+        "properties": {
+          "name": { "type": "string", "required": true, "enum": null },
+          "category": { "type": "string", "required": true, "enum": ["produce", "packaged", "meat_dairy", "cleaning", "drinks", "bakery"] }
+        }
+      },
+      {
+        "id": "milestone",
+        "label": "Kilometre Taşı",
+        "properties": {
+          "phase_number": { "type": "integer", "required": true, "enum": null },
+          "verdict": { "type": "string", "required": true, "enum": ["planned", "in_progress", "completed"] }
+        }
+      }
+    ],
+    "relation_types": [
+      {
+        "id": "contains",
+        "label": "Barındırır",
+        "from_type": "scene_module",
+        "to_type": "procedural_asset",
+        "from_min": 0,
+        "from_max": null,
+        "to_min": 0,
+        "to_max": null,
+        "impact": "forward"
+      },
+      {
+        "id": "displays",
+        "label": "Sergiler",
+        "from_type": "procedural_asset",
+        "to_type": "product_item",
+        "from_min": 0,
+        "from_max": null,
+        "to_min": 0,
+        "to_max": null,
+        "impact": "none"
+      },
+      {
+        "id": "targets",
+        "label": "Hedefler",
+        "from_type": "milestone",
+        "to_type": "scene_module",
+        "from_min": 1,
+        "from_max": null,
+        "to_min": 0,
+        "to_max": null,
+        "impact": "none"
+      }
+    ]
+  },
+  "objects": [
+    {
+      "id": "mod-supermarket",
+      "type": "scene_module",
+      "label": "Süpermarket İç Mekanı",
+      "properties": {
+        "name": "Supermarket Interior",
+        "description": "Cilalı fayans zemin, manav stantları, gondol reyonlar, içecek dolapları, kasa konveyör hattı",
+        "phase": 1
+      }
+    },
+    {
+      "id": "mod-parking-road",
+      "type": "scene_module",
+      "label": "Otopark ve Yol Alanı",
+      "properties": {
+        "name": "Parking & Roadway",
+        "description": "Asfalt otopark şeritleri, 5+ renk araçlar, kargo kamyonu, van, sokak lambaları ve totem",
+        "phase": 3
+      }
+    },
+    {
+      "id": "mod-farm-production",
+      "type": "scene_module",
+      "label": "Tarım ve Üretim Alanı",
+      "properties": {
+        "name": "Farm & Production",
+        "description": "Sera, buğday tarlaları, sebze parselleri, kırmızı ahır, su kulesi ve çiftlik hayvanları",
+        "phase": 4
+      }
+    },
+    {
+      "id": "mod-logistics-backend",
+      "type": "scene_module",
+      "label": "Depo ve Lojistik Üssü",
+      "properties": {
+        "name": "Logistics & Warehouse",
+        "description": "Yükleme rampası, forklift, transpalet, palet rafları, atık ve geri dönüşüm merkezi",
+        "phase": 5
+      }
+    },
+    {
+      "id": "asset-produce-shelf",
+      "type": "procedural_asset",
+      "label": "Ahşap Eğimli Manav Reyonu",
+      "properties": {
+        "name": "Slanted Wooden Produce Shelf",
+        "category": "interior",
+        "file_ref": "src/presentation/ShelfModel.js"
+      }
+    },
+    {
+      "id": "asset-checkout-counter",
+      "type": "procedural_asset",
+      "label": "Konveyör Bantlı Kasa Masası",
+      "properties": {
+        "name": "Checkout Conveyor Register",
+        "category": "interior",
+        "file_ref": "src/presentation/RegisterModel.js"
+      }
+    },
+    {
+      "id": "asset-beverage-cooler",
+      "type": "procedural_asset",
+      "label": "Cam Kapaklı Soğutucu Dolap",
+      "properties": {
+        "name": "Glass Door Beverage Cooler",
+        "category": "interior",
+        "file_ref": "src/presentation/ShelfModel.js"
+      }
+    },
+    {
+      "id": "asset-forklift",
+      "type": "procedural_asset",
+      "label": "Endüstriyel Forklift",
+      "properties": {
+        "name": "Yellow Warehouse Forklift",
+        "category": "logistics",
+        "file_ref": "src/environment/EnvironmentProps.js"
+      }
+    },
+    {
+      "id": "item-tomato",
+      "type": "product_item",
+      "label": "Taze Domates",
+      "properties": {
+        "name": "Fresh Tomato",
+        "category": "produce"
+      }
+    },
+    {
+      "id": "item-milk",
+      "type": "product_item",
+      "label": "Paket Süt",
+      "properties": {
+        "name": "Carton Milk",
+        "category": "packaged"
+      }
+    },
+    {
+      "id": "ms-phase1",
+      "type": "milestone",
+      "label": "Faz 1: Market İç Mekanı",
+      "properties": {
+        "phase_number": 1,
+        "verdict": "planned"
+      }
+    }
+  ],
+  "relations": [
+    { "id": "rel-sup-shelf", "from": "mod-supermarket", "type": "contains", "to": "asset-produce-shelf" },
+    { "id": "rel-sup-reg", "from": "mod-supermarket", "type": "contains", "to": "asset-checkout-counter" },
+    { "id": "rel-sup-cool", "from": "mod-supermarket", "type": "contains", "to": "asset-beverage-cooler" },
+    { "id": "rel-log-fork", "from": "mod-logistics-backend", "type": "contains", "to": "asset-forklift" },
+    { "id": "rel-shelf-tom", "from": "asset-produce-shelf", "type": "displays", "to": "item-tomato" },
+    { "id": "rel-cool-milk", "from": "asset-beverage-cooler", "type": "displays", "to": "item-milk" },
+    { "id": "rel-ms1-sup", "from": "ms-phase1", "type": "targets", "to": "mod-supermarket" }
+  ],
+  "tasks": [
+    {
+      "id": "T-PHASE-1",
+      "title": "Faz 1: Süpermarket İç Mekan ve Ekipman Mimarisinin Kurulması",
+      "status": "todo",
+      "object_ids": ["mod-supermarket", "asset-produce-shelf", "asset-checkout-counter", "asset-beverage-cooler", "ms-phase1"],
+      "input_ids": ["mod-supermarket"],
+      "output_ids": ["ms-phase1"],
+      "depends_on": [],
+      "decision_ids": [],
+      "acceptance": [
+        "Süpermarket içi cilalı porselen fayans ve açık mağaza düzenine kavuşturuldu.",
+        "Manav tezgâhları, gondol reyonlar ve cam kapaklı içecek dolapları referans görseldeki gibi konumlandırıldı.",
+        "Konveyör bantlı kasa masası, market arabaları ve alışveriş sepetleri yerleştirildi."
+      ],
+      "evidence": [],
+      "input_snapshot": null,
+      "generation": 0,
+      "review_reasons": []
+    },
+    {
+      "id": "T-PHASE-2",
+      "title": "Faz 2: 3D Ürün Varlıklarının Geliştirilmesi ve Reyon Yerleşimi",
+      "status": "todo",
+      "object_ids": ["item-tomato", "item-milk"],
+      "input_ids": ["item-tomato"],
+      "output_ids": [],
+      "depends_on": ["T-PHASE-1"],
+      "decision_ids": [],
+      "acceptance": [
+        "Meyve-sebze, paketli gıdalar, içecekler, unlu mamüller ve et-süt kategorileri için 3D düşük poligonlu ürün modelleri oluşturuldu.",
+        "Ürünler reyon raflarına düzenli ve renkli biçimde istiflendi."
+      ],
+      "evidence": [],
+      "input_snapshot": null,
+      "generation": 0,
+      "review_reasons": []
+    },
+    {
+      "id": "T-PHASE-3",
+      "title": "Faz 3: Dış Mekan, Otopark, Yollar ve Araç Filosu",
+      "status": "todo",
+      "object_ids": ["mod-parking-road"],
+      "input_ids": ["mod-parking-road"],
+      "output_ids": [],
+      "depends_on": ["T-PHASE-1"],
+      "decision_ids": [],
+      "acceptance": [
+        "Asfalt otopark çizgileri ve park cepleri tamamlandı.",
+        "Farklı renklerde sedanlar, teslimat kamyonu, kargo vanı ve scooter modellendi.",
+        "Sokak lambaları, oturma bankları, çöp kutuları ve GBLB Store totem tabelası yerleştirildi."
+      ],
+      "evidence": [],
+      "input_snapshot": null,
+      "generation": 0,
+      "review_reasons": []
+    },
+    {
+      "id": "T-PHASE-4",
+      "title": "Faz 4: Tarım ve Üretim Çiftliği Bölgesi",
+      "status": "todo",
+      "object_ids": ["mod-farm-production"],
+      "input_ids": ["mod-farm-production"],
+      "output_ids": [],
+      "depends_on": ["T-PHASE-1"],
+      "decision_ids": [],
+      "acceptance": [
+        "Sera, buğday tarlası yatakları ve sebze parselleri modellendi.",
+        "Kırmızı çiftlik ahırı, su kulesi ve inek/tavuk modelleri eklendi."
+      ],
+      "evidence": [],
+      "input_snapshot": null,
+      "generation": 0,
+      "review_reasons": []
+    },
+    {
+      "id": "T-PHASE-5",
+      "title": "Faz 5: Arka Alan, Depo ve Lojistik Tesisleri",
+      "status": "todo",
+      "object_ids": ["mod-logistics-backend", "asset-forklift"],
+      "input_ids": ["mod-logistics-backend"],
+      "output_ids": [],
+      "depends_on": ["T-PHASE-3"],
+      "decision_ids": [],
+      "acceptance": [
+        "Yükleme iskelesi, sarı forklift, transpalet ve ahşap palet istifleri kuruldu.",
+        "Depo binası, soğuk hava deposu ve geri dönüşüm konteynerleri yerleştirildi."
+      ],
+      "evidence": [],
+      "input_snapshot": null,
+      "generation": 0,
+      "review_reasons": []
+    }
+  ],
+  "decisions": [],
+  "history": []
+}

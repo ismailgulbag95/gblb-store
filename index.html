@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1, user-scalable=no" />
     <meta name="theme-color" content="#173d46" />
     <link rel="icon" type="image/svg+xml" href="/assets/branding/seed-to-serve/market-stall-color.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700;800;900&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet" />
     <title>Tohumdan Sofraya: Market Oyunu</title>
   </head>
   <body>
@@ -35,7 +38,7 @@
           </div>
           <div class="top-actions">
             <button class="icon-btn" id="btn-expansions" aria-label="İşletme geliştirmeleri"><span data-asset-icon="upgrade" data-asset-size="34"></span><span id="upgrade-count">1</span></button>
-            <button class="icon-btn" id="btn-layout" aria-label="Yerleşimi düzenle" aria-pressed="false" title="Yerleşimi düzenle">▦</button>
+            <button class="icon-btn" id="btn-layout" aria-label="Yerleşimi düzenle" aria-pressed="false" title="Yerleşimi düzenle"><span data-asset-icon="grid" data-asset-size="26"></span></button>
             <button class="icon-btn" id="btn-decor-top" aria-label="Dekorasyon mağazası" title="Dekorasyon mağazası"><span data-asset-icon="decoration" data-asset-size="34"></span></button>
             <button class="icon-btn" id="btn-settings" aria-label="Ayarlar"><span data-asset-icon="settings" data-asset-size="34"></span></button>
           </div>
@@ -48,7 +51,7 @@
             <div class="quest-progress"><span id="progress-count">0 / 17</span><div class="progress-track"><i id="progress-fill"></i></div></div>
           </section>
           <section class="order-card hidden" id="order-card" data-ui aria-live="polite">
-            <div class="order-heading"><span data-asset-icon="orders" data-asset-size="34"></span><strong id="order-title" data-short-label="SİPARİŞ">MÜŞTERİ SİPARİŞİ</strong><button id="btn-order-toggle" class="order-collapse" aria-label="Sipariş ayrıntılarını küçült" aria-expanded="true">⌃</button></div>
+            <div class="order-heading"><span data-asset-icon="orders" data-asset-size="34"></span><strong id="order-title" data-short-label="SİPARİŞ">MÜŞTERİ SİPARİŞİ</strong><button id="btn-order-toggle" class="order-collapse" aria-label="Sipariş ayrıntılarını küçült" aria-expanded="true"><span data-asset-icon="chevronUp" data-asset-size="18"></span></button></div>
             <div class="order-details"><span id="order-item"></span><strong id="order-reward"></strong></div>
             <div class="order-progress"><span id="order-progress"></span><div class="progress-track"><i id="order-progress-fill"></i></div></div>
             <button id="btn-deliver-order" class="order-deliver">Siparişi teslim et</button>
@@ -61,9 +64,9 @@
         </div>
       </header>
       <div id="layout-help" class="layout-help hidden" data-ui>
-        <span id="layout-help-text">Taşımak için bir yapıya dokun, sonra boş bir kareye dokun. Bitirmek için ▦ düğmesine bas.</span>
-        <button id="btn-rotate-layout" class="layout-rotate-btn hidden" type="button" aria-label="Seçili yapıyı döndür">↻ Döndür (R)</button>
-        <button id="btn-cancel-layout" class="layout-cancel-btn hidden" type="button" aria-label="Seçimi iptal et">✕ İptal (Esc)</button>
+        <span id="layout-help-text">Taşımak için bir yapıya dokun, sonra boş bir kareye dokun. Bitirmek için düzenle düğmesine bas.</span>
+        <button id="btn-rotate-layout" class="layout-rotate-btn hidden" type="button" aria-label="Seçili yapıyı döndür"><span data-asset-icon="rotate" data-asset-size="18"></span><span>Döndür (R)</span></button>
+        <button id="btn-cancel-layout" class="layout-cancel-btn hidden" type="button" aria-label="Seçimi iptal et"><span data-asset-icon="close" data-asset-size="18"></span><span>İptal (Esc)</span></button>
       </div>
 
       <aside class="business-card" id="business-card" data-ui>
@@ -72,9 +75,9 @@
         <div class="business-row"><span><span data-asset-icon="staff" data-asset-size="28"></span> Çalışanlar</span><strong id="worker-count">0</strong></div>
         <div class="business-row"><span><span data-asset-icon="stock" data-asset-size="28"></span> Reyon stoğu</span><strong id="shelf-count">0</strong></div>
         <div class="business-row"><span id="mood-label"><span data-asset-icon="satisfied" data-asset-size="28"></span> Memnuniyet</span><strong id="mood-count">—</strong></div>
-        <button id="btn-inventory" class="text-button">Ürünleri gör <span>›</span></button>
+        <button id="btn-inventory" class="text-button"><span>Ürünleri gör</span><span data-asset-icon="chevronRight" data-asset-size="18"></span></button>
         <div class="decor-score-row"><span><span data-asset-icon="decorScore" data-asset-size="26"></span> Dekor puanı</span><strong id="decor-score">0 · +0%</strong></div>
-        <button id="btn-decor" class="text-button decor-button"><span data-asset-icon="decoration" data-asset-size="26"></span> Dekorasyon mağazası <span>›</span></button>
+        <button id="btn-decor" class="text-button decor-button"><span><span data-asset-icon="decoration" data-asset-size="26"></span> Dekorasyon mağazası</span><span data-asset-icon="chevronRight" data-asset-size="18"></span></button>
       </aside>
 
       <div class="bottom-controls" data-ui>
@@ -92,7 +95,7 @@
 
       <div class="modal-overlay hidden" id="expansion-modal" data-ui>
         <section class="modal-card expansions-card" role="dialog" aria-modal="true" aria-labelledby="expansion-title">
-          <header class="modal-header"><div><span class="eyebrow">İŞLETMEYİ BÜYÜT</span><h1 id="expansion-title">Yeni geliştirmeler</h1></div><button class="close-btn" data-close="expansion-modal" aria-label="Kapat">×</button></header>
+          <header class="modal-header"><div><span class="eyebrow">İŞLETMEYİ BÜYÜT</span><h1 id="expansion-title">Yeni geliştirmeler</h1></div><button class="close-btn" data-close="expansion-modal" aria-label="Kapat"><span data-asset-icon="close" data-asset-size="22"></span></button></header>
           <p class="modal-intro">Kazancını yeni üretim hatlarına ve ekibe yatır. Açılan her istasyon dünyaya eklenir.</p>
           <div class="upgrade-tabs" role="tablist" aria-label="İşletme menüsü">
             <button class="upgrade-tab active" role="tab" aria-selected="true" data-upgrade-tab="business">İşletme</button>
@@ -105,7 +108,7 @@
 
       <div class="modal-overlay hidden" id="settings-modal" data-ui>
         <section class="modal-card settings-card" role="dialog" aria-modal="true" aria-labelledby="settings-title">
-          <header class="modal-header"><div><span class="eyebrow">OYUN MENÜSÜ</span><h1 id="settings-title">Ayarlar</h1></div><button class="close-btn" data-close="settings-modal" aria-label="Kapat">×</button></header>
+          <header class="modal-header"><div><span class="eyebrow">OYUN MENÜSÜ</span><h1 id="settings-title">Ayarlar</h1></div><button class="close-btn" data-close="settings-modal" aria-label="Kapat"><span data-asset-icon="close" data-asset-size="22"></span></button></header>
           <div class="settings-tabs">
             <button class="settings-tab active" data-tab="general">Genel</button>
             <button class="settings-tab" data-tab="character">Karakter</button>
@@ -142,14 +145,14 @@
 
       <div class="modal-overlay hidden" id="inventory-modal" data-ui>
         <section class="modal-card inventory-card" role="dialog" aria-modal="true" aria-labelledby="inventory-title">
-          <header class="modal-header"><div><span class="eyebrow">STOK DURUMU</span><h1 id="inventory-title">Ürünler</h1></div><button class="close-btn" data-close="inventory-modal" aria-label="Kapat">×</button></header>
+          <header class="modal-header"><div><span class="eyebrow">STOK DURUMU</span><h1 id="inventory-title">Ürünler</h1></div><button class="close-btn" data-close="inventory-modal" aria-label="Kapat"><span data-asset-icon="close" data-asset-size="22"></span></button></header>
           <div id="inventory-list" class="inventory-list"></div>
         </section>
       </div>
 
       <div class="modal-overlay hidden" id="decor-modal" data-ui>
         <section class="modal-card decor-card" role="dialog" aria-modal="true" aria-labelledby="decor-title">
-          <header class="modal-header"><div><span class="eyebrow">MAĞAZANI KİŞİSELLEŞTİR</span><h1 id="decor-title">Dekorasyon mağazası</h1></div><button class="close-btn" data-close="decor-modal" aria-label="Kapat">×</button></header>
+          <header class="modal-header"><div><span class="eyebrow">MAĞAZANI KİŞİSELLEŞTİR</span><h1 id="decor-title">Dekorasyon mağazası</h1></div><button class="close-btn" data-close="decor-modal" aria-label="Kapat"><span data-asset-icon="close" data-asset-size="22"></span></button></header>
           <p class="modal-intro" id="decor-intro">Dekorasyon satın al; her parça mağazanda yer bulur ve satış kârını artırır.</p>
           <div class="decor-score-banner"><span data-asset-icon="decorScore" data-asset-size="46"></span><div><strong id="decor-shop-score">0 puan · +0%</strong><small id="decor-score-caption">Yerleştirilen dekorlar alışveriş keyfini artırır.</small></div></div>
           <div id="decor-list" class="decor-list"></div>

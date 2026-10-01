@@ -1,0 +1,6 @@
+{
+  "action": "start_task",
+  "actor": "agent",
+  "reason": "Faz 2: 3D ürün modelleri (meyve-sebze, paketli gıdalar, içecekler, unlu mamüller, et-süt) üretimine başlanıyor.",
+  "task_id": "T-PHASE-2"
+}

@@ -163,7 +163,7 @@ async function boot() {
     input.setLayoutMode(enabled);
     layoutButton.setAttribute('aria-pressed', String(enabled));
     layoutHelp?.classList.toggle('hidden', !enabled);
-    const initialMsg = 'Taşımak istediğin yapıya dokun, ardından yeni konumu seç. Bitirmek için ▦ düğmesine bas.';
+    const initialMsg = 'Taşımak istediğin yapıya dokun, ardından yeni konumu seç. Bitirmek için düzenle düğmesine bas.';
     if (layoutHelpText) layoutHelpText.textContent = initialMsg;
     else if (layoutHelp) layoutHelp.textContent = initialMsg;
     if (rotateButton) rotateButton.classList.add('hidden');

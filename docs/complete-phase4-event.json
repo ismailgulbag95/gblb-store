@@ -1,0 +1,6 @@
+{
+  "action": "complete_task",
+  "actor": "agent",
+  "reason": "Faz 4 Tarım ve Üretim Çiftliği Bölgesi (sera, ahır, su kulesi, traktör, hayvanlar, tarlalar) başarıyla tamamlandı, test edildi ve visual screenshot ile doğrulandı.",
+  "task_id": "T-PHASE-4"
+}

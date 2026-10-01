@@ -85,7 +85,7 @@ export class HUD {
       orderToggle.setAttribute('aria-label', english
         ? (compact ? 'Expand customer order' : 'Collapse customer order')
         : (compact ? 'Sipariş ayrıntılarını aç' : 'Sipariş ayrıntılarını kapat'));
-      orderToggle.textContent = compact ? '⌄' : '⌃';
+      orderToggle.innerHTML = assetIconMarkup(compact ? 'chevronDown' : 'chevronUp', 18);
     };
     syncOrderLayout();
     compactOrderMedia.addEventListener('change', syncOrderLayout);
@@ -96,7 +96,7 @@ export class HUD {
       orderToggle.setAttribute('aria-label', english
         ? (collapsed ? 'Expand customer order' : 'Collapse customer order')
         : (collapsed ? 'Sipariş ayrıntılarını aç' : 'Sipariş ayrıntılarını kapat'));
-      orderToggle.textContent = collapsed ? '⌄' : '⌃';
+      orderToggle.innerHTML = assetIconMarkup(collapsed ? 'chevronDown' : 'chevronUp', 18);
     };
     orderCard.querySelector('.order-heading').addEventListener('click', (event) => {
       if (!event.target.closest('button')) toggleOrderCard();
@@ -595,13 +595,14 @@ export class HUD {
     orderToggle.setAttribute('aria-label', english
       ? (orderCollapsed ? 'Expand customer order' : 'Collapse customer order')
       : (orderCollapsed ? 'Sipariş ayrıntılarını aç' : 'Sipariş ayrıntılarını kapat'));
+    orderToggle.innerHTML = assetIconMarkup(orderCollapsed ? 'chevronDown' : 'chevronUp', 18);
     document.getElementById('btn-deliver-order').textContent = english ? 'Deliver order' : 'Siparişi teslim et';
-    document.getElementById('btn-inventory').innerHTML = `${english ? EN.viewProducts : 'Ürünleri gör'} <span>›</span>`;
+    document.getElementById('btn-inventory').innerHTML = `<span>${english ? EN.viewProducts : 'Ürünleri gör'}</span> ${assetIconMarkup('chevronRight', 18)}`;
     document.querySelector('#btn-settings').setAttribute('aria-label', english ? EN.settings : 'Ayarlar');
     document.getElementById('btn-expansions').setAttribute('aria-label', english ? EN.upgrades : 'İşletme geliştirmeleri');
     document.getElementById('btn-decor-top').setAttribute('aria-label', english ? 'Decoration shop' : 'Dekorasyon mağazası');
     document.getElementById('btn-decor-top').title = english ? 'Decoration shop' : 'Dekorasyon mağazası';
-    document.getElementById('btn-decor').innerHTML = `${assetIconMarkup('decoration', 26)} ${english ? 'Decoration shop' : 'Dekorasyon mağazası'} <span>›</span>`;
+    document.getElementById('btn-decor').innerHTML = `<span>${assetIconMarkup('decoration', 26)} ${english ? 'Decoration shop' : 'Dekorasyon mağazası'}</span> ${assetIconMarkup('chevronRight', 18)}`;
     document.getElementById('decor-title').textContent = english ? 'Decoration shop' : 'Dekorasyon mağazası';
     document.getElementById('decor-intro').textContent = english
       ? 'Add decorative pieces to your market and farm. Each placed piece adds style and a small sales bonus.'

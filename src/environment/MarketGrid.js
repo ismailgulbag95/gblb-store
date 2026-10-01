@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { GAME_CONFIG } from '../config/GameConfig.js';
 import { SHELF_STAGING_AREA } from '../domain/layout.js';
 import { EnvironmentProps } from './EnvironmentProps.js';
@@ -27,25 +28,7 @@ export class MarketGrid {
     this.scene.add(baseGround);
 
     // 2. Asphalt Road & Parking Lot in Front of Store & Restaurant (z = 10 to 28)
-    const roadGeo = new THREE.PlaneGeometry(80, 18);
-    const roadMat = new THREE.MeshStandardMaterial({
-      color: 0x2f3640,
-      roughness: 0.6
-    });
-    const road = new THREE.Mesh(roadGeo, roadMat);
-    road.rotation.x = -Math.PI / 2;
-    road.position.set(-10, -0.04, 19);
-    road.receiveShadow = true;
-    this.scene.add(road);
-
-    // Parking Lot White Dividing Stripes
-    const stripeMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
-    [-24, -17, -10, -3, 4, 11, 18].forEach(x => {
-      const line = new THREE.Mesh(new THREE.PlaneGeometry(0.2, 5), stripeMat);
-      line.rotation.x = -Math.PI / 2;
-      line.position.set(x, -0.03, 16);
-      this.scene.add(line);
-    });
+    this.createParkingLotAndRoadways();
 
     // Sidewalk curb in front of all zones (z = 9.8)
     const sidewalkGeo = new THREE.PlaneGeometry(74, 2.2);
@@ -158,14 +141,21 @@ export class MarketGrid {
     // 8. Supermarket Entrance & Fixtures (Directly from Reference Photo!)
     // A. Automatic Sliding Glass Doors at entrance (x = 5, z = 9)
     this.props.createSlidingGlassDoors(5, 9.0, 6.2, 2.7);
+    this.createSupermarketShowcaseWindows();
+    this.createEntranceWelcomeMat(5, 7.6);
+    this.createAisleCategorySigns();
 
     // B. Nested metal wire shopping carts parked outside entrance on sidewalk (x = 9.2, z = 10.2)
     this.props.createCartStack(9.2, 10.2, 4, -Math.PI / 2);
 
-    // C. Stack of red handheld shopping baskets right inside entrance (x = 2.0, z = 7.8)
-    this.props.createBasketStack(2.0, 7.8);
+    // C. Nested shopping carts & red handheld baskets right inside entrance
+    this.props.createCartStack(1.8, 7.8, 3, 0);
+    this.props.createBasketStack(3.2, 7.8);
 
-    // D. Decorative flower display stand & planters flanking entrance
+    // D. Rolling wire promo dump basket near main aisle (Image 1 reference)
+    this.props.createWireDumpBasket(8.2, 7.5, -0.2);
+
+    // E. Decorative flower display stand & planters flanking entrance
     this.props.createFlowerDisplayStand(1.0, 9.8, 0);
     this.props.createFlowerDisplayStand(11.8, 9.8, 0);
 
@@ -177,34 +167,54 @@ export class MarketGrid {
     this.props.createStoreAwning(-37, 2.3, 9.1, 12, 1.8);
     this.createRestaurantSign(-37, 3.4, 9.0);
 
-    // 10. Low-Poly Cars in Parking Lot (Ultra vibrant candy colors)
-    this.props.createCar(4, 16.5, -Math.PI / 2, 0xff4757); // Candy Red car
-    this.props.createCar(11, 16.5, -Math.PI / 2, 0xffa502); // Bright Gold Taxi
-    this.props.createCar(-10, 16.5, -Math.PI / 2, 0x1e90ff); // Electric Blue car
-    this.props.createCar(-24, 16.5, -Math.PI / 2, 0xa55eea); // Sweet Lilac/Purple car
+    // 10. Procedural Vehicle Fleet in Parking Lot & Service Bays
+    this.props.createDeliveryTruck(-20.5, 16.8, -Math.PI / 2); // Commercial Supermarket Box Truck
+    this.props.createSedan(14.5, 16.5, -Math.PI / 2, 0xff4757); // Crimson Red Sedan
+    this.props.createSedan(7.5, 16.5, -Math.PI / 2, 0xffa502);  // Taxi Gold Sedan
+    this.props.createSedan(-6.5, 16.5, -Math.PI / 2, 0x1e90ff); // Electric Blue Sedan
+    this.props.createSedan(-13.5, 16.5, -Math.PI / 2, 0xf1f2f6);// Pearl White Sedan
+    this.props.createDeliveryVan(21.5, 16.8, -Math.PI / 2, 0xffffff); // GBLB Express Delivery Van
+    this.props.createPickupTruck(-27.5, 16.8, -Math.PI / 2, 0xd63031); // Farm Harvest Pickup
+    this.props.createDeliveryScooter(8.6, 10.6, 0.15, 0xe74c3c); // Courier Delivery Scooter near entrance
 
-    // 11. Street Lamps & Fences
-    this.props.createStreetLamp(14, 10.5);
-    this.props.createStreetLamp(-4, 10.5);
-    this.props.createStreetLamp(-26, 10.5);
-    this.props.createStreetLamp(-47, 10.5);
+    // 11. Street Lamps, Outdoor Furniture & Entrance Totem
+    this.props.createModernStreetLamp(14, 13.2);
+    this.props.createModernStreetLamp(-3, 13.2);
+    this.props.createModernStreetLamp(-20, 13.2);
+    this.props.createModernStreetLamp(-38, 13.2);
 
-    // Farm Fences (North and South borders)
+    // Park benches flanking the supermarket entrance on the sidewalk
+    this.props.createParkBench(-1.5, 10.5, 0);
+    this.props.createParkBench(11.5, 10.5, 0);
+
+    // Outdoor recycling trash bins
+    this.props.createOutdoorTrashBin(2.6, 10.4);
+    this.props.createOutdoorTrashBin(7.6, 10.4);
+
+    // Grand Entrance Totem Pylon Sign at corner
+    this.props.createEntranceTotem(18.5, 14.5);
+
+    // South Farm Fence (Border with sidewalk)
     this.props.createWoodenFence(-15, 9.0, 22, 0);
-    this.props.createWoodenFence(-15, -9.0, 22, 0);
     this.registerObstacle(-15, 9.0, 22, 0.4);
-    this.registerObstacle(-15, -9.0, 22, 0.4);
 
-    // 12. Lush Trees
+    // 12. FAZ 4: Tarım ve Çiftlik Bölgesi (Greenhouse, Red Barn, Water Tower, Tractor, Animals, Fields)
+    this.createFarmAndAgriculturalZone();
+
+    // 13. FAZ 5: Arka Alan, Depo ve Lojistik Tesisleri (Loading Dock, Forklift, Pallet Stacks, Hangar, Cold Storage)
+    this.createLogisticsAndWarehouseZone();
+
+    // 14. Lush Trees & Forest Perimeter
     this.props.createOakTree(-52, 4, 1.3);
     this.props.createOakTree(-51, -6, 1.2);
-    this.props.createOakTree(-8, -14, 1.1);
+    this.props.createOakTree(-3.5, -15, 1.1);
     this.props.createOakTree(2, -14, 1.2);
     this.props.createOakTree(12, -14, 1.0);
-    this.props.createPineTree(17, -5, 1.1);
-    this.props.createPineTree(18, 4, 1.2);
-    this.props.createPineTree(-30, -14, 1.2);
-    this.props.createPineTree(-42, -14, 1.1);
+    this.props.createPineTree(30, -5, 1.1);
+    this.props.createPineTree(30, 4, 1.2);
+    this.props.createPineTree(-37, -10, 1.2);
+    this.props.createPineTree(-41, -16, 1.1);
+    this.props.createPineTree(-31, -21, 1.3);
   }
 
   createShelfStagingArea() {
@@ -322,6 +332,120 @@ export class MarketGrid {
 
     // Architectural Garden Arch & Sign over the door (x = -4, z = 0)
     this.createGardenDoorway(-4, 0);
+  }
+
+  createSupermarketShowcaseWindows() {
+    const frameMat = new THREE.MeshStandardMaterial({ color: 0x2f3542, roughness: 0.3, metalness: 0.6 });
+    const glassMat = new THREE.MeshPhysicalMaterial({
+      color: 0x81ecec,
+      transparent: true,
+      opacity: 0.32,
+      roughness: 0.08,
+      metalness: 0.15,
+    });
+
+    // Windows flanking the entrance along front wall (z = 9.0)
+    for (const wx of [-1.5, 11.5]) {
+      const windowGroup = new THREE.Group();
+      windowGroup.position.set(wx, 0, 9.0);
+
+      // Panoramic tinted glass pane
+      const glass = new THREE.Mesh(new THREE.PlaneGeometry(4.8, 1.45), glassMat);
+      glass.position.set(0, 1.85, 0);
+      windowGroup.add(glass);
+
+      // Top lintel beam
+      const topLintel = new THREE.Mesh(new THREE.BoxGeometry(5.0, 0.18, 0.35), frameMat);
+      topLintel.position.set(0, 2.65, 0);
+      windowGroup.add(topLintel);
+
+      // Vertical mullions / dividers
+      for (const mx of [-1.6, 0, 1.6]) {
+        const mullion = new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.5, 0.2), frameMat);
+        mullion.position.set(mx, 1.85, 0);
+        windowGroup.add(mullion);
+      }
+
+      this.scene.add(windowGroup);
+    }
+  }
+
+  createEntranceWelcomeMat(x, z) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 256;
+    const ctx = canvas.getContext('2d');
+
+    // Charcoal rubber base with embossed border
+    ctx.fillStyle = '#2f3542';
+    ctx.fillRect(0, 0, 512, 256);
+    ctx.strokeStyle = '#e74c3c';
+    ctx.lineWidth = 10;
+    ctx.strokeRect(12, 12, 488, 232);
+
+    ctx.fillStyle = '#f1f2f6';
+    ctx.font = 'bold 44px Fredoka, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('GBLB STORE', 256, 95);
+
+    ctx.font = 'bold 22px Fredoka, sans-serif';
+    ctx.fillStyle = '#ced6e0';
+    ctx.fillText('HOŞ GELDİNİZ • WELCOME', 256, 165);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    const mat = new THREE.MeshBasicMaterial({ map: texture });
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(3.4, 1.6), mat);
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.position.set(x, 0.015, z);
+    mesh.receiveShadow = true;
+    this.scene.add(mesh);
+  }
+
+  createAisleCategorySigns() {
+    const signs = [
+      { text: 'MANAV • PRODUCE', x: 3.0, z: 0.5, color: '#27ae60' },
+      { text: 'İÇECEK • COLD DRINKS', x: 7.5, z: -0.5, color: '#2980b9' },
+      { text: 'FIRIN • BAKERY', x: 8.6, z: -3.4, color: '#d35400' },
+      { text: 'TEMEL GIDA • GROCERY', x: 11.0, z: 0.5, color: '#c0392b' },
+    ];
+
+    const cableMat = new THREE.MeshBasicMaterial({ color: 0x95a5a6 });
+    for (const s of signs) {
+      const group = new THREE.Group();
+      group.position.set(s.x, 2.65, s.z);
+
+      const canvas = document.createElement('canvas');
+      canvas.width = 512;
+      canvas.height = 128;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = s.color;
+      ctx.fillRect(0, 0, 512, 128);
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 6;
+      ctx.strokeRect(8, 8, 496, 112);
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 36px Fredoka, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(s.text, 256, 64);
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      const signMat = new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide });
+      const signMesh = new THREE.Mesh(new THREE.PlaneGeometry(1.8, 0.45), signMat);
+      group.add(signMesh);
+
+      // Hanging chrome suspension cables
+      for (const cx of [-0.75, 0.75]) {
+        const cable = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.7, 4), cableMat);
+        cable.position.set(cx, 0.45, 0);
+        group.add(cable);
+      }
+
+      this.scene.add(group);
+    }
   }
 
   createRestaurantWalls() {
@@ -627,6 +751,272 @@ export class MarketGrid {
       min: { x: x - width / 2, z: z - depth / 2 },
       max: { x: x + width / 2, z: z + depth / 2 }
     });
+  }
+
+  createParkingLotAndRoadways() {
+    // 1. Asphalt Roadway & Parking Lot apron (z = 10 to 28)
+    const roadGeo = new THREE.PlaneGeometry(80, 18);
+    const roadMat = new THREE.MeshStandardMaterial({
+      color: 0x242831,
+      roughness: 0.65,
+    });
+    const road = new THREE.Mesh(roadGeo, roadMat);
+    road.rotation.x = -Math.PI / 2;
+    road.position.set(-10, -0.04, 19);
+    road.receiveShadow = true;
+    this.scene.add(road);
+
+    // 2. White Stall Dividers & Tire Stop Bumpers for Parking Bays
+    const stripeMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+    const bumperMat = new THREE.MeshStandardMaterial({ color: 0xf1c40f, roughness: 0.6 });
+    const stallXCoords = [-24, -17, -10, -3, 4, 11, 18];
+
+    stallXCoords.forEach(x => {
+      // Dividing stripe
+      const line = new THREE.Mesh(new THREE.PlaneGeometry(0.22, 6.2), stripeMat);
+      line.rotation.x = -Math.PI / 2;
+      line.position.set(x, -0.03, 16.2);
+      this.scene.add(line);
+
+      // Rubber wheel tire-stop bumper near sidewalk end
+      const bumper = new THREE.Mesh(new RoundedBoxGeometry(1.8, 0.12, 0.2, 2, 0.03), bumperMat);
+      bumper.position.set(x + 3.5, 0.06, 13.5);
+      bumper.castShadow = true;
+      this.scene.add(bumper);
+    });
+
+    // 3. Handicap Accessible Parking Bay at x = 0.5 (Blue zone + Wheelchair icon)
+    const handicapCanvas = document.createElement('canvas');
+    handicapCanvas.width = 256; handicapCanvas.height = 256;
+    const hctx = handicapCanvas.getContext('2d');
+    hctx.fillStyle = '#0984e3'; hctx.fillRect(0, 0, 256, 256);
+    hctx.strokeStyle = '#ffffff'; hctx.lineWidth = 14; hctx.strokeRect(12, 12, 232, 232);
+    hctx.fillStyle = '#ffffff';
+    hctx.beginPath(); hctx.arc(135, 75, 24, 0, Math.PI * 2); hctx.fill();
+    hctx.lineWidth = 20; hctx.strokeStyle = '#ffffff'; hctx.lineCap = 'round';
+    hctx.beginPath(); hctx.moveTo(135, 100); hctx.lineTo(135, 155); hctx.lineTo(175, 155); hctx.lineTo(190, 205); hctx.stroke();
+    hctx.beginPath(); hctx.arc(120, 165, 42, -0.3, Math.PI * 1.2); hctx.stroke();
+
+    const handicapTex = new THREE.CanvasTexture(handicapCanvas);
+    const handicapMesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(3.6, 3.6),
+      new THREE.MeshBasicMaterial({ map: handicapTex })
+    );
+    handicapMesh.rotation.x = -Math.PI / 2;
+    handicapMesh.position.set(0.5, -0.03, 16.5);
+    this.scene.add(handicapMesh);
+
+    // 4. Yellow Center Road Dashed Line on driving thoroughfare (z = 24.5)
+    const yellowStripeMat = new THREE.MeshBasicMaterial({ color: 0xf1c40f });
+    for (let x = -48; x <= 26; x += 5.5) {
+      const yellowLine = new THREE.Mesh(new THREE.PlaneGeometry(2.8, 0.22), yellowStripeMat);
+      yellowLine.rotation.x = -Math.PI / 2;
+      yellowLine.position.set(x, -0.03, 24.5);
+      this.scene.add(yellowLine);
+    }
+
+    // 5. Pedestrian Zebra Crossing connecting parking to supermarket entrance doors at x = 5
+    for (let x = 3.2; x <= 6.8; x += 0.72) {
+      const zebra = new THREE.Mesh(new THREE.PlaneGeometry(0.44, 2.6), stripeMat);
+      zebra.rotation.x = -Math.PI / 2;
+      zebra.position.set(x, -0.03, 11.5);
+      this.scene.add(zebra);
+    }
+  }
+
+  createSafeCanvas(width, height) {
+    if (typeof document === 'undefined') return null;
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    return canvas;
+  }
+
+  /**
+   * FAZ 4: Tarım ve Üretim Çiftliği Bölgesi (GBLB Farm & Greenhouse)
+   * Builds the commercial glass greenhouse, red barn, water tower, tractor,
+   * dairy cows, free-range chickens, wheat fields, vegetable beds, and pasture fences.
+   */
+  createFarmAndAgriculturalZone() {
+    // 1. Pastoral Farm Ground Extension in North Farm Zone (z = -9 to -25, x = -38 to -4)
+    const farmGroundGeo = new THREE.PlaneGeometry(36, 17);
+    const farmGroundMat = new THREE.MeshStandardMaterial({
+      color: 0x228b22, // Rich pastoral meadow green
+      roughness: 0.82
+    });
+    const farmGround = new THREE.Mesh(farmGroundGeo, farmGroundMat);
+    farmGround.rotation.x = -Math.PI / 2;
+    farmGround.position.set(-20, -0.015, -17.5);
+    farmGround.receiveShadow = true;
+    this.scene.add(farmGround);
+
+    // Farm Dirt & Cobblestone Main Courtyard Path (connects garden promenade at z = -6 to barn & greenhouse at z = -17)
+    this.createPath(-18, -12, 3.2, 8.5);
+    this.createPath(-20, -17, 12, 3.6);
+
+    // 2. Modern Commercial Glass Greenhouse
+    this.props.createGreenhouse(-15, -17, 0);
+    this.registerObstacle(-15, -17, 5.2, 6.6);
+
+    // 3. Classic American Red Farm Barn with Gambrel Roof & Weather Vane
+    this.props.createRedBarn(-26, -17, 0.1);
+    this.registerObstacle(-26, -17, 7.0, 8.0);
+
+    // 4. Iconic Cylindrical Stilt Water Tower
+    this.props.createWaterTower(-33, -14);
+    this.registerObstacle(-33, -14, 3.2, 3.2);
+
+    // 5. Classic Green Farm Tractor (Parked beside farm gateway courtyard)
+    this.props.createFarmTractor(-18.5, -10.8, -0.4, 0x27ae60);
+    this.registerObstacle(-18.5, -10.8, 2.0, 2.6);
+
+    // 6. Holstein Dairy Cows in Pasture Meadow
+    this.props.createDairyCow(-21.5, -8.6, 0.3, true); // Grazing head down on pasture grass
+    this.props.createDairyCow(-12.8, -11.5, -0.7, false); // Standing alert near greenhouse
+
+    // 7. Free-Range Grazing Chickens
+    this.props.createGrazingChicken(-15.8, -6.8, 0.4, true); // Pecking along garden path
+    this.props.createGrazingChicken(-22.2, 5.4, 0.8, true);  // Pecking near coop
+    this.props.createGrazingChicken(-24.5, 2.0, -0.5, false); // Alert
+    this.props.createGrazingChicken(-19.8, 6.2, 2.1, true);   // Pecking
+    this.props.createGrazingChicken(-13.2, -7.5, 1.2, false); // Near garden edge
+
+    // 8. Golden Wheat Field Patches & Organic Raised Vegetable Beds
+    this.props.createWheatFieldPatch(-7.5, -15.5, 4.6, 3.4);
+    this.registerObstacle(-7.5, -15.5, 4.8, 3.6);
+
+    this.props.createVegetablePlotRaisedBeds(-7.5, -10.5, 0);
+    this.registerObstacle(-7.5, -10.5, 3.2, 3.6);
+
+    // 9. Farm Pasture Fencing & Grand Farm Gate
+    // South garden fence with open central breezeway gate
+    this.props.createWoodenFence(-7.5, -9.0, 7.0, 0);
+    this.props.createWoodenFence(-22.5, -9.0, 7.0, 0);
+    this.registerObstacle(-7.5, -9.0, 7.0, 0.4);
+    this.registerObstacle(-22.5, -9.0, 7.0, 0.4);
+
+    // North & West Pasture Boundary Fences
+    this.props.createWoodenFence(-26, -24.5, 22.0, 0);
+    this.props.createWoodenFence(-37, -16.5, 16.0, Math.PI / 2);
+    this.registerObstacle(-26, -24.5, 22.0, 0.4);
+    this.registerObstacle(-37, -16.5, 0.4, 16.0);
+
+    // Grand Rustic Farm Gateway Arch at x = -15, z = -9
+    this.createFarmGateArch(-15, -9.0);
+  }
+
+  createFarmGateArch(x, z) {
+    const group = new THREE.Group();
+    group.position.set(x, 0, z);
+
+    const timberMat = new THREE.MeshStandardMaterial({ color: 0x795548, roughness: 0.85 });
+    // Left & Right Gate Posts
+    const postL = new THREE.Mesh(new THREE.BoxGeometry(0.25, 3.6, 0.25), timberMat);
+    postL.position.set(-2.2, 1.8, 0);
+    const postR = new THREE.Mesh(new THREE.BoxGeometry(0.25, 3.6, 0.25), timberMat);
+    postR.position.set(2.2, 1.8, 0);
+
+    // Overhead Header Beam
+    const header = new THREE.Mesh(new THREE.BoxGeometry(4.8, 0.3, 0.28), timberMat);
+    header.position.set(0, 3.4, 0);
+
+    // Hanging Wooden Signboard
+    const signCanvas = this.createSafeCanvas(512, 128);
+    let signTex = null;
+    if (signCanvas) {
+      const ctx = signCanvas.getContext('2d');
+      ctx.fillStyle = '#4e342e';
+      ctx.fillRect(0, 0, 512, 128);
+      ctx.strokeStyle = '#8d6e63';
+      ctx.lineWidth = 6;
+      ctx.strokeRect(6, 6, 500, 116);
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 36px Fredoka, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('GBLB ORGANİK ÇİFTLİK', 256, 44);
+      ctx.font = 'bold 24px Fredoka, sans-serif';
+      ctx.fillStyle = '#f1c40f';
+      ctx.fillText('FRESH HARVEST • TARIM & SERA', 256, 88);
+      signTex = new THREE.CanvasTexture(signCanvas);
+    }
+    const signMat = signTex
+      ? new THREE.MeshBasicMaterial({ map: signTex, side: THREE.DoubleSide })
+      : new THREE.MeshBasicMaterial({ color: 0x5d4037 });
+    const signMesh = new THREE.Mesh(new THREE.PlaneGeometry(3.6, 0.9), signMat);
+    signMesh.position.set(0, 2.7, 0);
+
+    // Decorative lanterns on posts
+    for (const px of [-2.2, 2.2]) {
+      const lantern = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.3, 0.2), new THREE.MeshStandardMaterial({ color: 0x222222 }));
+      lantern.position.set(px, 2.2, 0.22);
+      const glass = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.2, 0.14), new THREE.MeshBasicMaterial({ color: 0xfffae8 }));
+      glass.position.set(px, 2.2, 0.22);
+      group.add(lantern, glass);
+    }
+
+    group.add(postL, postR, header, signMesh);
+    this.scene.add(group);
+  }
+
+  /**
+   * FAZ 5: Arka Alan, Depo ve Lojistik Tesisleri (Logistics, Warehouse & Loading Bay)
+   * Builds the industrial concrete service yard, loading dock platform with motorized roll-up shutter,
+   * yellow warehouse forklift, red hydraulic pallet jack, Euro pallet stacks, warehouse hangar,
+   * cold storage refrigeration bunker, and 3-stream commercial recycling dumpsters.
+   */
+  createLogisticsAndWarehouseZone() {
+    // 1. Industrial Concrete Logistics Service Yard Floor (x = 14 to 30, z = -9 to 9)
+    const yardGeo = new THREE.PlaneGeometry(16, 18);
+    const yardMat = new THREE.MeshStandardMaterial({
+      color: 0x636e72, // Dark industrial slab concrete
+      roughness: 0.85
+    });
+    const yardFloor = new THREE.Mesh(yardGeo, yardMat);
+    yardFloor.rotation.x = -Math.PI / 2;
+    yardFloor.position.set(22, -0.015, 0);
+    yardFloor.receiveShadow = true;
+    this.scene.add(yardFloor);
+
+    // Yellow Logistics Safety Boundary Line along sidewalk (z = 9.0, x = 14 to 30)
+    const yellowLineMat = new THREE.MeshBasicMaterial({ color: 0xf1c40f });
+    const safetyLine = new THREE.Mesh(new THREE.PlaneGeometry(16, 0.2), yellowLineMat);
+    safetyLine.rotation.x = -Math.PI / 2;
+    safetyLine.position.set(22, 0.005, 9.0);
+    this.scene.add(safetyLine);
+
+    // 2. Elevated Concrete Loading Dock Platform with Motorized Shutter Door
+    this.props.createLoadingDock(16.5, 0, -Math.PI / 2);
+    this.registerObstacle(16.5, 0, 3.8, 5.8);
+
+    // 3. Warehouse Logistics Hangar Facade with "MAL KABUL & LOJİSTİK" Sign
+    this.props.createWarehouseHangarBuilding(23.5, -6.0, 0);
+    this.registerObstacle(23.5, -6.0, 8.5, 5.2);
+
+    // 4. Commercial Walk-In Cold Storage Bunker with Condenser Fans
+    this.props.createColdStorageBunker(24.0, 5.8, 0);
+    this.registerObstacle(24.0, 5.8, 3.6, 3.2);
+
+    // 5. Industrial Yellow Warehouse Forklift
+    this.props.createWarehouseForklift(19.2, 2.8, 0.4);
+    this.registerObstacle(19.2, 2.8, 1.4, 2.4);
+
+    // 6. Manual Hydraulic Pallet Jack (Transpalet)
+    this.props.createHydraulicPalletJack(18.6, -2.4, -0.3, 0xe74c3c);
+
+    // 7. Euro Pallet Stacks with Shrink-Wrapped Shipping Cartons
+    this.props.createPalletStack(19.5, 6.2, 4, true, 0.2);
+    this.registerObstacle(19.5, 6.2, 1.4, 1.2);
+
+    this.props.createPalletStack(17.0, 6.2, 3, false, -0.15);
+    this.registerObstacle(17.0, 6.2, 1.4, 1.2);
+
+    this.props.createPalletStack(20.5, -1.8, 3, true, 0.1);
+    this.registerObstacle(20.5, -1.8, 1.4, 1.2);
+
+    // 8. 3-Stream Commercial Industrial Recycling Dumpsters
+    this.props.createRecyclingDumpsters(28.0, 0.8, -Math.PI / 2);
+    this.registerObstacle(28.0, 0.8, 1.2, 5.2);
   }
 
   getObstacles() {

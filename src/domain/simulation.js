@@ -878,7 +878,7 @@ export function findCustomerMarketRoute(state, start, target, targetItem = null)
   blocked[cellKey(targetC, targetR)] = 0;
 
   const startKey = cellKey(startC, startR);
-  const targetKey = cellKey(targetC, targetR);
+  let targetKey = cellKey(targetC, targetR);
   const openSet = new Set([startKey]);
   const cameFrom = new Map();
   const gScore = new Float32Array(cols * rows).fill(Infinity);
@@ -930,7 +930,20 @@ export function findCustomerMarketRoute(state, start, target, targetItem = null)
   }
 
   if (currentKey !== targetKey) {
-    return [];
+    let closestVisited = null;
+    let closestDist = Infinity;
+    for (const k of cameFrom.keys()) {
+      const d = Math.hypot(toX(k % cols) - targetPoint.x, toZ(Math.floor(k / cols)) - targetPoint.z);
+      if (d < closestDist) {
+        closestDist = d;
+        closestVisited = k;
+      }
+    }
+    if (closestVisited !== null && closestDist <= 2.5) {
+      targetKey = closestVisited;
+    } else {
+      return [];
+    }
   }
 
   const path = [];
@@ -1079,22 +1092,28 @@ function shelfQueuePosition(item, index, state, shelfId = null) {
   const shelf = getShelfLocations(state, item).find((entry) => entry.id === shelfId)
     ?? chooseShelfLocation(state, item);
   if (!shelf) return { x: 5, z: 1.3 + index * 0.85 };
-  const distance = 1.3 + index * 0.85;
-  const forward = { x: Math.sin(shelf.rotation), z: Math.cos(shelf.rotation) };
-  const directions = [forward, { x: -forward.x, z: -forward.z },
-    { x: forward.z, z: -forward.x }, { x: -forward.z, z: forward.x }];
+  const dims = getStationDimensions(shelf.id, shelf.rotation ?? 0);
+  const halfW = dims.width / 2;
+  const halfD = dims.depth / 2;
+  const forward = { x: Math.sin(shelf.rotation ?? 0), z: Math.cos(shelf.rotation ?? 0) };
+  // Check front, back, left, right with appropriate distances for each axis
+  const candidates = [
+    // Local front
+    { x: shelf.x + forward.x * (halfD + 0.55 + index * 0.7), z: shelf.z + forward.z * (halfD + 0.55 + index * 0.7) },
+    // Local back
+    { x: shelf.x - forward.x * (halfD + 0.55 + index * 0.7), z: shelf.z - forward.z * (halfD + 0.55 + index * 0.7) },
+    // Local left (into aisle)
+    { x: shelf.x - forward.z * (halfW + 0.55 + index * 0.7), z: shelf.z + forward.x * (halfW + 0.55 + index * 0.7) },
+    // Local right
+    { x: shelf.x + forward.z * (halfW + 0.55 + index * 0.7), z: shelf.z - forward.x * (halfW + 0.55 + index * 0.7) },
+  ];
   const obstacles = getMarketObstacles(state);
-  return directions.map((direction) => ({
-    x: shelf.x + direction.x * distance,
-    z: shelf.z + direction.z * distance,
-  })).find((position) => !obstacles.some((box) => position.x >= box.minX && position.x <= box.maxX
-    && position.z >= box.minZ && position.z <= box.maxZ)) ?? {
-    x: shelf.x + forward.x * distance,
-    z: shelf.z + forward.z * distance,
-  };
+  const found = candidates.find((pos) => !obstacles.some((box) => pos.x >= box.minX && pos.x <= box.maxX
+    && pos.z >= box.minZ && pos.z <= box.maxZ));
+  return found ?? candidates[2] ?? candidates[0];
 }
 
-function routeCustomerToShelf(state, customer, item, queueIndex = 0) {
+export function routeCustomerToShelf(state, customer, item, queueIndex = 0) {
   const preferred = chooseShelfLocation(state, item, customer.targetShelfId, false, customer.checkoutOrder ?? 0);
   const shelves = getShelfLocations(state, item);
   const ordered = [preferred,

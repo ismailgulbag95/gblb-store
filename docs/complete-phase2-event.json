@@ -1,0 +1,6 @@
+{
+  "action": "complete_task",
+  "actor": "agent",
+  "reason": "Faz 2 3D ürün modelleri ve reyon yerleşimi başarıyla tamamlandı, tüm ölçütler doğrulandı.",
+  "task_id": "T-PHASE-2"
+}

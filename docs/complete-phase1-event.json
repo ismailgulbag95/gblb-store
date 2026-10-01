@@ -1,0 +1,6 @@
+{
+  "action": "complete_task",
+  "actor": "agent",
+  "reason": "Faz 1 süpermarket iç mekan porselen zemin, vitrinler, reyonlar, dikey içecek dolabı, kasa bankosu ve arabalar başarıyla tamamlandı.",
+  "task_id": "T-PHASE-1"
+}

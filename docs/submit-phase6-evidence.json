@@ -1,0 +1,20 @@
+{
+  "action": "submit_evidence",
+  "actor": "agent",
+  "reason": "Faz 6: 10 Personel Mesleği ve 20+ Zengin Müşteri Tipi için birim test ve denetim raporu kanıtları sunuluyor.",
+  "task_id": "T-PHASE-6",
+  "items": [
+    {
+      "path": "tests/characters-archetypes.test.js",
+      "criterion": 0,
+      "note": "10 farklı personel mesleği modelleri, üniformaları ve yürüme animasyonları birim test ile doğrulandı.",
+      "reviewer": "agent"
+    },
+    {
+      "path": "docs/FAZ_6_INSPECTION_REPORT.md",
+      "criterion": 1,
+      "note": "20+ zengin müşteri arketipi, 6 ten rengi, 8 saç rengi paleti ve 3D aksesuar donanımları belgelendi ve doğrulandı.",
+      "reviewer": "agent"
+    }
+  ]
+}

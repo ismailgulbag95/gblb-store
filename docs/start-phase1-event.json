@@ -1,0 +1,6 @@
+{
+  "action": "start_task",
+  "actor": "agent",
+  "reason": "Faz 1: Süpermarket iç mekan zemin, reyonlar, dolaplar ve kasa hattı inşasına başlanıyor.",
+  "task_id": "T-PHASE-1"
+}

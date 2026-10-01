@@ -1,0 +1,20 @@
+{
+  "action": "submit_evidence",
+  "actor": "agent",
+  "reason": "Faz 4 Tarım ve Üretim Çiftliği Bölgesi için modern ticari cam sera, kırmızı çiftlik ahırı, silindirik su kulesi, traktör, inekler, tavuklar, buğday tarlası ve organik yükseltilmiş sebze yatakları modellendi ve test edildi.",
+  "task_id": "T-PHASE-4",
+  "items": [
+    {
+      "path": "docs/FAZ_4_INSPECTION_REPORT.md",
+      "criterion": 0,
+      "note": "Modern ticari cam sera, rüzgarda salınan altın sarısı buğday tarlası ve yükseltilmiş organik sebze yatakları modellendi.",
+      "reviewer": "agent"
+    },
+    {
+      "path": "docs/FAZ_4_INSPECTION_REPORT.md",
+      "criterion": 1,
+      "note": "Gambrel çatılı kırmızı çiftlik ahırı, 7.2m ahşap stilt su kulesi, yeşil tarım traktörü, benekli süt inekleri ve otlayan tavuk modelleri eklendi.",
+      "reviewer": "agent"
+    }
+  ]
+}

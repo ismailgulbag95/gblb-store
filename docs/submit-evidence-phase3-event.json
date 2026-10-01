@@ -1,0 +1,26 @@
+{
+  "action": "submit_evidence",
+  "actor": "agent",
+  "reason": "Faz 3 için asfalt otopark, şeritler, yaya geçidi, engelli alanı, 5 farklı araç tipi, modern sokak lambaları, banklar, çöp kovaları ve totem tabelası inşa edilip test edildi.",
+  "task_id": "T-PHASE-3",
+  "items": [
+    {
+      "path": "docs/FAZ_3_INSPECTION_REPORT.md",
+      "criterion": 0,
+      "note": "Asfalt zemin, beyaz park cepleri, tekerlek stoperleri, mavi engelli alanı ve yaya geçidi oluşturuldu.",
+      "reviewer": "agent"
+    },
+    {
+      "path": "docs/FAZ_3_INSPECTION_REPORT.md",
+      "criterion": 1,
+      "note": "Farklı renklerde sedanlar, teslimat kamyonu, kargo vanı, çiftlik pikapı ve kurye scooterı modellendi.",
+      "reviewer": "agent"
+    },
+    {
+      "path": "docs/FAZ_3_INSPECTION_REPORT.md",
+      "criterion": 2,
+      "note": "Çift kollu LED sokak lambaları, oturma bankları, çöp kutuları ve GBLB Store giriş totem tabelası yerleştirildi.",
+      "reviewer": "agent"
+    }
+  ]
+}
