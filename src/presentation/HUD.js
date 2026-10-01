@@ -6,6 +6,7 @@ import { gameDayNumber } from '../domain/dayCycle.js';
 import { PLAYER_CHARACTERS } from '../domain/characters.js';
 import { assetIconMarkup, hydrateAssetIcons } from '../ui/AssetIcons.js';
 import { mountCharacterPreviews } from './CharacterPreviews.js';
+import { ToastManager } from '../ui/ToastManager.js';
 
 const UPGRADE_ICONS = {
   tomatoFarm2: 'tomato', cornFarm2: 'corn', wheatFarm2: 'wheat', cashier: 'cashier', paste: 'tomatoPaste', harvester: 'workerAvatar', orange: 'orange',
@@ -46,6 +47,7 @@ export class HUD {
     this.lastInventorySignature = '';
     this.lastLanguage = null;
     this.elements = {};
+    this.toasts = new ToastManager(app);
     hydrateAssetIcons();
     this.#cacheElements();
     this.characterPreviewSources = mountCharacterPreviews();
@@ -901,94 +903,11 @@ export class HUD {
   }
 
   toast(message, tone = 'success', iconId = null) {
-    const container = document.getElementById('toast-container');
-    if (!container) return;
-    const toast = document.createElement('div');
-    toast.className = `toast-msg${tone === 'error' ? ' error' : ''}`;
-    if (iconId) toast.innerHTML = assetIconMarkup(iconId, 30);
-    toast.append(document.createTextNode(message));
-    container.appendChild(toast);
-    while (container.children.length > 3) {
-      container.firstElementChild.remove();
-    }
-    window.setTimeout(() => toast.remove(), 2600);
+    this.toasts.toast(message, tone, iconId);
   }
 
   showEvent(event) {
-    let message = event.message;
-    let iconId = null;
-    if (event.type === 'sale' || event.type === 'production' || event.type === 'tip-ready') {
-      this.#eventSound(event.type);
-    }
-    if (event.type === 'payroll') {
-      const english = this.app.getState().settings.language === 'en';
-      const locale = english ? 'en-US' : 'tr-TR';
-      const paid = `$${(event.paidAtoms / MONEY_ATOMS).toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-      if (english) {
-        message = event.resumedCount && !event.dayStarted
-          ? `${event.resumedCount} staff member(s) received overdue pay and returned to work.`
-          : `Day ${event.day} payroll: ${paid} paid${event.waitingCount ? ` · ${event.waitingCount} waiting for salary` : ''}.`;
-      } else {
-        message = event.resumedCount && !event.dayStarted
-          ? `${event.resumedCount} personelin gecikmiş maaşı ödendi; işe döndü.`
-          : `Gün ${event.day} maaş ödemesi: ${paid}${event.waitingCount ? ` · ${event.waitingCount} personel bekliyor` : ''}.`;
-      }
-    }
-    if (this.app.getState().settings.language === 'en') {
-      if (event.type === 'sale') {
-        const itemIds = event.items ?? [event.item];
-        iconId = ITEMS[itemIds[0]]?.icon ?? 'stock';
-        const sold = itemIds.map((itemId) => this.#itemNameEnglish(itemId, ITEMS[itemId]?.name ?? itemId));
-        message = `+$${event.amount.toFixed(2)} · ${sold.join(', ')} sold${event.decorationBonus ? ` · +${(event.decorationBonus * 100).toFixed(1)}% decor bonus` : ''}.`;
-      }
-      if (event.type === 'production') {
-        iconId = ITEMS[event.item]?.icon ?? 'stock';
-        message = `${this.#itemNameEnglish(event.item, ITEMS[event.item]?.name ?? event.item)} ready.`;
-      }
-      if (event.type === 'tip-ready') {
-        iconId = 'tip';
-        message = 'A customer left a tip.';
-      }
-      if (message === 'Yedek kayıttan devam edildi.') message = 'Recovered from the backup save.';
-      if (message === 'Yeni oyun hazır.') message = 'A new game is ready.';
-      if (message === 'Müşteriler kasada ödeme yapıyor.') message = 'Customers are paying at the register.';
-      if (message.includes('ürün alındı.')) message = 'Products collected.';
-      if (message.includes('Reyon dolduruldu.')) message = 'Shelf restocked.';
-      if (message.includes('Ürün makineye aktarıldı')) message = 'Ingredients moved to the machine.';
-      if (message.includes('Bahşiş alındı.')) message = 'Tip collected.';
-      if (message.includes('Yemek servis edildi.')) message = 'Meal served.';
-      if (message.includes('eklendi.')) message = 'Credits added.';
-    }
-    if (event.type === 'sale') iconId ??= ITEMS[(event.items ?? [event.item])[0]]?.icon ?? 'stock';
-    if (event.type === 'production') iconId ??= ITEMS[event.item]?.icon ?? 'stock';
-    if (event.type === 'tip-ready') iconId ??= 'tip';
-    this.toast(message, event.tone, iconId);
-  }
-
-  #eventSound(type) {
-    if (!this.app.getState().settings.sound) return;
-    const now = performance.now();
-    if (now - (this.lastEventSoundTime ?? 0) < 180) return;
-    this.lastEventSoundTime = now;
-    const AudioContextType = window.AudioContext || window.webkitAudioContext;
-    if (!AudioContextType) return;
-    try {
-      this.audioContext ??= new AudioContextType();
-      if (this.audioContext.state === 'suspended') this.audioContext.resume();
-      const frequencies = { sale: [620, 840], production: [450, 580], 'tip-ready': [740, 980] };
-      const tones = frequencies[type] ?? [600];
-      tones.forEach((frequency, index) => {
-        const oscillator = this.audioContext.createOscillator();
-        const gain = this.audioContext.createGain();
-        const start = this.audioContext.currentTime + index * 0.075;
-        oscillator.type = 'sine'; oscillator.frequency.value = frequency;
-        gain.gain.setValueAtTime(0.0001, start);
-        gain.gain.exponentialRampToValueAtTime(0.025, start + 0.012);
-        gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.12);
-        oscillator.connect(gain); gain.connect(this.audioContext.destination);
-        oscillator.start(start); oscillator.stop(start + 0.12);
-      });
-    } catch { /* sound is optional */ }
+    this.toasts.showEvent(event);
   }
 
   showRecovery(message) {
