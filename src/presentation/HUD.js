@@ -116,27 +116,14 @@ export class HUD {
   #bind() {
     const compactOrderMedia = window.matchMedia('(max-width: 720px) and (orientation: portrait)');
     const orderCard = document.getElementById('order-card');
-    const orderToggle = document.getElementById('btn-order-toggle');
     const syncOrderLayout = () => {
       const compact = compactOrderMedia.matches;
       orderCard.classList.toggle('collapsed', compact);
-      orderToggle.setAttribute('aria-expanded', String(!compact));
-      const english = this.app.getState().settings.language === 'en';
-      orderToggle.setAttribute('aria-label', english
-        ? (compact ? 'Expand customer order' : 'Collapse customer order')
-        : (compact ? 'Sipariş ayrıntılarını aç' : 'Sipariş ayrıntılarını kapat'));
-      orderToggle.innerHTML = assetIconMarkup(compact ? 'chevronDown' : 'chevronUp', 18);
     };
     syncOrderLayout();
     compactOrderMedia.addEventListener('change', syncOrderLayout);
     const toggleOrderCard = () => {
-      const collapsed = orderCard.classList.toggle('collapsed');
-      const english = this.app.getState().settings.language === 'en';
-      orderToggle.setAttribute('aria-expanded', String(!collapsed));
-      orderToggle.setAttribute('aria-label', english
-        ? (collapsed ? 'Expand customer order' : 'Collapse customer order')
-        : (collapsed ? 'Sipariş ayrıntılarını aç' : 'Sipariş ayrıntılarını kapat'));
-      orderToggle.innerHTML = assetIconMarkup(collapsed ? 'chevronDown' : 'chevronUp', 18);
+      orderCard.classList.toggle('collapsed');
     };
     orderCard.querySelector('.order-heading').addEventListener('click', (event) => {
       if (!event.target.closest('button')) toggleOrderCard();
@@ -211,7 +198,6 @@ export class HUD {
         ? (english ? 'Collapse business panel' : 'İşletme canlı panelini daralt')
         : (english ? 'Expand business panel' : 'İşletme canlı panelini aç'));
     });
-    orderToggle.addEventListener('click', toggleOrderCard);
     document.getElementById('btn-deliver-order').addEventListener('click', () => {
       const result = this.app.fulfillOrder();
       if (!result.ok) this.toast('Sipariş için çantanda yeterli ürün yok.', 'error');
@@ -877,16 +863,8 @@ export class HUD {
     document.querySelectorAll('.business-row')[2].children[0].innerHTML = `${assetIconMarkup('stock', 28)} ${english ? EN.shelfStock : 'Reyon stoğu'}`;
     document.getElementById('mood-label').innerHTML = `${assetIconMarkup('satisfied', 28)} ${english ? 'Satisfaction' : 'Memnuniyet'}`;
     const orderTitle = document.getElementById('order-title');
-    const orderCard = document.getElementById('order-card');
-    const orderToggle = document.getElementById('btn-order-toggle');
-    const orderCollapsed = orderCard.classList.contains('collapsed');
     orderTitle.textContent = english ? 'CUSTOMER ORDER' : 'MÜŞTERİ SİPARİŞİ';
     orderTitle.dataset.shortLabel = english ? 'ORDER' : 'SİPARİŞ';
-    orderToggle.setAttribute('aria-expanded', String(!orderCollapsed));
-    orderToggle.setAttribute('aria-label', english
-      ? (orderCollapsed ? 'Expand customer order' : 'Collapse customer order')
-      : (orderCollapsed ? 'Sipariş ayrıntılarını aç' : 'Sipariş ayrıntılarını kapat'));
-    orderToggle.innerHTML = assetIconMarkup(orderCollapsed ? 'chevronDown' : 'chevronUp', 18);
     document.getElementById('btn-deliver-order').textContent = english ? 'Deliver order' : 'Siparişi teslim et';
     document.getElementById('btn-inventory').innerHTML = `<span>${english ? EN.viewProducts : 'Ürünleri gör'}</span> ${assetIconMarkup('chevronRight', 18)}`;
     document.querySelector('#btn-settings').setAttribute('aria-label', english ? EN.settings : 'Ayarlar');
