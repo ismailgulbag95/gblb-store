@@ -5,8 +5,10 @@ import { AdMobRewardedProvider, DevelopmentRewardedProvider, RewardedAdService }
 import { HUD } from './presentation/HUD.js';
 import { InputManager } from './presentation/InputManager.js';
 import { WorldScene } from './presentation/WorldScene.js';
+import { createSceneFreezeDiagnostics } from './diagnostics/SceneFreezeDiagnostics.js';
 import { hydrateAssetIcons, preloadAssetAtlas } from './ui/AssetIcons.js';
 
+const sceneFreezeDiagnostics = createSceneFreezeDiagnostics();
 hydrateAssetIcons();
 
 const SIMULATION_STEP = 0.1;
@@ -15,7 +17,6 @@ const MIN_LOADING_VISIBLE_MS = 850;
 const loadingStartedAt = performance.now();
 const loadingScreen = document.getElementById('loading-screen');
 const loadingStatus = document.getElementById('loading-status');
-const loadingTitle = document.getElementById('loading-title');
 const loadingCopy = {
   tr: {
     resources: 'Oyun kaynakları hazırlanıyor…',
@@ -36,7 +37,6 @@ let loadingDismissed = false;
 function setLoadingLanguage(language) {
   loadingLanguage = language === 'en' ? 'en' : 'tr';
   document.documentElement.lang = loadingLanguage;
-  if (loadingTitle) loadingTitle.textContent = loadingLanguage === 'en' ? 'Seed to Serve' : 'Tohumdan Sofraya';
 }
 
 function setLoadingStatus(step) {
@@ -80,7 +80,42 @@ function showRecovery(saveService, error) {
   }, { once: true });
 }
 
+function sceneDiagnosisSnapshot(app, world = null) {
+  const state = app.getState();
+  const renderer = world?.engine?.renderer;
+  const rendererInfo = renderer?.info;
+  const lastDraw = renderer?.__tohumdanSceneLastDraw;
+  return {
+    revision: state.revision,
+    tick: state.tick,
+    player: { x: state.player?.x, z: state.player?.z },
+    balanceAtoms: state.economy?.balanceAtoms,
+    completedUpgrades: [...(state.completedUpgrades ?? [])],
+    availableUpgrades: [...(state.availableUpgrades ?? [])],
+    unlocked: Object.keys(state.unlocked ?? {}).filter((key) => state.unlocked[key]),
+    farms: Object.keys(state.farms ?? {}),
+    machines: Object.keys(state.machines ?? {}),
+    coop: state.coops?.coop ? {
+      chickens: state.coops.coop.chickens,
+      eggs: state.coops.coop.eggs,
+      feed: state.coops.coop.feed,
+    } : null,
+    sceneCollections: world ? Object.fromEntries(
+      ['farms', 'machines', 'shelves', 'customers', 'workers', 'tables', 'upgradeMarkers']
+        .map((name) => [name, world[name]?.size ?? null]),
+    ) : null,
+    renderer: rendererInfo ? {
+      calls: rendererInfo.render?.calls,
+      triangles: rendererInfo.render?.triangles,
+      geometries: rendererInfo.memory?.geometries,
+      textures: rendererInfo.memory?.textures,
+    } : null,
+    lastDraw: lastDraw ? { ...lastDraw } : null,
+  };
+}
+
 async function boot() {
+  sceneFreezeDiagnostics?.record('boot:started');
   let saveService;
   let app;
   try {
@@ -94,7 +129,9 @@ async function boot() {
       : admobProvider;
     app = new GameApplication(saveService, undefined, new RewardedAdService(rewardedProvider));
     setLoadingLanguage(app.getState().settings.language);
+    sceneFreezeDiagnostics?.record('application:ready', sceneDiagnosisSnapshot(app));
   } catch (error) {
+    sceneFreezeDiagnostics?.fail('application:init', error);
     if (saveService && error.name === 'SaveRecoveryError') showRecovery(saveService, error);
     else showFatal(error.message);
     return;
@@ -104,7 +141,9 @@ async function boot() {
   try {
     setLoadingStatus('scene');
     world = new WorldScene();
+    sceneFreezeDiagnostics?.record('scene:ready', sceneDiagnosisSnapshot(app, world));
   } catch (error) {
+    sceneFreezeDiagnostics?.fail('scene:init', error, sceneDiagnosisSnapshot(app));
     showFatal(`3B sahne oluşturulamadı. ${error.message}`);
     return;
   }
@@ -136,6 +175,13 @@ async function boot() {
     setPaused();
     if (!open) showPendingBonusOffer();
   });
+  world.onVisualError = (visualId, error) => {
+    sceneFreezeDiagnostics?.fail('world.visual-build', error, {
+      visualId,
+      state: sceneDiagnosisSnapshot(app, world),
+    });
+    hud.toast(`3B yapı yüklenemedi (${visualId}): ${error.message}`, 'error');
+  };
   input = new InputManager(world.getCanvas(), world, app, () => document.getElementById('btn-interact').click());
   const layoutButton = document.getElementById('btn-layout');
   const layoutHelp = document.getElementById('layout-help');
@@ -147,7 +193,7 @@ async function boot() {
     else if (layoutHelp) layoutHelp.textContent = message;
   };
   input.onSelectionChange = (selected) => {
-    if (rotateButton) rotateButton.classList.toggle('hidden', !selected);
+    if (rotateButton) rotateButton.classList.toggle('hidden', !selected || selected.startsWith('hanging-sign:'));
     if (cancelButton) cancelButton.classList.toggle('hidden', !selected);
   };
   rotateButton?.addEventListener('click', (e) => {
@@ -163,7 +209,7 @@ async function boot() {
     input.setLayoutMode(enabled);
     layoutButton.setAttribute('aria-pressed', String(enabled));
     layoutHelp?.classList.toggle('hidden', !enabled);
-    const initialMsg = 'Taşımak istediğin yapıya dokun, ardından yeni konumu seç. Bitirmek için düzenle düğmesine bas.';
+    const initialMsg = 'Taşımak istediğin yapıya veya asılı tabelaya dokun, ardından yeni konumu seç. Bitirmek için düzenle düğmesine bas.';
     if (layoutHelpText) layoutHelpText.textContent = initialMsg;
     else if (layoutHelp) layoutHelp.textContent = initialMsg;
     if (rotateButton) rotateButton.classList.add('hidden');
@@ -234,11 +280,13 @@ async function boot() {
   const canvas = world.getCanvas();
   canvas.addEventListener('webglcontextlost', (event) => {
     event.preventDefault();
+    sceneFreezeDiagnostics?.record('webgl:context-lost', sceneDiagnosisSnapshot(app, world));
     pauseReasons.add('webgl');
     setPaused();
     hud.toast('3B görüntü durakladı; ekran geri geldiğinde yeniden bağlanacak.', 'error');
   });
   canvas.addEventListener('webglcontextrestored', () => {
+    sceneFreezeDiagnostics?.record('webgl:context-restored', sceneDiagnosisSnapshot(app, world));
     pauseReasons.delete('webgl');
     setPaused();
     hud.toast('3B görüntü yeniden bağlandı.');
@@ -250,7 +298,13 @@ async function boot() {
   let autoPickupElapsed = 0;
   let firstFrameRendered = false;
   let insideTerminal = false;
+  let pendingUpgradeRender = null;
+  let diagnosisWatchUntil = 0;
+  let lastSlowFrameRecordedAt = 0;
+  let nextWorldRenderAt = 0;
+  let lastWorldRenderFailure = null;
   function frame(now) {
+    const frameStartedAt = performance.now();
     const elapsed = Math.min((now - previousTime) / 1000, 0.1);
     previousTime = now;
     const paused = pauseReasons.size > 0;
@@ -281,6 +335,38 @@ async function boot() {
         if (pauseReasons.size > 0) break;
       }
       if (ticks === MAX_TICKS_PER_FRAME && simulationAccumulator >= SIMULATION_STEP) simulationAccumulator = 0;
+      const nearbyUpgradeAction = app.getNearbyAction();
+      const upgradePurchaseWillComplete = nearbyUpgradeAction?.kind === 'upgrade'
+        && nearbyUpgradeAction.paymentSecondsRemaining <= elapsed
+        && !nearbyUpgradeAction.insufficientFunds
+        && !nearbyUpgradeAction.rearmRequired
+        && !input.layoutMode;
+      if (upgradePurchaseWillComplete) {
+        sceneFreezeDiagnostics?.begin('unlock-flow', {
+          phase: 'purchase',
+          upgradeId: nearbyUpgradeAction.id,
+          title: nearbyUpgradeAction.title,
+          before: sceneDiagnosisSnapshot(app, world),
+        });
+      }
+      const upgradePurchase = app.advanceUpgradeMarkerPurchase(nearbyUpgradeAction, elapsed, !input.layoutMode);
+      if (upgradePurchase?.completed) {
+        const purchaseDetails = {
+          upgradeId: upgradePurchase.id,
+          ok: Boolean(upgradePurchase.result?.ok),
+          reason: upgradePurchase.result?.reason ?? null,
+          after: sceneDiagnosisSnapshot(app, world),
+        };
+        if (upgradePurchaseWillComplete && !upgradePurchase.result?.ok) {
+          sceneFreezeDiagnostics?.finish('unlock-flow', { phase: 'purchase-failed', ...purchaseDetails });
+        }
+        if (upgradePurchase.result?.ok) {
+          sceneFreezeDiagnostics?.record('unlock:completed', purchaseDetails);
+          pendingUpgradeRender = upgradePurchase.id;
+          diagnosisWatchUntil = performance.now() + 5_000;
+        }
+      }
+      if (upgradePurchase?.completed && upgradePurchase.result?.ok) hud.feedback();
       const pendingBonusOffer = app.getPendingBonusOffer();
       if (pendingBonusOffer && !input.layoutMode
         && app.canOfferRewardedAd('bonus-offer', {
@@ -301,16 +387,78 @@ async function boot() {
     insideTerminal = nearTerminal;
     const upgrades = app.getAvailableUpgrades();
     try {
-      if (!pauseReasons.has('render-error') && !pauseReasons.has('webgl')) world.render(state, upgrades);
+      if (!pauseReasons.has('webgl') && now >= nextWorldRenderAt) {
+        if (pendingUpgradeRender) {
+          sceneFreezeDiagnostics?.record('unlock-flow:render-start', {
+            upgradeId: pendingUpgradeRender,
+            state: sceneDiagnosisSnapshot(app, world),
+          });
+        }
+        world.render(state, upgrades, nearbyAction);
+        if (pauseReasons.delete('render-error')) {
+          setPaused();
+          nextWorldRenderAt = 0;
+          lastWorldRenderFailure = null;
+          sceneFreezeDiagnostics?.record('world.render:recovered', sceneDiagnosisSnapshot(app, world));
+        }
+        if (pendingUpgradeRender) {
+          sceneFreezeDiagnostics?.finish('unlock-flow', {
+            phase: 'render-complete',
+            upgradeId: pendingUpgradeRender,
+            state: sceneDiagnosisSnapshot(app, world),
+          });
+          pendingUpgradeRender = null;
+        }
+      }
     } catch (error) {
+      const signature = `${error?.name ?? 'Error'}: ${error?.message ?? String(error)}`;
+      const firstFailure = !pauseReasons.has('render-error') || signature !== lastWorldRenderFailure;
+      const isMissingThreeUniform = error instanceof TypeError
+        && error.message.includes("reading 'value'")
+        && error.stack?.includes('refreshUniformsCommon');
+      const drawTrace = world.engine.renderer.__tohumdanSceneLastDraw;
+      const failedObject = isMissingThreeUniform && drawTrace?.objectUuid
+        ? world.scene.getObjectByProperty('uuid', drawTrace.objectUuid)
+        : null;
+
+      if (failedObject) {
+        failedObject.visible = false;
+        sceneFreezeDiagnostics?.fail('world.render', error, {
+          upgradeId: pendingUpgradeRender,
+          state: sceneDiagnosisSnapshot(app, world),
+          isolatedObject: failedObject.name || failedObject.type,
+        });
+        sceneFreezeDiagnostics?.record('world.render:object-isolated', {
+          drawTrace: { ...drawTrace },
+          objectName: failedObject.name || failedObject.type,
+        });
+        if (firstFailure) hud.toast('Çizilemeyen bir 3B nesne geçici olarak gizlendi; sahne yeniden deneniyor.', 'error');
+      } else if (firstFailure) {
+        sceneFreezeDiagnostics?.fail('world.render', error, {
+          upgradeId: pendingUpgradeRender,
+          state: sceneDiagnosisSnapshot(app, world),
+          drawTrace: drawTrace ? { ...drawTrace } : null,
+        });
+        hud.toast(`Sahne çizilemedi: ${error.message}`, 'error');
+      }
+      lastWorldRenderFailure = signature;
+      nextWorldRenderAt = now + 250;
       pauseReasons.add('render-error');
       setPaused();
-      hud.toast(`Sahne çizilemedi: ${error.message}`, 'error');
     }
     hudElapsed += elapsed;
     if (hudElapsed >= 0.12) {
       hudElapsed = 0;
       hud.render(state, nearbyAction);
+    }
+    const frameDuration = performance.now() - frameStartedAt;
+    if (sceneFreezeDiagnostics && performance.now() < diagnosisWatchUntil
+      && frameDuration > 100 && now - lastSlowFrameRecordedAt >= 1_000) {
+      lastSlowFrameRecordedAt = now;
+      sceneFreezeDiagnostics.record('frame:slow-after-unlock', {
+        durationMs: Math.round(frameDuration),
+        state: sceneDiagnosisSnapshot(app, world),
+      });
     }
     if (!firstFrameRendered) {
       firstFrameRendered = true;

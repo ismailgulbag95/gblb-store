@@ -42,7 +42,7 @@ function anchor(group, position) {
 
 function baseIsland(group, m, width = 3.1, depth = 2.8) {
   box(group, [width, 0.2, depth], m.sand, [0, 0.1, 0], 0.1);
-  box(group, [width - 0.12, 0.09, depth - 0.12], m.grass, [0, 0.24, 0], 0.07);
+  box(group, [width - 0.12, 0.09, depth - 0.12], m.soil, [0, 0.24, 0], 0.07);
   for (const [x, z] of [[-width * 0.38, depth * 0.36], [width * 0.36, depth * 0.37], [-width * 0.4, -depth * 0.35], [width * 0.39, -depth * 0.36]]) {
     const paver = add(group, new THREE.DodecahedronGeometry(0.15, 0), m.stoneLight,
       [x, 0.3, z], undefined, [1.4, 0.3, 0.8]);
@@ -870,7 +870,7 @@ function pizzaOven(group, m) {
 // -------------------------------------------------------------
 export function createProductionBuildModel(group, id) {
   const m = {
-    sand: material(0xdcb976), grass: material(0x69c843), leaf: material(0x329544),
+    sand: material(0xdcb976), soil: material(0x62412b), leaf: material(0x329544),
     leafBright: material(0x69c849), wood: material(0xa86a35), woodLight: material(0xd59a54),
     woodDark: material(0x744629), rope: material(0x90704d), red: material(0xe83a2d),
     redDark: material(0xb92f27), white: material(0xf8f9fa), roof: material(0xe94332),

@@ -238,6 +238,19 @@ export const EXTENDED_CUSTOMER_ARCHETYPES = [
   'influencer',     // 13: Blonde hair, sunglasses, crop top, selfie smartphone
 ];
 
+function customerVariantHash(customerId, variant) {
+  let value = 2166136261;
+  for (const char of `${customerId}:${variant}`) {
+    value = Math.imul(value ^ char.charCodeAt(0), 16777619);
+  }
+  value ^= value >>> 16;
+  value = Math.imul(value, 0x7feb352d);
+  value ^= value >>> 15;
+  value = Math.imul(value, 0x846ca68b);
+  value ^= value >>> 16;
+  return value >>> 0;
+}
+
 /**
  * Builds a highly stylized, expressive low-poly humanoid character with
  * role-specific uniforms, hats, accessories, and customizable archetypes.
@@ -909,10 +922,11 @@ export function createCustomerMesh(customer, environment, itemFactory) {
   const archetype = customer.archetype ?? EXTENDED_CUSTOMER_ARCHETYPES[archetypeIndex];
   const skinColor = CUSTOMER_SKINS[hash % CUSTOMER_SKINS.length];
   const hairColor = CUSTOMER_HAIR[(hash >>> 3) % CUSTOMER_HAIR.length];
-  const shirtColor = CUSTOMER_SHIRTS[(hash >>> 5) % CUSTOMER_SHIRTS.length];
-  const pantsColor = CUSTOMER_PANTS[(hash >>> 7) % CUSTOMER_PANTS.length];
+  const outfitStyle = customerVariantHash(customerId, 'style');
+  const shirtColor = CUSTOMER_SHIRTS[customerVariantHash(customerId, 'shirt') % CUSTOMER_SHIRTS.length];
+  const pantsColor = CUSTOMER_PANTS[customerVariantHash(customerId, 'pants') % CUSTOMER_PANTS.length];
 
-  const body = makeHumanoid(group, shirtColor, hairColor, hash >>> 4, '', {
+  const body = makeHumanoid(group, shirtColor, hairColor, outfitStyle, '', {
     archetype,
     skinColor,
     pantsColor

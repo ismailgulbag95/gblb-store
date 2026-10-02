@@ -12,14 +12,12 @@
   </head>
   <body>
     <main id="game-container" aria-label="Tohumdan Sofraya oyun dünyası" aria-busy="true"></main>
-    <section id="loading-screen" class="loading-screen" aria-labelledby="loading-title">
+    <section id="loading-screen" class="loading-screen" role="region" aria-label="Oyun yükleniyor">
       <div class="loading-landscape" aria-hidden="true">
         <span class="loading-sun"></span>
       </div>
       <div class="loading-content">
-        <div class="loading-logo-frame"><img class="loading-logo" src="/assets/branding/seed-to-serve/market-stall-color.svg" alt="" /></div>
-        <h1 id="loading-title">Tohumdan Sofraya</h1>
-        <p id="loading-status" class="loading-status" role="status">Oyun yükleniyor, lütfen bekleyin.</p>
+        <p id="loading-status" class="loading-status loading-status--visually-hidden" role="status" aria-live="polite">Oyun yükleniyor, lütfen bekleyin.</p>
         <div class="loading-baskets" aria-hidden="true">
           <span class="loading-basket loading-basket--tomato"><i></i></span>
           <span class="loading-basket loading-basket--corn"><i></i></span>
@@ -64,7 +62,7 @@
         </div>
       </header>
       <div id="layout-help" class="layout-help hidden" data-ui>
-        <span id="layout-help-text">Taşımak için bir yapıya dokun, sonra boş bir kareye dokun. Bitirmek için düzenle düğmesine bas.</span>
+        <span id="layout-help-text">Taşımak için bir yapıya veya asılı tabelaya dokun, sonra yeni konuma dokun. Bitirmek için düzenle düğmesine bas.</span>
         <button id="btn-rotate-layout" class="layout-rotate-btn hidden" type="button" aria-label="Seçili yapıyı döndür"><span data-asset-icon="rotate" data-asset-size="18"></span><span>Döndür (R)</span></button>
         <button id="btn-cancel-layout" class="layout-cancel-btn hidden" type="button" aria-label="Seçimi iptal et"><span data-asset-icon="close" data-asset-size="18"></span><span>İptal (Esc)</span></button>
       </div>
@@ -154,6 +152,8 @@
           </div>
           <div class="settings-content hidden" data-panel="debug">
             <div class="debug-grid"><button class="debug-button" data-debug="credit"><span data-asset-icon="money" data-asset-size="28"></span> +$1.000</button><button class="debug-button" data-debug="creditLarge"><span data-asset-icon="money" data-asset-size="28"></span> +$99.999</button><button class="debug-button" data-debug="capacity"><span data-asset-icon="capacity" data-asset-size="28"></span> +50 kapasite</button><button class="debug-button" data-debug="speed2"><span data-asset-icon="clock" data-asset-size="28"></span> 2× hız</button><button class="debug-button" data-debug="speed5"><span data-asset-icon="clock" data-asset-size="28"></span> 5× hız</button><button class="debug-button" data-debug="speed1"><span data-asset-icon="clock" data-asset-size="28"></span> Normal hız</button></div>
+            <button class="debug-button debug-button-wide" data-debug="allUpgrades"><span data-asset-icon="upgrade" data-asset-size="28"></span><span data-debug-label="allUpgrades">Tüm geliştirmeleri aç</span></button>
+            <p class="setting-note" id="debug-all-note">Tüm üretim yapıları, ithal reyonlar ve personel tesisleri ücretsiz kurulur.</p>
             <button class="reset-button" id="btn-reset">Yeni oyuna başla</button>
             <p class="setting-note">Geliştirici araçları kayıtlı oyun durumunu değiştirir.</p>
           </div>

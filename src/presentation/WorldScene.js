@@ -12,7 +12,7 @@ import { animateCoopChicken, createChickenCoopModel } from './ChickenCoopModel.j
 import { createFarmBuildModel } from './FarmBuildModel.js';
 import { buildFarmDecorationModel } from './FarmDecorationModels.js';
 import { createProductionBuildModel } from './ProductionBuildModel.js';
-import { ZONES, canPlaceDecoration, canPlaceStation, getAllStationIds, getDecorationDimensions, getStationDimensions, isStationUnlocked, stationPosition } from '../domain/layout.js';
+import { ZONES, canPlaceDecoration, canPlaceHangingSign, canPlaceStation, getAllStationIds, getDecorationDimensions, getStationDimensions, HANGING_SIGN_FOOTPRINT, hangingSignPosition, isStationUnlocked, stationPosition } from '../domain/layout.js';
 import { DECORATIONS } from '../domain/decorCatalog.js';
 import { drawAssetIcon } from '../ui/AssetIcons.js';
 
@@ -24,6 +24,15 @@ import { buildDecorationModel } from './DecorationModel.js';
 import { createWorkerMesh, createCustomerMesh, updateWorkerEnergyBar } from './HumanoidFactory.js';
 import { createDiningTableModel } from './DiningTableModel.js';
 import { CharacterAnimator } from './CharacterAnimator.js';
+
+const SCENE_VISUALS_PER_FRAME = 1;
+const SCENE_VISUAL_BATCH_THRESHOLD = 6;
+
+function countMissingVisuals(map, ids) {
+  let count = 0;
+  for (const id of ids) if (!map.has(id)) count += 1;
+  return count;
+}
 
 export class WorldScene {
   constructor(containerId = 'game-container') {
@@ -44,6 +53,9 @@ export class WorldScene {
     this.decorationLoader = new GLTFLoader();
     this.coop = null;
     this.upgradeMarkers = new Map();
+    this.visualBuildFailures = new Map();
+    this.dynamicVisualFailures = new Set();
+    this.onVisualError = null;
     this.itemFactory = new Item3DFactory();
     this.raycaster = new THREE.Raycaster();
     this.pointer = new THREE.Vector2();
@@ -305,11 +317,14 @@ export class WorldScene {
     const snappedZ = Math.round(z * 2) / 2;
     this.lastPreviewSnapped = { x: snappedX, z: snappedZ };
 
+    const isHangingSign = this.selectedStation.startsWith('hanging-sign:');
     const isDecor = this.selectedStation.startsWith('decor:');
     let rotation = 0;
     let dims = { width: 2, depth: 2 };
 
-    if (isDecor) {
+    if (isHangingSign) {
+      dims = HANGING_SIGN_FOOTPRINT;
+    } else if (isDecor) {
       const decorId = this.selectedStation.slice(6);
       const decor = state.decorations?.find((item) => item.id === decorId);
       rotation = decor?.rotation ?? 0;
@@ -323,9 +338,11 @@ export class WorldScene {
     this.placementFill.scale.set(dims.width, dims.depth, 1);
     this.placementBorder.scale.set(dims.width, dims.depth, 1);
 
-    const valid = isDecor
-      ? canPlaceDecoration(state, this.selectedStation.slice(6), snappedX, snappedZ, rotation)
-      : canPlaceStation(state, this.selectedStation, snappedX, snappedZ, rotation);
+    const valid = isHangingSign
+      ? canPlaceHangingSign(state, this.selectedStation.slice('hanging-sign:'.length), snappedX, snappedZ)
+      : isDecor
+        ? canPlaceDecoration(state, this.selectedStation.slice(6), snappedX, snappedZ, rotation)
+        : canPlaceStation(state, this.selectedStation, snappedX, snappedZ, rotation);
 
     const fillColor = valid ? 0x2ed573 : 0xff4757;
     const borderColor = valid ? 0x00ff88 : 0xff3838;
@@ -375,7 +392,19 @@ export class WorldScene {
     return nearest;
   }
 
+  hangingSignAtScreen(clientX, clientY) {
+    const rect = this.engine.renderer.domElement.getBoundingClientRect();
+    this.pointer.set(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1);
+    this.raycaster.setFromCamera(this.pointer, this.engine.camera);
+    const signs = [...this.environment.hangingSigns.values()];
+    const hit = this.raycaster.intersectObjects(signs, true)[0];
+    let object = hit?.object;
+    while (object && !object.userData.hangingSignId) object = object.parent;
+    return object?.userData.hangingSignId ?? null;
+  }
+
   #selectionPosition(state, id) {
+    if (id.startsWith('hanging-sign:')) return hangingSignPosition(state, id.slice('hanging-sign:'.length)) ?? { x: 0, z: 0 };
     if (!id.startsWith('decor:')) return stationPosition(state, id);
     const entry = state.decorations?.find((item) => item.id === id.slice(6));
     return entry ? { x: entry.x, z: entry.z } : { x: 0, z: 0 };
@@ -874,6 +903,11 @@ export class WorldScene {
   #syncDecorations(state) {
     const entries = state.decorations ?? [];
     const activeIds = new Set(entries.map((entry) => entry.id));
+    for (const failure of this.dynamicVisualFailures) {
+      if (failure.startsWith('decoration:') && !activeIds.has(failure.slice('decoration:'.length))) {
+        this.dynamicVisualFailures.delete(failure);
+      }
+    }
     for (const [id, visual] of this.decorItems) {
       if (activeIds.has(id)) continue;
       this.scene.remove(visual.group);
@@ -882,14 +916,18 @@ export class WorldScene {
     for (const entry of entries) {
       let visual = this.decorItems.get(entry.id);
       if (!visual) {
-        this.#addDecoration(entry);
+        if (this.dynamicVisualFailures.has(`decoration:${entry.id}`)) continue;
+        if (!this.sceneBuildBudget.take()) continue;
+        this.#guardDynamicVisual(`decoration:${entry.id}`, () => this.#addDecoration(entry));
         visual = this.decorItems.get(entry.id);
       } else {
         const model = DECORATIONS[entry.type]?.model;
         if (model && this.decorationModels.has(model) && !visual.modelReady) {
+          if (this.dynamicVisualFailures.has(`decoration:${entry.id}`)) continue;
+          if (!this.sceneBuildBudget.take()) continue;
           this.scene.remove(visual.group);
           this.decorItems.delete(entry.id);
-          this.#addDecoration(entry);
+          this.#guardDynamicVisual(`decoration:${entry.id}`, () => this.#addDecoration(entry));
           visual = this.decorItems.get(entry.id);
         }
       }
@@ -908,6 +946,18 @@ export class WorldScene {
     const actor = createCustomerMesh(customer, this.environment, this.itemFactory);
     this.scene.add(actor.group);
     return actor;
+  }
+
+  #guardDynamicVisual(id, create) {
+    if (this.dynamicVisualFailures.has(id)) return false;
+    try {
+      create();
+      return true;
+    } catch (error) {
+      this.dynamicVisualFailures.add(id);
+      this.onVisualError?.(id, error);
+      return false;
+    }
   }
 
   #animationTarget(cue, state, actor) {
@@ -997,23 +1047,251 @@ export class WorldScene {
     }
   }
 
-  #addUpgradeMarker(upgrade) {
+  #addUpgradeMarker(upgrade, language = 'tr') {
     if (this.upgradeMarkers.has(upgrade.id)) return;
     const group = new THREE.Group();
     group.position.set(upgrade.x, 0, upgrade.z);
-    const pad = new THREE.Mesh(new THREE.CylinderGeometry(0.78, 0.92, 0.18, 12), new THREE.MeshStandardMaterial({ color: 0xffc800, roughness: 0.45, metalness: 0.16 }));
-    pad.position.y = 0.12;
-    pad.castShadow = true;
-    const gem = new THREE.Mesh(new THREE.OctahedronGeometry(0.42), new THREE.MeshStandardMaterial({ color: 0x58cc02, emissive: 0x143b00, roughness: 0.3 }));
-    gem.position.y = 0.95;
-    gem.castShadow = true;
-    group.add(pad, gem);
+
+    const soil = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.78, 0.9, 0.14, 24),
+      new THREE.MeshStandardMaterial({ color: 0x74543a, roughness: 0.9 }),
+    );
+    soil.position.y = 0.08;
+    soil.castShadow = true;
+    soil.receiveShadow = true;
+
+    const stone = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.72, 0.76, 0.055, 24),
+      new THREE.MeshStandardMaterial({ color: 0xc8b797, roughness: 0.94 }),
+    );
+    stone.position.y = 0.17;
+    stone.castShadow = true;
+    stone.receiveShadow = true;
+
+    const turf = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.54, 0.56, 0.035, 24),
+      new THREE.MeshStandardMaterial({ color: 0x59734d, roughness: 0.96 }),
+    );
+    turf.position.y = 0.215;
+    turf.receiveShadow = true;
+
+    const goldTrim = new THREE.Mesh(
+      new THREE.TorusGeometry(0.62, 0.035, 7, 32),
+      new THREE.MeshStandardMaterial({ color: 0xd0a957, roughness: 0.72, metalness: 0.08 }),
+    );
+    goldTrim.rotation.x = -Math.PI / 2;
+    goldTrim.position.y = 0.238;
+
+    const halo = new THREE.Mesh(
+      new THREE.TorusGeometry(0.94, 0.025, 6, 40),
+      new THREE.MeshStandardMaterial({
+        color: 0x8fa276,
+        emissive: 0x344628,
+        emissiveIntensity: 0.14,
+        roughness: 0.82,
+        transparent: true,
+        opacity: 0.4,
+        depthWrite: false,
+      }),
+    );
+    halo.rotation.x = -Math.PI / 2;
+    halo.position.y = 0.04;
+
+    const sprout = new THREE.Group();
+    sprout.position.y = 0.22;
+    const stem = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.025, 0.04, 0.25, 7),
+      new THREE.MeshStandardMaterial({ color: 0x426b43, roughness: 0.88 }),
+    );
+    stem.position.y = 0.22;
+    const leafMaterial = new THREE.MeshStandardMaterial({ color: 0x82a76b, roughness: 0.82 });
+    const leftLeaf = new THREE.Mesh(new THREE.SphereGeometry(0.13, 9, 7), leafMaterial);
+    leftLeaf.position.set(-0.1, 0.34, 0);
+    leftLeaf.scale.set(1.25, 0.55, 0.72);
+    leftLeaf.rotation.z = 0.58;
+    const rightLeaf = new THREE.Mesh(new THREE.SphereGeometry(0.13, 9, 7), leafMaterial.clone());
+    rightLeaf.position.set(0.1, 0.4, 0);
+    rightLeaf.scale.set(1.25, 0.55, 0.72);
+    rightLeaf.rotation.z = -0.58;
+    sprout.add(stem, leftLeaf, rightLeaf);
+    sprout.traverse((object) => {
+      if (object.isMesh) object.castShadow = true;
+    });
+
+    const coins = Array.from({ length: 3 }, () => {
+      const coin = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.085, 0.085, 0.035, 12),
+        new THREE.MeshStandardMaterial({ color: 0xf0c45e, emissive: 0x543a0d, emissiveIntensity: 0.18, metalness: 0.28, roughness: 0.48 }),
+      );
+      coin.rotation.x = Math.PI / 2;
+      coin.visible = false;
+      coin.castShadow = true;
+      group.add(coin);
+      return coin;
+    });
+
+    const badgeCanvas = document.createElement('canvas');
+    badgeCanvas.width = 720;
+    badgeCanvas.height = 190;
+    const badgeTexture = new THREE.CanvasTexture(badgeCanvas);
+    badgeTexture.colorSpace = THREE.SRGBColorSpace;
+    const badge = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: badgeTexture,
+      transparent: true,
+      depthWrite: false,
+      toneMapped: false,
+    }));
+    badge.scale.set(2.8, 0.74, 1);
+    badge.position.y = 1.55;
+    badge.visible = false;
+    this.#drawUpgradeBadge(badgeCanvas, upgrade, language);
+
+    group.add(soil, stone, turf, goldTrim, halo, sprout, badge);
     this.scene.add(group);
-    this.upgradeMarkers.set(upgrade.id, { group, gem });
+    this.upgradeMarkers.set(upgrade.id, {
+      group,
+      sprout,
+      halo,
+      badge,
+      badgeCanvas,
+      badgeStateKey: '',
+      coins,
+      upgrade,
+      language,
+    });
+  }
+
+  #drawUpgradeBadge(canvas, upgrade, language, paymentProgress = 0, paymentAmount = 0, insufficientFunds = false, shortfall = 0, rearmRequired = false) {
+    const context = canvas.getContext('2d');
+    context.clearRect(0, 0, canvas.width, canvas.height);
+    context.beginPath();
+    context.roundRect(8, 8, canvas.width - 16, canvas.height - 16, 28);
+    context.fillStyle = insufficientFunds ? '#60413a' : '#3c4d3c';
+    context.fill();
+    context.lineWidth = 7;
+    context.strokeStyle = insufficientFunds ? '#d78369' : '#d0ad69';
+    context.stroke();
+
+    context.beginPath();
+    context.arc(80, 88, 48, 0, Math.PI * 2);
+    context.fillStyle = '#617b53';
+    context.fill();
+    context.strokeStyle = '#26392a';
+    context.lineWidth = 4;
+    context.stroke();
+
+    context.save();
+    context.translate(80, 88);
+    context.rotate(-0.35);
+    context.beginPath();
+    context.ellipse(-9, -3, 13, 25, -0.7, 0, Math.PI * 2);
+    context.ellipse(11, 5, 12, 21, 0.72, 0, Math.PI * 2);
+    context.fillStyle = '#d8e3bd';
+    context.fill();
+    context.restore();
+
+    context.textBaseline = 'middle';
+    context.textAlign = 'left';
+    context.fillStyle = insufficientFunds ? '#ffd2c4' : '#f3eddb';
+    context.font = 'bold 37px Fredoka, sans-serif';
+    const heading = rearmRequired ? (language === 'en' ? 'STEP AWAY' : 'BİRAZ UZAKLAŞ')
+      : insufficientFunds ? (language === 'en' ? 'NEED MORE CASH' : 'BAKİYE YETERSİZ')
+        : paymentProgress > 0 ? (language === 'en' ? 'CHARGING' : 'PARA ÇEKİLİYOR')
+          : (language === 'en' ? 'NEW UNLOCK' : 'YENİ AÇILIM');
+    context.fillText(heading, 154, 68);
+
+    context.beginPath();
+    context.arc(538, 72, 38, 0, Math.PI * 2);
+    context.fillStyle = '#e2bd66';
+    context.fill();
+    context.strokeStyle = '#76582f';
+    context.lineWidth = 5;
+    context.stroke();
+    context.fillStyle = '#463b29';
+    context.textAlign = 'center';
+    context.font = 'bold 38px Fredoka, sans-serif';
+    context.fillText('$', 538, 73);
+
+    context.fillStyle = '#f3eddb';
+    context.textAlign = 'left';
+    context.font = 'bold 43px Fredoka, sans-serif';
+    context.fillText(String(upgrade.price), 594, 73);
+
+    context.textAlign = 'left';
+    context.fillStyle = insufficientFunds ? '#ffd2c4' : '#e3ddcd';
+    context.font = 'bold 24px Fredoka, sans-serif';
+    const locale = language === 'en' ? 'en-US' : 'tr-TR';
+    const detail = rearmRequired ? (language === 'en' ? 'Move away, then return to unlock' : 'Yeniden açmak için uzaklaşıp tekrar gel')
+      : insufficientFunds ? (language === 'en' ? `$${shortfall.toLocaleString(locale, { maximumFractionDigits: 2 })} more needed` : `$${shortfall.toLocaleString(locale, { maximumFractionDigits: 2 })} daha gerekli`)
+        : paymentProgress > 0 ? `${language === 'en' ? 'Paid' : 'Çekilen'}  $${paymentAmount.toLocaleString(locale, { maximumFractionDigits: 2 })} / $${upgrade.price}`
+          : (language === 'en' ? 'Stay close for 3 seconds' : 'Yanında 3 saniye bekle');
+    context.fillText(detail, 154, 119);
+
+    context.beginPath();
+    context.roundRect(154, 151, 510, 16, 8);
+    context.fillStyle = '#253127';
+    context.fill();
+    if (paymentProgress > 0) {
+      context.beginPath();
+      context.roundRect(154, 151, Math.max(12, 510 * paymentProgress), 16, 8);
+      context.fillStyle = insufficientFunds ? '#d78369' : '#f0c45e';
+      context.fill();
+    }
+  }
+
+  #syncUpgradeMarkerFocus(upgradeMarkers, state, nearbyAction, time, frameDelta) {
+    const activeId = nearbyAction?.kind === 'upgrade' ? nearbyAction.id : null;
+    const language = state.settings.language;
+    const motionScale = this.reducedMotion.matches ? 0 : 1;
+    for (const [id, marker] of upgradeMarkers) {
+      const focused = id === activeId;
+      const progress = focused ? (nearbyAction.paymentProgress ?? 0) : 0;
+      const charging = focused && progress > 0;
+      const insufficientFunds = focused && Boolean(nearbyAction.insufficientFunds);
+      marker.badge.visible = focused;
+      const pulse = Math.sin(time * 5) * motionScale;
+      const bounce = focused ? 0.06 : 0.025;
+      marker.sprout.position.y = 0.22 + Math.sin(time * (charging ? 5.8 : 2.4) + marker.group.position.x) * bounce * motionScale;
+      marker.sprout.rotation.y += frameDelta * (charging ? 2.2 : focused ? 0.9 : 0.4) * motionScale;
+      marker.sprout.scale.setScalar(focused ? 1.08 + pulse * 0.035 : 1);
+      marker.halo.material.color.setHex(insufficientFunds ? 0xc56b57 : 0x8fa276);
+      marker.halo.material.emissive.setHex(insufficientFunds ? 0x5b2018 : 0x344628);
+      marker.halo.material.emissiveIntensity = charging ? 0.95 + pulse * 0.18 : focused ? 0.5 + pulse * 0.12 : 0.14;
+      marker.halo.material.opacity = focused ? (charging ? 0.82 + pulse * 0.1 : 0.65 + pulse * 0.12) : 0.4;
+      marker.halo.scale.setScalar(focused ? 1.06 + pulse * (charging ? 0.08 : 0.045) : 1);
+
+      marker.coins.forEach((coin, index) => {
+        coin.visible = charging;
+        if (!charging) return;
+        const angle = time * 3.4 * motionScale + index * Math.PI * 2 / marker.coins.length;
+        const radius = 0.66;
+        coin.position.set(Math.cos(angle) * radius, 0.47 + Math.sin(time * 4 + index) * 0.035 * motionScale, Math.sin(angle) * radius);
+        coin.rotation.y = angle;
+      });
+
+      const progressBucket = Math.floor(progress * 20);
+      const badgeStateKey = `${language}:${progressBucket}:${insufficientFunds}:${nearbyAction?.shortfall ?? 0}:${nearbyAction?.rearmRequired ?? false}`;
+      if (marker.badgeStateKey !== badgeStateKey) {
+        this.#drawUpgradeBadge(
+          marker.badgeCanvas,
+          marker.upgrade,
+          language,
+          progress,
+          nearbyAction?.paymentAmount ?? 0,
+          insufficientFunds,
+          nearbyAction?.shortfall ?? 0,
+          Boolean(nearbyAction?.rearmRequired),
+        );
+        marker.badge.material.map.needsUpdate = true;
+        marker.badgeStateKey = badgeStateKey;
+        marker.language = language;
+      }
+    }
   }
 
   #syncCollection(map, ids, create, dispose) {
     const idSet = new Set(ids);
+    let failedIds = this.visualBuildFailures.get(map);
     for (const [id, value] of map) {
       if (idSet.has(id)) continue;
       value.animator?.dispose();
@@ -1021,7 +1299,21 @@ export class WorldScene {
       this.scene.remove(value.group ?? value);
       map.delete(id);
     }
-    for (const id of ids) if (!map.has(id)) create(id);
+    if (failedIds) {
+      for (const id of failedIds) if (!idSet.has(id)) failedIds.delete(id);
+    }
+    for (const id of ids) {
+      if (map.has(id) || failedIds?.has(id)) continue;
+      if (!this.sceneBuildBudget.take()) break;
+      try {
+        create(id);
+      } catch (error) {
+        failedIds ??= new Set();
+        failedIds.add(id);
+        this.visualBuildFailures.set(map, failedIds);
+        this.onVisualError?.(id, error);
+      }
+    }
   }
 
   #disposeVisual(value) {
@@ -1037,16 +1329,52 @@ export class WorldScene {
     });
   }
 
-  render(state, availableUpgrades = []) {
+  render(state, availableUpgrades = [], nearbyAction = null) {
+    const shelfItems = state.unlockedProducts.filter((item) => SHELVES[item]);
+    if (!shelfItems.includes('TOMATO')) shelfItems.push('TOMATO');
+    const selfRegIds = Object.keys(state.selfRegisters ?? {});
+    const customShelfIds = Object.keys(state.customStations ?? {})
+      .filter((id) => state.customStations[id].kind === 'shelf');
+    const upgradeIds = availableUpgrades.map((entry) => entry.id);
+    const customerIds = state.customers.map((customer) => customer.id);
+    const workerIds = state.workers.map((worker) => worker.id);
+    const decorationIds = (state.decorations ?? []).map((entry) => entry.id);
+    const pendingVisuals = countMissingVisuals(this.farms, Object.keys(state.farms))
+      + countMissingVisuals(this.machines, Object.keys(state.machines))
+      + countMissingVisuals(this.shelves, shelfItems)
+      + countMissingVisuals(this.tables, Object.keys(state.diningTables))
+      + countMissingVisuals(this.selfRegisters, selfRegIds)
+      + countMissingVisuals(this.customShelves, customShelfIds)
+      + countMissingVisuals(this.upgradeMarkers, upgradeIds)
+      + countMissingVisuals(this.customers, customerIds)
+      + countMissingVisuals(this.workers, workerIds)
+      + countMissingVisuals(this.decorItems, decorationIds)
+      + Number(Boolean(state.coops.coop && !this.coop))
+      + Number(Boolean(state.unlocked?.managerOffice && !this.environment.logistics))
+      + Number(Boolean(state.staffLandCleared && !this.environment.staffLand))
+      + countMissingVisuals(this.environment.staffFacilities, Object.keys(state.staffFacilities ?? {}))
+      + Number(this.playerCharacter.type !== state.player.character);
+    const visualBuildLimit = pendingVisuals > SCENE_VISUAL_BATCH_THRESHOLD
+      ? SCENE_VISUALS_PER_FRAME
+      : Number.POSITIVE_INFINITY;
+    this.sceneBuildBudget = {
+      remaining: visualBuildLimit,
+      take() {
+        if (this.remaining <= 0) return false;
+        this.remaining -= 1;
+        return true;
+      },
+    };
     const frameDelta = Math.min(this.clock.getDelta(), 0.05);
     const time = this.clock.elapsedTime;
     this.lighting.updateDaylight(gameDaylight, state.tick, THREE);
+    this.environment.syncHangingSigns(state.hangingSigns);
     this.environment.setRestaurantUnlocked(state.unlocked?.restaurant);
-    this.environment.syncStaffFacilities(state);
-    this.environment.syncLogistics(state);
+    this.#guardDynamicVisual('staff-facilities', () => this.environment.syncStaffFacilities(state, this.sceneBuildBudget));
+    this.#guardDynamicVisual('east-logistics', () => this.environment.syncLogistics(state, this.sceneBuildBudget));
     this.environment.update(frameDelta, time);
     const wasMoving = Math.hypot(state.player.x - this.playerMesh.position.x, state.player.z - this.playerMesh.position.z) > 0.001;
-    if (this.playerCharacter.type !== state.player.character) {
+    if (this.playerCharacter.type !== state.player.character && this.sceneBuildBudget.take()) {
       this.#disposeVisual(this.playerMesh);
       this.scene.remove(this.playerMesh);
       this.playerCharacter = new CharacterFactory(state.player.character);
@@ -1111,8 +1439,6 @@ export class WorldScene {
       }
     }
     this.#syncCollection(this.machines, Object.keys(state.machines), (id) => this.#addMachine(id), (entry) => this.#disposeVisual(entry));
-    const shelfItems = state.unlockedProducts.filter((item) => SHELVES[item]);
-    if (!shelfItems.includes('TOMATO')) shelfItems.push('TOMATO');
     this.#syncCollection(this.shelves, shelfItems, (id) => this.#addShelf(id), (entry) => this.#disposeVisual(entry));
     this.#syncCollection(this.tables, Object.keys(state.diningTables), (id) => this.#addTable(id), (entry) => this.#disposeVisual(entry));
     this.#syncDecorations(state);
@@ -1147,7 +1473,6 @@ export class WorldScene {
       if (p.rotation !== undefined) this.registerMesh.rotation.y = p.rotation;
     }
     // Otomatik Kasalar (Self-Checkouts)
-    const selfRegIds = Object.keys(state.selfRegisters ?? {});
     this.#syncCollection(this.selfRegisters, selfRegIds, (id) => this.#createSelfRegister(id), (entry) => this.#disposeVisual(entry));
     for (const [id, regGroup] of this.selfRegisters) {
       const p = stationPosition(state, id);
@@ -1157,7 +1482,6 @@ export class WorldScene {
       }
     }
     // Ekstra Satın Alınan Reyonlar (Custom Shelves)
-    const customShelfIds = Object.keys(state.customStations ?? {}).filter((id) => state.customStations[id].kind === 'shelf');
     this.#syncCollection(this.customShelves, customShelfIds, (id) => this.#addCustomShelf(id, state.customStations[id]), (entry) => this.#disposeVisual(entry));
     for (const [id, shelf] of this.customShelves) {
       const p = stationPosition(state, id);
@@ -1176,7 +1500,9 @@ export class WorldScene {
       this.coop.group.position.set(p.x, 0, p.z);
       if (p.rotation !== undefined) this.coop.group.rotation.y = p.rotation;
     }
-    if (state.coops.coop && !this.coop) this.#addCoop();
+    if (state.coops.coop && !this.coop && !this.dynamicVisualFailures.has('coop') && this.sceneBuildBudget.take()) {
+      this.#guardDynamicVisual('coop', () => this.#addCoop());
+    }
     if (!state.coops.coop && this.coop) {
       this.scene.remove(this.coop.group);
       this.coop = null;
@@ -1208,10 +1534,11 @@ export class WorldScene {
       const baseScale = Math.max(dims.width, dims.depth) * 0.55;
       this.selectionRing.scale.setScalar(baseScale * (1 + Math.sin(time * 4) * 0.06));
     }
-    this.#syncCollection(this.upgradeMarkers, availableUpgrades.map((entry) => entry.id), (id) => {
+    this.#syncCollection(this.upgradeMarkers, upgradeIds, (id) => {
       const upgrade = availableUpgrades.find((entry) => entry.id === id);
-      if (upgrade) this.#addUpgradeMarker(upgrade);
+      if (upgrade) this.#addUpgradeMarker(upgrade, state.settings.language);
     }, (marker) => this.#disposeVisual(marker));
+    this.#syncUpgradeMarkerFocus(this.upgradeMarkers, state, nearbyAction, time, frameDelta);
 
     for (const [itemId, shelf] of this.shelves) {
       const count = state.stock[shelf.id]?.items[itemId] ?? 0;
@@ -1403,7 +1730,6 @@ export class WorldScene {
       }
     }
 
-    const customerIds = state.customers.map((customer) => customer.id);
     this.#syncCollection(this.customers, customerIds, (id) => {
       const customer = state.customers.find((entry) => entry.id === id);
       if (customer) this.customers.set(id, this.#createCustomer(customer));
@@ -1413,7 +1739,6 @@ export class WorldScene {
       if (actor) this.#syncCustomer(actor, customer, state, frameDelta);
     }
 
-    const workerIds = state.workers.map((worker) => worker.id);
     this.#syncCollection(this.workers, workerIds, (id) => {
       const worker = state.workers.find((entry) => entry.id === id);
       if (worker) this.workers.set(id, this.#createWorker(worker.type));
@@ -1431,10 +1756,6 @@ export class WorldScene {
       updateWorkerEnergyBar(actor, worker, this.engine.camera.quaternion);
     });
 
-    for (const marker of this.upgradeMarkers.values()) {
-      marker.gem.position.y = 0.98 + Math.sin(time * 2.5) * 0.12;
-      marker.gem.rotation.y += frameDelta;
-    }
     this.engine.render();
   }
 

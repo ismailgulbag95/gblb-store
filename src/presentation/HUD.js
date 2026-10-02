@@ -324,6 +324,7 @@ export class HUD {
   #interact() {
     const action = this.app.getNearbyAction();
     if (!action) return;
+    if (action.kind === 'upgrade') return;
     const result = this.app.interact(action.id);
     if (result.ok) { this.#feedback(); return; }
     if (action.kind === 'trashBin') {
@@ -391,6 +392,7 @@ export class HUD {
     if (action === 'credit') this.app.debugCredit(1_000);
     if (action === 'creditLarge') this.app.debugCredit(99_999);
     if (action === 'capacity') this.app.debugCapacity(this.app.getState().player.capacity + 50);
+    if (action === 'allUpgrades') this.app.debugUnlockAllUpgrades();
     if (action === 'speed2') this.app.setSpeedMultiplier(2);
     if (action === 'speed5') this.app.setSpeedMultiplier(5);
     if (action === 'speed1') this.app.setSpeedMultiplier(1);
@@ -651,10 +653,13 @@ export class HUD {
   render(state, action, force = false) {
     const language = state.settings.language;
     this.#applyLanguage(language);
-    const balance = state.economy.balanceAtoms / 10_000;
+    const ledgerBalance = state.economy.balanceAtoms / 10_000;
+    const balance = Math.max(0, state.economy.balanceAtoms / 10_000
+      - (action?.kind === 'upgrade' ? (action.paymentAmount ?? 0) : 0));
     const moneyLabel = `$${balance.toLocaleString(language === 'tr' ? 'tr-TR' : 'en-US', { maximumFractionDigits: 2 })}`;
     if (this.elements['money-display']) this.elements['money-display'].textContent = moneyLabel;
     if (this.elements.moneyPill) this.elements.moneyPill.classList.toggle('compact', moneyLabel.length >= 8);
+    if (this.elements.moneyPill) this.elements.moneyPill.classList.toggle('charging', action?.kind === 'upgrade' && action.paymentProgress > 0);
     if (this.elements['day-display']) {
       this.elements['day-display'].textContent = language === 'en'
         ? `Day ${gameDayNumber(state.tick)}` : `Gün ${gameDayNumber(state.tick)}`;
@@ -706,12 +711,15 @@ export class HUD {
     if (this.elements['progress-fill']) this.elements['progress-fill'].style.width = `${Math.min(100, state.completedUpgrades.length / UPGRADES.length * 100)}%`;
     const actionButton = this.elements['btn-interact'];
     const actionLabel = this.elements['action-label'];
-    if (actionButton) actionButton.disabled = !action || action.actionable === false;
+    if (actionButton) {
+      actionButton.disabled = !action || action.actionable === false || action.kind === 'upgrade';
+      actionButton.classList.toggle('charging', action?.kind === 'upgrade' && action.paymentProgress > 0);
+    }
     if (actionLabel) actionLabel.textContent = action ? this.#actionText(action, state) : (language === 'en' ? 'Move closer to a station' : 'Bir istasyona yaklaş');
     if (this.elements['upgrade-count']) this.elements['upgrade-count'].textContent = String(this.app.getAvailableUpgrades().length);
     this.renderAdOffers(state, action);
     this.#syncSettings(state);
-    const signature = `${state.revision}:${balance}:${this.app.getAvailableUpgrades().map((upgrade) => upgrade.id).join(',')}:${state.completedUpgrades.join(',')}:${state.workers.map((worker) => worker.type).join(',')}:${Object.keys(state.layout ?? {}).length}:${Object.keys(state.selfRegisters ?? {}).length}`;
+    const signature = `${state.revision}:${ledgerBalance}:${this.app.getAvailableUpgrades().map((upgrade) => upgrade.id).join(',')}:${state.completedUpgrades.join(',')}:${state.workers.map((worker) => worker.type).join(',')}:${Object.keys(state.layout ?? {}).length}:${Object.keys(state.selfRegisters ?? {}).length}`;
     if (force || signature !== this.lastUpgradeSignature) {
       this.lastUpgradeSignature = signature;
       this.renderUpgrades(state);
@@ -830,6 +838,10 @@ export class HUD {
     document.querySelector('.settings-tabs [data-tab="character"]').textContent = english ? EN.character : 'Karakter';
     document.querySelector('.settings-tabs [data-tab="language"]').textContent = english ? 'Language' : 'Dil';
     document.querySelector('.settings-tabs [data-tab="debug"]').textContent = english ? EN.developer : 'Geliştirici';
+    document.querySelector('[data-debug-label="allUpgrades"]').textContent = english ? 'Unlock and build everything' : 'Tüm geliştirmeleri aç';
+    document.getElementById('debug-all-note').textContent = english
+      ? 'All production buildings, imported shelves, and staff facilities are built for free.'
+      : 'Tüm üretim yapıları, ithal reyonlar ve personel tesisleri ücretsiz kurulur.';
     const generalLabels = english
       ? [EN.sound, EN.haptics, EN.autoPickup]
       : ['Ses efektleri', 'Dokunsal geri bildirim', 'Otomatik üstüne alma'];
@@ -1106,7 +1118,16 @@ export class HUD {
     if (action.kind === 'office') return 'Open wholesale procurement terminal';
     if (action.kind === 'dock') return 'Collect stock from the loading dock';
     if (action.kind === 'warehouse') return 'Store bag items or collect warehouse stock';
-    if (action.kind === 'upgrade') return `${this.#upgradeNameEnglish(action.id, action.title)} · $${action.price}`;
+    if (action.kind === 'upgrade') {
+      if (action.rearmRequired) return 'Step away, then return to the marker';
+      if (action.insufficientFunds) return `Need $${action.shortfall.toLocaleString('en-US', { maximumFractionDigits: 2 })} more`;
+      if (action.paymentProgress > 0) {
+        const percent = Math.round(action.paymentProgress * 100);
+        const paid = action.paymentAmount.toLocaleString('en-US', { maximumFractionDigits: 2 });
+        return `Unlocking ${percent}% · $${paid} / $${action.price}`;
+      }
+      return `Stay nearby for 3 sec · $${action.price}`;
+    }
     if (action.kind === 'trashBin') {
       if (action.actionable !== false) return 'Discard bag items';
       return action.label.includes('ayrılmış') ? 'Items reserved for staff' : 'Bag is empty';
@@ -1129,7 +1150,11 @@ export class HUD {
       if (state.stock.player.items[action.item]) return 'Restock shelf';
       return state.stock[SHELVES[action.item].id]?.items?.[action.item] ? 'Collect product' : 'Shelf empty';
     }
-    if (action.kind === 'coop') return state.stock['coop:eggs']?.items?.EGG ? 'Collect eggs' : 'Add chicken feed';
+    if (action.kind === 'coop') {
+      const eggs = state.stock['coop:eggs']?.items?.EGG ?? 0;
+      const carried = Object.values(state.stock.player.items).reduce((total, count) => total + count, 0);
+      return eggs > 0 && carried < state.player.capacity && action.actionable ? 'Collect eggs' : 'Add chicken feed';
+    }
     if (action.kind === 'table') {
       const table = state.diningTables[action.id];
       return table?.tipAtoms ? 'Collect tip' : table?.customerId ? 'Serve meal' : `Table ${action.id.slice(-1)}`;

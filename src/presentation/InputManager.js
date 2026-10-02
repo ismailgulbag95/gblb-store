@@ -166,21 +166,34 @@ export class InputManager {
       }
       const target = this.world.screenToWorld(event.clientX, event.clientY);
       if (this.layoutMode) {
-        if (!target) return;
         if (!this.selectedStation) {
+          const hangingSignId = this.world.hangingSignAtScreen?.(event.clientX, event.clientY);
+          if (!hangingSignId && !target) return;
           const state = this.app.getState();
-          const decorationId = this.world.decorationAt(state, target.x, target.z);
-          this.selectedStation = decorationId
-            ? 'decor:' + decorationId
-            : this.world.stationAt(state, target.x, target.z);
+          if (hangingSignId) {
+            this.selectedStation = `hanging-sign:${hangingSignId}`;
+          } else if (target) {
+            const decorationId = this.world.decorationAt(state, target.x, target.z);
+            this.selectedStation = decorationId
+              ? 'decor:' + decorationId
+              : this.world.stationAt(state, target.x, target.z);
+          }
           this.world.selectStation(this.selectedStation, state);
-          this.onLayoutMessage?.(this.selectedStation ? 'Yeni konum için dokun veya R ile döndür.' : 'Taşımak için bir yapıya dokun.');
+          this.onLayoutMessage?.(this.selectedStation?.startsWith('hanging-sign:')
+            ? 'Asılı tabela seçildi. Yeni konumunu belirlemek için sahneye dokun.'
+            : this.selectedStation ? 'Yeni konum için dokun veya R ile döndür.' : 'Taşımak için bir yapıya ya da asılı tabelaya dokun.');
           this.onSelectionChange?.(this.selectedStation);
         } else {
-          const result = this.selectedStation.startsWith('decor:')
-            ? this.app.moveDecoration(this.selectedStation.slice(6), target.x, target.z)
-            : this.app.moveStation(this.selectedStation, target.x, target.z);
-          this.onLayoutMessage?.(result.ok ? 'Yerleşim kaydedildi. Başka bir yapı seçebilirsin.' : 'Bu kare dolu veya alanın dışında. Başka bir kare seç.');
+          if (!target) return;
+          const isHangingSign = this.selectedStation.startsWith('hanging-sign:');
+          const result = isHangingSign
+            ? this.app.moveHangingSign(this.selectedStation.slice('hanging-sign:'.length), target.x, target.z)
+            : this.selectedStation.startsWith('decor:')
+              ? this.app.moveDecoration(this.selectedStation.slice(6), target.x, target.z)
+              : this.app.moveStation(this.selectedStation, target.x, target.z);
+          this.onLayoutMessage?.(result.ok
+            ? (isHangingSign ? 'Tabela taşındı. Başka bir tabela veya yapı seçebilirsin.' : 'Yerleşim kaydedildi. Başka bir yapı seçebilirsin.')
+            : 'Bu konum dolu veya alanın dışında. Başka bir konum seç.');
           if (result.ok) {
             this.selectedStation = null;
             this.world.selectStation(null);
@@ -209,7 +222,7 @@ export class InputManager {
   }
 
   rotateCurrentSelection() {
-    if (!this.layoutMode || !this.selectedStation) return;
+    if (!this.layoutMode || !this.selectedStation || this.selectedStation.startsWith('hanging-sign:')) return;
     const result = this.app.rotateSelected(this.selectedStation);
     this.onLayoutMessage?.(result.ok ? 'Döndürüldü (90°). Yeni konumu seçebilirsin.' : 'Döndürülemedi.');
     if (result.ok) {
@@ -222,7 +235,7 @@ export class InputManager {
     this.selectedStation = null;
     this.world.selectStation(null);
     this.onSelectionChange?.(null);
-    this.onLayoutMessage?.('Seçim iptal edildi. Taşımak istediğin yapıya dokun.');
+    this.onLayoutMessage?.('Seçim iptal edildi. Taşımak istediğin yapı ya da asılı tabelaya dokun.');
   }
 
   getMovementVector() {

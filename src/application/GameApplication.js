@@ -5,7 +5,7 @@ import { createInitialState, hydrateState } from '../domain/state.js';
 import { advanceSimulation } from '../domain/simulation.js';
 import { gameDayNumber } from '../domain/dayCycle.js';
 import { createFarmState, removeFarmReady, syncFarmHarvest } from '../domain/farm.js';
-import { ZONES, canPlaceDecoration, canPlaceStation, getAllStationIds, getDecorationDimensions, getDecorationZone, getMarketCollisionBoxes, getShelfLocations, getStationDimensions, isStationUnlocked, nextShelfStagingPosition, stationPosition, syncCatalogLayout } from '../domain/layout.js';
+import { ZONES, canPlaceDecoration, canPlaceHangingSign, canPlaceStation, getAllStationIds, getDecorationDimensions, getDecorationZone, getMarketCollisionBoxes, getShelfLocations, getStationDimensions, isStationUnlocked, nextShelfStagingPosition, stationPosition, syncCatalogLayout } from '../domain/layout.js';
 import { DECORATIONS } from '../domain/decorCatalog.js';
 import { decorationPrice, nextOrder } from '../domain/orders.js';
 import { machineProductionSeconds, machineSpeedMultiplier, machineUpgradeCost, percentGain, staffSpeedMultiplier, staffUpgradeCost } from '../domain/progression.js';
@@ -15,6 +15,7 @@ import { generateStaffCandidates, normalizeWorkerWelfare } from '../domain/staff
 import { placeWholesaleOrder, configureProcurementAutomation } from '../domain/procurement.js';
 
 const LOGISTICS_KINDS = ['office', 'dock', 'warehouse'];
+const UPGRADE_MARKER_PURCHASE_SECONDS = 3;
 
 function clone(value) {
   return structuredClone(value);
@@ -85,6 +86,8 @@ export class GameApplication {
   constructor(saveService, seed, rewardedAdService = null) {
     this.saveService = saveService;
     this.rewardedAdService = rewardedAdService;
+    this.upgradeMarkerPurchase = null;
+    this.upgradeMarkerPurchaseLockPosition = null;
     this.adSessionTicks = 0;
     this.adOfferSequence = 0;
     this.shownAdOffers = new Set();
@@ -574,6 +577,20 @@ export class GameApplication {
     return result;
   }
 
+  moveHangingSign(id, x, z) {
+    const snappedX = Math.round(x * 2) / 2;
+    const snappedZ = Math.round(z * 2) / 2;
+    if (!canPlaceHangingSign(this.state, id, snappedX, snappedZ)) {
+      return { ok: false, reason: 'invalid-placement' };
+    }
+
+    return this.#command(`hanging-sign-layout:${id}:${this.state.revision + 1}`, (draft) => {
+      if (!draft.hangingSigns?.[id]) return { ok: false, reason: 'unknown-hanging-sign' };
+      draft.hangingSigns[id] = { x: snappedX, z: snappedZ };
+      return { ok: true, message: 'Asılı reyon tabelası taşındı.' };
+    });
+  }
+
   rotateSelected(id) {
     if (!id) return { ok: false, reason: 'nothing-selected' };
     if (LOGISTICS_KINDS.includes(STATIONS[id]?.kind)) return { ok: false, reason: 'fixed-station' };
@@ -732,7 +749,8 @@ export class GameApplication {
     if (AD_ONLY_UPGRADE_IDS.includes(upgradeId)) return { ok: false, reason: 'rewarded-ad-required' };
     const upgrade = UPGRADES.find((entry) => entry.id === upgradeId);
     if (!upgrade) return { ok: false, reason: 'unknown-upgrade' };
-    return this.#command(`upgrade:${upgradeId}:${this.state.revision + 1}`, (draft) => {
+    const playerWasNearUpgrade = Math.hypot(this.state.player.x - upgrade.x, this.state.player.z - upgrade.z) <= 2.2;
+    const result = this.#command(`upgrade:${upgradeId}:${this.state.revision + 1}`, (draft) => {
       if (!draft.availableUpgrades.includes(upgradeId) || draft.completedUpgrades.includes(upgradeId)) {
         return { ok: false, reason: 'locked' };
       }
@@ -743,6 +761,11 @@ export class GameApplication {
       draft.quest = this.#questFor(draft);
       return { ok: true, message: UPGRADE_MESSAGES[upgradeId] };
     });
+    if (result.ok && playerWasNearUpgrade) {
+      this.upgradeMarkerPurchase = null;
+      this.upgradeMarkerPurchaseLockPosition = { x: upgrade.x, z: upgrade.z };
+    }
+    return result;
   }
 
   upgradeMachine(machineId) {
@@ -1091,7 +1114,7 @@ export class GameApplication {
     const state = this.state;
     const player = state.player;
     const upgrade = UPGRADES.find((entry) => entry.id === targetId);
-    if (upgrade && !state.completedUpgrades.includes(targetId)) return this.buyUpgrade(targetId);
+    if (upgrade && !state.completedUpgrades.includes(targetId)) return { ok: false, reason: 'automatic-purchase' };
     const trashBin = state.decorations.find((entry) => entry.id === targetId && entry.type === 'trashBin');
     if (trashBin) {
       if (Math.hypot(player.x - trashBin.x, player.z - trashBin.z) > 2.5) return { ok: false, reason: 'too-far' };
@@ -1161,8 +1184,8 @@ export class GameApplication {
         return moved ? { ok: true, message: `${moved} malzeme ${station.title} girişine yüklendi.` } : { ok: false, reason: 'no-compatible-stock' };
       }
       if (station.kind === 'coop') {
+        moved += this.#transferUpTo(draft, 'player', 'coop:feed', 'CHICKEN_FEED', draft.player.capacity);
         moved += this.#transferUpTo(draft, 'coop:eggs', 'player', 'EGG', draft.player.capacity);
-        if (!moved) moved += this.#transferUpTo(draft, 'player', 'coop:feed', 'CHICKEN_FEED', draft.player.capacity);
         return moved ? { ok: true, message: 'Kümes stoğu aktarıldı.' } : { ok: false, reason: 'no-compatible-stock' };
       }
       if (station.kind === 'shelf') {
@@ -1304,8 +1327,53 @@ export class GameApplication {
     this.setPlayerMove({ x: dx / distance, z: dz / distance }, step / speed);
   }
 
+  advanceUpgradeMarkerPurchase(action, deltaSeconds, eligible = true) {
+    const player = this.state.player;
+    const lockPosition = this.upgradeMarkerPurchaseLockPosition;
+    if (lockPosition) {
+      if (Math.hypot(player.x - lockPosition.x, player.z - lockPosition.z) <= 2.2) {
+        this.upgradeMarkerPurchase = null;
+        return null;
+      }
+      this.upgradeMarkerPurchaseLockPosition = null;
+    }
+
+    if (!eligible || action?.kind !== 'upgrade') {
+      this.upgradeMarkerPurchase = null;
+      return null;
+    }
+    const upgrade = UPGRADES.find((entry) => entry.id === action.id);
+    if (!upgrade || !this.state.availableUpgrades.includes(upgrade.id)
+      || this.state.completedUpgrades.includes(upgrade.id)) {
+      this.upgradeMarkerPurchase = null;
+      return null;
+    }
+    const priceAtoms = Math.round(upgrade.price * MONEY_ATOMS);
+    if (this.state.economy.balanceAtoms < priceAtoms) {
+      this.upgradeMarkerPurchase = null;
+      return null;
+    }
+
+    if (this.upgradeMarkerPurchase?.id !== upgrade.id) {
+      this.upgradeMarkerPurchase = { id: upgrade.id, elapsed: 0 };
+    }
+    const elapsed = Number.isFinite(deltaSeconds) ? Math.max(0, Math.min(0.1, deltaSeconds)) : 0;
+    this.upgradeMarkerPurchase.elapsed += elapsed;
+    if (this.upgradeMarkerPurchase.elapsed < UPGRADE_MARKER_PURCHASE_SECONDS) {
+      return { id: upgrade.id, progress: this.upgradeMarkerPurchase.elapsed / UPGRADE_MARKER_PURCHASE_SECONDS };
+    }
+
+    this.upgradeMarkerPurchase = null;
+    const result = this.buyUpgrade(upgrade.id);
+    return { id: upgrade.id, progress: 1, completed: result.ok, result };
+  }
+
   getNearbyAction() {
     const player = this.state.player;
+    if (this.upgradeMarkerPurchaseLockPosition
+      && Math.hypot(player.x - this.upgradeMarkerPurchaseLockPosition.x, player.z - this.upgradeMarkerPurchaseLockPosition.z) > 2.2) {
+      this.upgradeMarkerPurchaseLockPosition = null;
+    }
     const candidates = [];
     const state = this.state;
     for (const id of getAllStationIds(state)) {
@@ -1341,7 +1409,32 @@ export class GameApplication {
     candidates.sort((a, b) => a.distance - b.distance);
     const nearest = candidates[0];
     if (!nearest || nearest.distance > 2.2) return null;
-    if (nearest.kind === 'upgrade') return { ...nearest, label: `${nearest.title} · $${nearest.price}` };
+    if (nearest.kind === 'upgrade') {
+      const priceAtoms = Math.round(nearest.price * MONEY_ATOMS);
+      const balanceAtoms = state.economy.balanceAtoms;
+      const insufficientFunds = balanceAtoms < priceAtoms;
+      const rearmRequired = Boolean(this.upgradeMarkerPurchaseLockPosition);
+      const progress = this.upgradeMarkerPurchase?.id === nearest.id
+        ? Math.min(1, this.upgradeMarkerPurchase.elapsed / UPGRADE_MARKER_PURCHASE_SECONDS)
+        : 0;
+      const paymentAmount = Math.round(priceAtoms * progress) / MONEY_ATOMS;
+      const shortfall = Math.max(0, priceAtoms - balanceAtoms) / MONEY_ATOMS;
+      const label = rearmRequired ? 'Tekrar yaklaşmak için biraz uzaklaş'
+        : insufficientFunds ? `Bakiye yetersiz · $${shortfall.toLocaleString('tr-TR', { maximumFractionDigits: 2 })} eksik`
+          : progress > 0 ? `Ödeme alınıyor · $${paymentAmount.toLocaleString('tr-TR', { maximumFractionDigits: 2 })} / $${nearest.price}`
+            : `Yanında dur · 3 sn · $${nearest.price}`;
+      return {
+        ...nearest,
+        label,
+        actionable: false,
+        paymentProgress: progress,
+        paymentAmount,
+        paymentSecondsRemaining: Math.max(0, UPGRADE_MARKER_PURCHASE_SECONDS - (this.upgradeMarkerPurchase?.elapsed ?? 0)),
+        insufficientFunds,
+        shortfall,
+        rearmRequired,
+      };
+    }
     if (nearest.kind === 'trashBin') return nearest;
     if (nearest.kind === 'office') return { ...nearest, label: 'Toptan sipariş terminalini aç', actionable: true };
     if (nearest.kind === 'dock' || nearest.kind === 'warehouse') {
@@ -1373,7 +1466,20 @@ export class GameApplication {
       const stocked = quantityAt(state.stock, shelf?.stockId ?? SHELVES[nearest.item]?.id, nearest.item);
       return { ...nearest, label: carried > 0 ? 'Reyonu doldur' : stocked > 0 ? `${ITEMS[nearest.item].name} al` : 'Reyon boş', actionable: carried > 0 || stocked > 0 };
     }
-    if (nearest.kind === 'coop') return { ...nearest, label: quantityAt(state.stock, 'coop:eggs', 'EGG') ? 'Yumurtaları al' : 'Kümese yem bırak' };
+    if (nearest.kind === 'coop') {
+      const eggs = quantityAt(state.stock, 'coop:eggs', 'EGG');
+      const playerCount = Object.values(state.stock.player.items).reduce((total, count) => total + count, 0);
+      const hasPlayerSpace = playerCount < state.player.capacity;
+      const feedInBag = Math.max(0, quantityAt(state.stock, 'player', 'CHICKEN_FEED') - (state.stock.player.reserved?.CHICKEN_FEED ?? 0));
+      const feedStock = state.stock['coop:feed'];
+      const feedSpace = (feedStock?.capacity ?? 0) - Object.values(feedStock?.items ?? {}).reduce((total, count) => total + count, 0);
+      const canCollectEggs = eggs > 0 && hasPlayerSpace;
+      const canDeliverFeed = feedInBag > 0 && feedSpace > 0;
+      const label = canCollectEggs ? 'Yumurtaları otomatik al'
+        : canDeliverFeed ? 'Yemi kümese bırak'
+          : eggs > 0 ? 'Çanta dolu' : 'Kümeste yapılacak iş yok';
+      return { ...nearest, label, actionable: canCollectEggs || canDeliverFeed };
+    }
     if (nearest.kind === 'table') {
       const table = state.diningTables[nearest.id];
       return { ...nearest, label: table.tipAtoms ? 'Bahşişi al' : table.customerId ? 'Yemeği servis et' : nearest.title };
@@ -1493,6 +1599,50 @@ export class GameApplication {
       draft.player.capacity = amount;
       draft.stock.player.capacity = amount;
       return { ok: true, message: `Taşıma kapasitesi ${amount} oldu.` };
+    });
+  }
+
+  debugUnlockAllUpgrades() {
+    return this.#command(`debug-all-upgrades:${this.state.revision + 1}`, (draft) => {
+      for (const upgrade of UPGRADES) {
+        for (const unlockedId of upgrade.unlocks) draft.unlocked[unlockedId] = true;
+        if (draft.completedUpgrades.includes(upgrade.id)) continue;
+        draft.completedUpgrades.push(upgrade.id);
+        this.#applyUpgrade(draft, upgrade.id);
+      }
+
+      draft.availableUpgrades = draft.availableUpgrades.filter((id) => !draft.completedUpgrades.includes(id));
+
+      draft.unlockedProducts ??= [];
+      draft.layout ??= {};
+      draft.pendingShelfIds ??= [];
+      for (const [itemId, shelf] of Object.entries(IMPORTED_SHELVES)) {
+        if (!draft.unlockedProducts.includes(itemId)) draft.unlockedProducts.push(itemId);
+        draft.unlocked[shelf.stationId] = true;
+        makeLocation(draft.stock, SHELVES[itemId].id, SHELVES[itemId].capacity);
+        if (!draft.layout[shelf.stationId] && !draft.pendingShelfIds.includes(shelf.stationId)) {
+          const station = STATIONS[shelf.stationId];
+          if (canPlaceStation(draft, shelf.stationId, station.x, station.z)) {
+            draft.layout[shelf.stationId] = { x: station.x, z: station.z };
+          } else {
+            draft.pendingShelfIds.push(shelf.stationId);
+          }
+        }
+        this.#stageNextPendingShelf(draft);
+        if (draft.layout[shelf.stationId]) this.#pushPlayerClearOfStation(draft, shelf.stationId);
+      }
+
+      draft.staffLandCleared = true;
+      draft.staffFacilities ??= {};
+      for (const facility of Object.values(STAFF_FACILITIES)) {
+        draft.staffFacilities[facility.id] = { id: facility.id };
+        draft.layout[`staff-${facility.id}`] = { x: facility.x, z: facility.z, rotation: 0 };
+      }
+
+      const message = draft.settings.language === 'en'
+        ? 'All upgrades, imported shelves, and staff facilities are now unlocked and built.'
+        : 'Tüm geliştirmeler, ithal reyonlar ve personel tesisleri açılıp kuruldu.';
+      return { ok: true, message };
     });
   }
 

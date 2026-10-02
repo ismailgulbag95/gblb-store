@@ -1,12 +1,12 @@
 import { ITEMS, SHELVES, STATIONS, STAFF_FACILITIES, STAFF_HIRES } from './catalog.js';
 import { normalizeWorkerWelfare } from './staff.js';
 import { createFarmState, ensureFarmState, syncFarmHarvest } from './farm.js';
-import { canPlaceDecoration } from './layout.js';
+import { canPlaceDecoration, HANGING_SIGN_DEFAULT_POSITIONS, normalizeHangingSignPositions } from './layout.js';
 import { machineSpeedMultiplier, staffSpeedMultiplier } from './progression.js';
 import { PLAYER_CHARACTER_IDS } from './characters.js';
 import { normalizeProcurement } from './procurement.js';
 
-export const SAVE_VERSION = 11;
+export const SAVE_VERSION = 12;
 
 function emptyStock(capacity) {
   return { capacity, items: {}, reserved: {}, reservedCapacity: 0 };
@@ -63,6 +63,7 @@ export function createInitialState(seed = 0x51f15e) {
     customStations: {},
     selfRegisters: {},
     layout: {},
+    hangingSigns: normalizeHangingSignPositions(HANGING_SIGN_DEFAULT_POSITIONS),
     pendingShelfIds: [],
     decorations: [
       { id: 'decoration-boxes', type: 'cardboardBoxes', x: -3.8, z: -7.5, rotation: 0 },
@@ -250,7 +251,7 @@ function removeLegacyFurniture(candidate) {
 
 export function hydrateState(candidate) {
   if (!candidate || typeof candidate !== 'object') throw new Error('Kayıt boş veya bozuk.');
-  if (![2, 3, 4, 5, 6, 7, 8, 9, 10, SAVE_VERSION].includes(candidate.saveVersion)) throw new Error(`Bu kayıt sürümü desteklenmiyor (${candidate.saveVersion ?? 'bilinmiyor'}).`);
+  if (![2, 3, 4, 5, 6, 7, 8, 9, 10, 11, SAVE_VERSION].includes(candidate.saveVersion)) throw new Error(`Bu kayıt sürümü desteklenmiyor (${candidate.saveVersion ?? 'bilinmiyor'}).`);
   candidate = removeLegacyFurniture(candidate);
   const initial = createInitialState(candidate.rng);
   const hydrated = { ...initial, ...candidate };
@@ -325,6 +326,7 @@ export function hydrateState(candidate) {
   hydrated.selfRegisters = { ...(candidate.selfRegisters ?? {}) };
   hydrated.layout = Object.fromEntries(Object.entries(candidate.layout ?? {}).filter(([id, point]) =>
     (STATIONS[id] || hydrated.staffFacilities[id.slice(6)] && id.startsWith('staff-') || candidate.customStations?.[id] || candidate.selfRegisters?.[id] || id.includes('_') || id.startsWith('selfRegister') || id.startsWith('custom_')) && Number.isFinite(point?.x) && Number.isFinite(point?.z)));
+  hydrated.hangingSigns = normalizeHangingSignPositions(candidate.hangingSigns);
   hydrated.pendingShelfIds = [...new Set((Array.isArray(candidate.pendingShelfIds) ? candidate.pendingShelfIds : [])
     .filter((id) => STATIONS[id]?.kind === 'shelf' && !hydrated.layout[id]
       && Array.isArray(hydrated.unlockedProducts) && hydrated.unlockedProducts.includes(STATIONS[id].item)))];

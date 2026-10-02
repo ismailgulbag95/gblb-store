@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+import { GAME_CONFIG } from '../config/GameConfig.js';
+import { createGrassMaterial } from './SurfaceTextures.js';
 
 const mat = (color, roughness = 0.82, metalness = 0) => new THREE.MeshStandardMaterial({ color, roughness, metalness });
 
@@ -440,7 +442,7 @@ function orangeFarm(group, m, produce) {
 export function createFarmBuildModel(item) {
   const group = new THREE.Group();
   const m = {
-    sand: mat(0xdcb775), grass: mat(0x69c840), grassLight: mat(0x83d955),
+    sand: mat(0xdcb775), grass: createGrassMaterial(GAME_CONFIG.COLORS.FLOOR_FARM, 1.2, 1.2), grassLight: mat(0x83d955),
     soil: mat(0x62412b), furrow: mat(0x7b5336), post: mat(0x8c512b), postCap: mat(0xb5793f),
     fence: mat(0xf1d6a7), wood: mat(0xa56a39), woodLight: mat(0xd9a15d), woodDark: mat(0x6b3f20),
     rope: mat(0x9d784e), stone: mat(0x918d80), leaf: mat(0x369a3e), leafBright: mat(0x63c742),

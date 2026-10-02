@@ -1,10 +1,11 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { GAME_CONFIG } from '../config/GameConfig.js';
-import { SHELF_STAGING_AREA } from '../domain/layout.js';
+import { HANGING_SIGN_DEFAULT_POSITIONS, SHELF_STAGING_AREA } from '../domain/layout.js';
 import { EnvironmentProps } from './EnvironmentProps.js';
 import { STAFF_FACILITIES } from '../domain/catalog.js';
 import { createStaffFacilityModel, disposeStaffFacilityModel } from '../presentation/StaffFacilityModel.js';
+import { createGrassMaterial, createParquetMaterial, createSidewalkMaterial } from '../presentation/SurfaceTextures.js';
 import { createProcurementDeliveryModel, syncProcurementDelivery, syncProcurementStock, disposeLogisticsModel } from './LogisticsModels.js';
 
 export class MarketGrid {
@@ -17,6 +18,7 @@ export class MarketGrid {
     this.staffLand = null;
     this.staffPlotTrees = [];
     this.logistics = null;
+    this.hangingSigns = new Map();
     this.props = new EnvironmentProps(scene);
     this.buildEnvironment();
   }
@@ -24,10 +26,7 @@ export class MarketGrid {
   buildEnvironment() {
     // 1. Huge Lush Green Grass Base Ground (extends to entire horizon x = -70 to +40)
     const baseGeo = new THREE.PlaneGeometry(160, 100);
-    const baseMat = new THREE.MeshStandardMaterial({
-      color: 0x2ed573, // Vibrant lush arcade grass
-      roughness: 0.75
-    });
+    const baseMat = createGrassMaterial(GAME_CONFIG.COLORS.FLOOR_FARM, 20, 12.5);
     const baseGround = new THREE.Mesh(baseGeo, baseMat);
     baseGround.rotation.x = -Math.PI / 2;
     baseGround.position.set(-15, -0.06, 0);
@@ -52,8 +51,8 @@ export class MarketGrid {
     const storeMat = new THREE.MeshStandardMaterial({
       map: storeFloorTex,
       color: 0xffffff,
-      roughness: 0.22,
-      metalness: 0.04
+      roughness: 0.98,
+      metalness: 0,
     });
     const storeFloor = new THREE.Mesh(storeGeo, storeMat);
     storeFloor.rotation.x = -Math.PI / 2;
@@ -64,10 +63,7 @@ export class MarketGrid {
 
     // 4. ZONE 2: Organic Garden & Greenhouse Farm Floor (Lush Garden Grass on Left x = -26 to -4)
     const gardenGeo = new THREE.PlaneGeometry(22, 18);
-    const gardenMat = new THREE.MeshStandardMaterial({
-      color: 0x27ae60,
-      roughness: 0.7,
-    });
+    const gardenMat = createGrassMaterial(GAME_CONFIG.COLORS.FLOOR_FARM, 2.75, 2.25);
     const gardenFloor = new THREE.Mesh(gardenGeo, gardenMat);
     gardenFloor.rotation.x = -Math.PI / 2;
     gardenFloor.position.set(-15, 0, 0);
@@ -130,10 +126,7 @@ export class MarketGrid {
 
     // 5. ZONE 3: Gourmet Restaurant Zone Floor (Rich Warm Timber Wood on Far Left x = -48 to -26)
     const restGeo = new THREE.PlaneGeometry(22, 18);
-    const restMat = new THREE.MeshStandardMaterial({
-      color: GAME_CONFIG.COLORS.FLOOR_RESTAURANT,
-      roughness: 0.3,
-    });
+    const restMat = createParquetMaterial(22 / 8, 18 / 4);
     const restFloor = new THREE.Mesh(restGeo, restMat);
     restFloor.rotation.x = -Math.PI / 2;
     restFloor.position.set(-37, 0, 0);
@@ -275,7 +268,7 @@ export class MarketGrid {
   }
 
   /**
-   * Procedurally generates a warm cream porcelain tile floor texture with subtle grout lines.
+   * Procedurally generates matte, warm greige stone tiles with subtle grout and surface variation.
    */
   createSupermarketFloorTexture() {
     const canvas = document.createElement('canvas');
@@ -283,34 +276,61 @@ export class MarketGrid {
     canvas.height = 512;
     const ctx = canvas.getContext('2d');
 
-    // Base warm creamy tile color
-    ctx.fillStyle = '#f7f2ea';
+    // Dark matte stone tiles keep the interior comfortable under bright daylight.
+    ctx.fillStyle = '#928a7e';
     ctx.fillRect(0, 0, 512, 512);
 
-    const tileSize = 64; // 8x8 tiles in 512x512
-    for (let y = 0; y < 512; y += tileSize) {
-      for (let x = 0; x < 512; x += tileSize) {
-        // Subtle organic tile variation
-        const shade = ((x + y * 7) % 3 === 0) ? '#fbf7f0' : ((x * 3 + y) % 2 === 0 ? '#f4eee4' : '#f8f3eb');
-        ctx.fillStyle = shade;
-        ctx.fillRect(x + 1, y + 1, tileSize - 2, tileSize - 2);
+    const tileSize = 128;
+    const tileColors = ['#a39a8d', '#a79e91', '#aaa193', '#a49b8e', '#ada496'];
+    for (let row = 0; row < 4; row += 1) {
+      for (let column = 0; column < 4; column += 1) {
+        const x = column * tileSize;
+        const y = row * tileSize;
+        let seed = ((row + 1) * 73856093 ^ (column + 1) * 19349663) >>> 0;
+        const random = () => {
+          seed = (seed * 1664525 + 1013904223) >>> 0;
+          return seed / 0x1_0000_0000;
+        };
 
-        // Crisp grout line
-        ctx.strokeStyle = '#e2d9cd';
-        ctx.lineWidth = 1.5;
-        ctx.strokeRect(x + 0.5, y + 0.5, tileSize - 1, tileSize - 1);
+        ctx.fillStyle = tileColors[(row * 3 + column * 2) % tileColors.length];
+        ctx.fillRect(x + 3, y + 3, tileSize - 6, tileSize - 6);
+
+        const wash = ctx.createLinearGradient(x + 4, y + 4, x + tileSize - 4, y + tileSize - 4);
+        wash.addColorStop(0, 'rgba(255, 255, 255, 0.075)');
+        wash.addColorStop(0.55, 'rgba(255, 255, 255, 0)');
+        wash.addColorStop(1, 'rgba(55, 48, 40, 0.055)');
+        ctx.fillStyle = wash;
+        ctx.fillRect(x + 4, y + 4, tileSize - 8, tileSize - 8);
+
+        for (let fleck = 0; fleck < 18; fleck += 1) {
+          const speckX = x + 9 + random() * (tileSize - 18);
+          const speckY = y + 9 + random() * (tileSize - 18);
+          const speckSize = 1 + random() * 2;
+          ctx.fillStyle = random() > 0.5 ? 'rgba(48, 43, 37, 0.09)' : 'rgba(255, 255, 255, 0.11)';
+          ctx.beginPath();
+          ctx.arc(speckX, speckY, speckSize, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        ctx.strokeStyle = '#827a6e';
+        ctx.lineWidth = 3;
+        ctx.strokeRect(x + 1.5, y + 1.5, tileSize - 3, tileSize - 3);
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.14)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(x + 4, y + 4, tileSize - 8, tileSize - 8);
       }
     }
     const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
     texture.wrapS = THREE.RepeatWrapping;
     texture.wrapT = THREE.RepeatWrapping;
-    texture.repeat.set(6, 6);
+    texture.repeat.set(4.5, 4.5);
     return texture;
   }
 
   createPath(x, z, width, depth) {
     const geo = new THREE.PlaneGeometry(width, depth);
-    const mat = new THREE.MeshStandardMaterial({ color: 0xecf0f1, roughness: 0.6 });
+    const mat = createSidewalkMaterial(width / 2.8, depth / 2.8);
     const path = new THREE.Mesh(geo, mat);
     path.rotation.x = -Math.PI / 2;
     path.position.set(x, 0.005, z);
@@ -412,28 +432,34 @@ export class MarketGrid {
 
   createAisleCategorySigns() {
     const signs = [
-      { text: 'MANAV • PRODUCE', x: 3.0, z: 0.5, color: '#27ae60' },
-      { text: 'İÇECEK • COLD DRINKS', x: 7.5, z: -0.5, color: '#2980b9' },
-      { text: 'FIRIN • BAKERY', x: 8.6, z: -3.4, color: '#d35400' },
-      { text: 'TEMEL GIDA • GROCERY', x: 11.0, z: 0.5, color: '#c0392b' },
+      { id: 'produce', text: 'MANAV • PRODUCE', color: '#5b9c66' },
+      { id: 'drinks', text: 'İÇECEK • COLD DRINKS', color: '#5d91bd' },
+      { id: 'bakery', text: 'FIRIN • BAKERY', color: '#c98754' },
+      { id: 'grocery', text: 'TEMEL GIDA • GROCERY', color: '#b9665e' },
     ];
 
-    const cableMat = new THREE.MeshBasicMaterial({ color: 0x95a5a6 });
+    const cableMat = new THREE.MeshStandardMaterial({ color: 0xaab1aa, metalness: 0.25, roughness: 0.52 });
+    const mountMat = new THREE.MeshStandardMaterial({ color: 0x56635b, metalness: 0.2, roughness: 0.64 });
     for (const s of signs) {
       const group = new THREE.Group();
-      group.position.set(s.x, 2.65, s.z);
+      const position = HANGING_SIGN_DEFAULT_POSITIONS[s.id];
+      group.name = `hanging-sign-${s.id}`;
+      group.userData.hangingSignId = s.id;
+      group.position.set(position.x, 3.6, position.z);
 
       const canvas = document.createElement('canvas');
       canvas.width = 512;
       canvas.height = 128;
       const ctx = canvas.getContext('2d');
-      ctx.fillStyle = s.color;
+      ctx.fillStyle = '#3e4d43';
       ctx.fillRect(0, 0, 512, 128);
-      ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = 6;
-      ctx.strokeRect(8, 8, 496, 112);
+      ctx.fillStyle = s.color;
+      ctx.fillRect(0, 0, 14, 128);
+      ctx.strokeStyle = '#d9d0c1';
+      ctx.lineWidth = 4;
+      ctx.strokeRect(6, 6, 500, 116);
       ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 36px Fredoka, sans-serif';
+      ctx.font = 'bold 33px Fredoka, sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(s.text, 256, 64);
@@ -441,17 +467,31 @@ export class MarketGrid {
       const texture = new THREE.CanvasTexture(canvas);
       texture.colorSpace = THREE.SRGBColorSpace;
       const signMat = new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide });
-      const signMesh = new THREE.Mesh(new THREE.PlaneGeometry(1.8, 0.45), signMat);
+      const signMesh = new THREE.Mesh(new THREE.PlaneGeometry(1.8, 0.5), signMat);
+      signMesh.position.y = -0.85;
+      signMesh.userData.hangingSignId = s.id;
       group.add(signMesh);
 
-      // Hanging chrome suspension cables
-      for (const cx of [-0.75, 0.75]) {
-        const cable = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.7, 4), cableMat);
-        cable.position.set(cx, 0.45, 0);
-        group.add(cable);
+      // Matching short hangers keep each sign level and visually connected to the ceiling.
+      for (const cx of [-0.66, 0.66]) {
+        const cable = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.62, 6), cableMat);
+        cable.position.set(cx, -0.31, 0);
+        const mount = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.06, 8), mountMat);
+        mount.position.set(cx, 0, 0);
+        group.add(cable, mount);
       }
 
       this.scene.add(group);
+      this.hangingSigns.set(s.id, group);
+    }
+  }
+
+  syncHangingSigns(positions) {
+    for (const [id, group] of this.hangingSigns) {
+      const position = positions?.[id] ?? HANGING_SIGN_DEFAULT_POSITIONS[id];
+      if (!position) continue;
+      group.position.x = position.x;
+      group.position.z = position.z;
     }
   }
 
@@ -847,10 +887,7 @@ export class MarketGrid {
   createFarmAndAgriculturalZone() {
     // 1. Pastoral Farm Ground Extension in North Farm Zone (z = -9 to -25, x = -38 to -4)
     const farmGroundGeo = new THREE.PlaneGeometry(36, 17);
-    const farmGroundMat = new THREE.MeshStandardMaterial({
-      color: 0x228b22, // Rich pastoral meadow green
-      roughness: 0.82
-    });
+    const farmGroundMat = createGrassMaterial(GAME_CONFIG.COLORS.FLOOR_FARM, 4.5, 2.125);
     const farmGround = new THREE.Mesh(farmGroundGeo, farmGroundMat);
     farmGround.rotation.x = -Math.PI / 2;
     farmGround.position.set(-20, -0.015, -17.5);
@@ -1028,7 +1065,7 @@ export class MarketGrid {
     return this.obstacles;
   }
 
-  syncLogistics(state) {
+  syncLogistics(state, sceneBuildBudget = null) {
     const unlocked = Boolean(state.unlocked?.managerOffice);
     if (!unlocked && this.logistics) {
       disposeLogisticsModel(this.logistics.group);
@@ -1039,6 +1076,7 @@ export class MarketGrid {
     }
     if (!unlocked) return;
     if (!this.logistics) {
+      if (!(sceneBuildBudget?.take?.() ?? true)) return;
       const group = new THREE.Group(); group.name = 'east-logistics';
       const office = this.props.createManagerOffice(22, 0);
       group.add(office);
@@ -1083,14 +1121,14 @@ export class MarketGrid {
     }
   }
 
-  syncStaffFacilities(state) {
+  syncStaffFacilities(state, sceneBuildBudget = null) {
     const cleared = Boolean(state.staffLandCleared);
     for (const tree of this.staffPlotTrees) tree.visible = !cleared;
-    if (cleared && !this.staffLand) {
+    if (cleared && !this.staffLand && (sceneBuildBudget?.take?.() ?? true)) {
       this.staffLand = new THREE.Group();
       this.staffLand.name = 'staff-north-land';
       const floor = new THREE.Mesh(new THREE.PlaneGeometry(17, 11),
-        new THREE.MeshStandardMaterial({ color: 0xb9c89e, roughness: 0.9 }));
+        createGrassMaterial(GAME_CONFIG.COLORS.FLOOR_FARM, 2.125, 1.375));
       floor.rotation.x = -Math.PI / 2;
       floor.position.set(5, 0.01, -14.5);
       floor.receiveShadow = true;
@@ -1119,6 +1157,7 @@ export class MarketGrid {
       if (!definition) continue;
       let model = this.staffFacilities.get(id);
       if (!model) {
+        if (!(sceneBuildBudget?.take?.() ?? true)) continue;
         model = createStaffFacilityModel(definition);
         this.staffFacilities.set(id, model);
         this.scene.add(model);

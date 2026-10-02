@@ -12,6 +12,58 @@ export const ZONES = {
   logistics: { minX: 14.5, maxX: 26.5, minZ: -8, maxZ: 8 },
 };
 
+export const HANGING_SIGN_DEFAULT_POSITIONS = Object.freeze({
+  produce: Object.freeze({ x: -1, z: 0 }),
+  drinks: Object.freeze({ x: 3, z: 0 }),
+  bakery: Object.freeze({ x: 7, z: 0 }),
+  grocery: Object.freeze({ x: 11, z: 0 }),
+});
+
+export const HANGING_SIGN_FOOTPRINT = Object.freeze({ width: 1.8, depth: 0.5 });
+
+export function hangingSignPosition(state, id) {
+  return state.hangingSigns?.[id] ?? HANGING_SIGN_DEFAULT_POSITIONS[id] ?? null;
+}
+
+export function normalizeHangingSignPositions(savedPositions) {
+  const halfWidth = HANGING_SIGN_FOOTPRINT.width / 2;
+  const halfDepth = HANGING_SIGN_FOOTPRINT.depth / 2;
+  const bounds = ZONES.market;
+  const minX = bounds.minX + halfWidth + 0.15;
+  const maxX = bounds.maxX - halfWidth - 0.15;
+  const minZ = bounds.minZ + halfDepth + 0.15;
+  const maxZ = bounds.maxZ - halfDepth - 0.15;
+
+  return Object.fromEntries(Object.entries(HANGING_SIGN_DEFAULT_POSITIONS).map(([id, fallback]) => {
+    const saved = savedPositions?.[id];
+    const snappedX = Math.round(saved?.x * 2) / 2;
+    const snappedZ = Math.round(saved?.z * 2) / 2;
+    const inBounds = Number.isFinite(saved?.x) && Number.isFinite(saved?.z)
+      && snappedX >= minX && snappedX <= maxX && snappedZ >= minZ && snappedZ <= maxZ;
+    return [id, inBounds
+      ? { x: snappedX, z: snappedZ }
+      : { ...fallback }];
+  }));
+}
+
+export function canPlaceHangingSign(state, id, x, z) {
+  if (!HANGING_SIGN_DEFAULT_POSITIONS[id] || !Number.isFinite(x) || !Number.isFinite(z)) return false;
+
+  const halfWidth = HANGING_SIGN_FOOTPRINT.width / 2;
+  const halfDepth = HANGING_SIGN_FOOTPRINT.depth / 2;
+  const bounds = ZONES.market;
+  if (x - halfWidth < bounds.minX + 0.15 || x + halfWidth > bounds.maxX - 0.15
+    || z - halfDepth < bounds.minZ + 0.15 || z + halfDepth > bounds.maxZ - 0.15) return false;
+
+  const positions = state.hangingSigns ?? HANGING_SIGN_DEFAULT_POSITIONS;
+  return Object.entries(positions).every(([otherId, other]) => {
+    if (otherId === id || !Number.isFinite(other?.x) || !Number.isFinite(other?.z)) return true;
+    const enoughXSpace = Math.abs(x - other.x) >= HANGING_SIGN_FOOTPRINT.width + 0.55;
+    const enoughZSpace = Math.abs(z - other.z) >= HANGING_SIGN_FOOTPRINT.depth + 0.35;
+    return enoughXSpace || enoughZSpace;
+  });
+}
+
 export const SHELF_STAGING_AREA = Object.freeze({
   bounds: Object.freeze({ minX: -2.75, maxX: -0.25, minZ: -8.475, maxZ: -6.525 }),
   slots: Object.freeze([
