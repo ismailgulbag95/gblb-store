@@ -11,6 +11,7 @@ import { cancelReservation, capacityAt, makeLocation, pickUpReservedStock, quant
 import { staffSpeedMultiplier } from './progression.js';
 import { STAFF_WAITING_AREA } from './dayCycle.js';
 import { advanceProcurement } from './procurement.js';
+import { findAvailableSlot, createTrafficVehicle, createDriveByVehicle, getVehicleByCustomer, stepTraffic } from './traffic.js';
 
 const TICKS_PER_SECOND = 10;
 const CHECKOUT_BASE_SECONDS = 1;
@@ -1246,14 +1247,35 @@ function addCustomer(state, options = {}) {
   const id = `customer-${state.nextEntityId++}`;
   const restaurantUnlocked = Boolean(state.unlocked.restaurant && Object.keys(state.diningTables).length);
   const diner = options.kind ? options.kind === 'diner' : restaurantUnlocked && random(state) < 0.35;
+
+  let vehicle = null;
+  let slot = null;
+  if (state.traffic && random(state) < 0.38) {
+    const kind = random(state) < 0.35 ? 'two-wheeler' : 'car';
+    slot = findAvailableSlot(state.traffic, kind);
+    if (slot) {
+      vehicle = createTrafficVehicle(state.traffic, id, slot);
+    } else {
+      createDriveByVehicle(state.traffic);
+    }
+  }
+
   if (diner) {
+    const startPos = slot ? slot.disembark : { x: -37 + (random(state) - 0.5) * 1.8, z: 16 + random(state) * 2 };
     const customer = {
-      id, kind: 'diner', x: -37 + (random(state) - 0.5) * 1.8, z: 16 + random(state) * 2,
+      id, kind: 'diner', x: startPos.x, z: startPos.z,
       phase: 'entering', demand: options.item ?? (random(state) < 0.5 ? 'BURGER' : 'PIZZA'), tableId: null,
       eventRole: options.eventRole, archetype: options.eventRole ? 'business' : undefined,
       eatTicks: 0, waitTicks: 0, mealWaitTicks: 0, missedItems: 0, checkoutWaitTicks: 0, facing: Math.PI,
+      vehicleId: vehicle?.id ?? null,
+      vehicleSlotId: slot?.id ?? null,
+      disembarkPoint: slot?.disembark ?? null,
     };
-    routeTo(customer, [{ x: -37, z: 10.4 }, { x: -37, z: 6.6 }], 'entering');
+    if (slot) {
+      routeTo(customer, [{ x: slot.disembark.x, z: 10.4 }, { x: -37, z: 10.4 }, { x: -37, z: 6.6 }], 'entering');
+    } else {
+      routeTo(customer, [{ x: -37, z: 10.4 }, { x: -37, z: 6.6 }], 'entering');
+    }
     state.customers.push(customer);
     return customer;
   }
@@ -1269,19 +1291,29 @@ function addCustomer(state, options = {}) {
     [alternatives[index], alternatives[swap]] = [alternatives[swap], alternatives[index]];
   }
   const shoppingList = options.item ? [firstItem] : premium ? [...retailItems].sort((a,b) => ITEMS[b].price - ITEMS[a].price).slice(0, 3) : [firstItem, ...alternatives.slice(0, basketSize - 1)];
+  const startPos = slot ? slot.disembark : { x: 5 + (random(state) - 0.5) * 1.4, z: 16 + random(state) * 2 };
   const customer = {
-    id, kind: 'shopper', eventRole: options.eventRole, archetype: options.eventRole === 'tourist' ? 'tourist' : options.eventRole ? 'business' : undefined, x: 5 + (random(state) - 0.5) * 1.4, z: 16 + random(state) * 2,
+    id, kind: 'shopper', eventRole: options.eventRole, archetype: options.eventRole === 'tourist' ? 'tourist' : options.eventRole ? 'business' : undefined,
+    x: startPos.x, z: startPos.z,
     phase: 'entering', shoppingList, shoppingIndex: 0, demand: firstItem, basket: [],
     payTicks: 0, waitTicks: 0, missedItems: 0, checkoutWaitTicks: 0, mealWaitTicks: 0, checkoutOrder: state.nextEntityId,
     facing: Math.PI,
+    vehicleId: vehicle?.id ?? null,
+    vehicleSlotId: slot?.id ?? null,
+    disembarkPoint: slot?.disembark ?? null,
   };
-  routeTo(customer, [{ x: customer.x, z: 10.4 }, { x: 5, z: 6.6 }], 'entering');
+  if (slot) {
+    routeTo(customer, [{ x: slot.disembark.x, z: 10.4 }, { x: 5, z: 6.6 }], 'entering');
+  } else {
+    routeTo(customer, [{ x: customer.x, z: 10.4 }, { x: 5, z: 6.6 }], 'entering');
+  }
   makeLocation(state.stock, `customer:${id}`, 4);
   state.customers.push(customer);
   return customer;
 }
 
 function getCustomerCarPoint(customer) {
+  if (customer.disembarkPoint) return customer.disembarkPoint;
   const hash = Math.abs(customer.id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0));
   if (customer.kind === 'diner') {
     return hash % 2 === 0 ? { x: -24, z: 16.5 } : { x: -10, z: 16.5 };
@@ -1307,7 +1339,7 @@ function leaveShopper(customer, state = null) {
     { x: 5, z: 8.5 },
     { x: 5, z: 10.4 },
     { x: car.x, z: 12.8 },
-    { x: car.x, z: 16.5 },
+    { x: car.x, z: car.z },
   ], 'leaving');
 }
 
@@ -1385,7 +1417,7 @@ function leaveDiner(state, customer) {
     { x: -37, z: 7 },
     { x: -37, z: 10.4 },
     { x: car.x, z: 12.8 },
-    { x: car.x, z: 16.5 },
+    { x: car.x, z: car.z },
   ], 'leaving');
 }
 
@@ -1545,6 +1577,10 @@ function customerTick(state, events) {
           durable = true;
         }
       } else if (customer.phase === 'leaving' && moveAlongRoute(customer)) {
+        if (customer.vehicleSlotId && state.traffic) {
+          const vehicle = getVehicleByCustomer(state.traffic, customer.id);
+          if (vehicle) vehicle.state = 'boarding';
+        }
         delete state.stock[`customer:${customer.id}`];
         state.customers.splice(index, 1);
       }
@@ -1705,6 +1741,10 @@ function customerTick(state, events) {
         state.customers.splice(index, 1);
       } else if (customer.routeBlockedTicks % 20 === 0) leaveShopper(customer, state);
     } else if (customer.phase === 'leaving' && moveAlongRoute(customer)) {
+      if (customer.vehicleSlotId && state.traffic) {
+        const vehicle = getVehicleByCustomer(state.traffic, customer.id);
+        if (vehicle) vehicle.state = 'boarding';
+      }
       delete state.stock[`customer:${customer.id}`];
       state.customers.splice(index, 1);
     }
@@ -1772,6 +1812,7 @@ export function advanceSimulation(state, environmentObstacles = []) {
   durable = workerTick(state, environmentObstacles) || durable;
   syncFarmHarvest(state);
   durable = customerTick(state, events) || durable;
+  if (state.traffic) stepTraffic(state.traffic, 0.05);
   durable = collectRegisterCash(state, events) || durable;
   if (!state.activeOrder) {
     state.activeOrder = nextOrder(state);

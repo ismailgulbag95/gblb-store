@@ -38,4 +38,16 @@ test('EnvironmentProps instantiates all Faz 3 vehicles and outdoor props properl
 
   const totem = props.createEntranceTotem(15, 10);
   assert.ok(totem, 'Entrance totem sign should be created');
+
+  const bike = props.createBicycle(25, 5, 0);
+  assert.ok(bike, 'Bicycle should be created');
+  assert.ok(scene.children.includes(bike), 'Bicycle should be added to scene');
+
+  const moto = props.createMotorcycle(30, 5, 0);
+  assert.ok(moto, 'Motorcycle should be created');
+  assert.ok(scene.children.includes(moto), 'Motorcycle should be added to scene');
+
+  const rack = props.createBicycleRack(35, 5, 0);
+  assert.ok(rack, 'Bicycle rack should be created');
+  assert.ok(scene.children.includes(rack), 'Bicycle rack should be added to scene');
 });

@@ -7,6 +7,7 @@ import { machineSpeedMultiplier, staffSpeedMultiplier } from './progression.js';
 import { PLAYER_CHARACTER_IDS } from './characters.js';
 import { normalizeProcurement } from './procurement.js';
 import { DEFAULT_CUSTOMER_SATISFACTION, normalizeCustomerSatisfaction } from './customerExperience.js';
+import { initTrafficState } from './traffic.js';
 
 export const SAVE_VERSION = 13;
 
@@ -87,6 +88,7 @@ export function createInitialState(seed = 0x51f15e) {
     diningTables: {},
     customers: [],
     workers: [],
+    traffic: initTrafficState(),
     staffLandCleared: false,
     staffFacilities: {},
     staffCandidates: {},
@@ -403,6 +405,7 @@ export function hydrateState(candidate) {
   }
   hydrated.coops = { ...initial.coops, ...(candidate.coops ?? {}) };
   hydrated.diningTables = { ...initial.diningTables, ...(candidate.diningTables ?? {}) };
+  hydrated.traffic = candidate.traffic ? { ...initTrafficState(), ...candidate.traffic } : initTrafficState();
   hydrated.reservations = { ...initial.reservations, ...(candidate.reservations ?? {}) };
   hydrated.ads = {
     ...initial.ads,

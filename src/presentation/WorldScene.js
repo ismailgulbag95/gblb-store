@@ -56,6 +56,8 @@ export class WorldScene {
     this.cashPiles = new Map();
     this.customers = new Map();
     this.workers = new Map();
+    this.trafficVehicles = new Map();
+    this.vehiclePool = new Map();
     this.animationClaims = new Set();
     this.tables = new Map();
     this.decorItems = new Map();
@@ -1138,6 +1140,143 @@ export class WorldScene {
     }
   }
 
+  #syncTrafficVehicles(state, frameDelta) {
+    if (!state.traffic?.vehicles) return;
+
+    const currentVehicles = state.traffic.vehicles;
+    const currentIds = new Set(currentVehicles.map((v) => v.id));
+    const daylight = gameDaylight(state.tick);
+    const nightIntensity = Math.max(0, Math.min(1, (0.55 - daylight) / 0.55));
+
+    // Recycle meshes for departed vehicles into the object pool
+    for (const [id, record] of this.trafficVehicles) {
+      if (!currentIds.has(id)) {
+        record.mesh.visible = false;
+        if (record.blinkerMesh) record.blinkerMesh.visible = false;
+        if (record.headlightMesh) record.headlightMesh.material.opacity = 0;
+        if (record.taillightMesh) record.taillightMesh.material.opacity = 0;
+        const pool = this.vehiclePool.get(record.type) ?? [];
+        pool.push(record.mesh);
+        this.vehiclePool.set(record.type, pool);
+        this.trafficVehicles.delete(id);
+      }
+    }
+
+    // Update or spawn meshes for active vehicles
+    for (const v of currentVehicles) {
+      let record = this.trafficVehicles.get(v.id);
+      if (!record) {
+        const pool = this.vehiclePool.get(v.type) ?? [];
+        let mesh;
+        if (pool.length > 0) {
+          mesh = pool.pop();
+          mesh.visible = true;
+        } else {
+          if (v.type === 'bicycle') mesh = this.environment.props.createBicycle(v.x, v.z, v.rotationY, v.color);
+          else if (v.type === 'motorcycle') mesh = this.environment.props.createMotorcycle(v.x, v.z, v.rotationY, v.color);
+          else if (v.type === 'scooter') mesh = this.environment.props.createDeliveryScooter(v.x, v.z, v.rotationY, v.color);
+          else if (v.type === 'pickup') mesh = this.environment.props.createPickupTruck(v.x, v.z, v.rotationY, v.color);
+          else mesh = this.environment.props.createSedan(v.x, v.z, v.rotationY, v.color);
+        }
+        record = { mesh, type: v.type, lastPuff: 0 };
+
+        // 1. Headlight beam projector on ground
+        const isBike = v.type === 'bicycle';
+        const headGeo = new THREE.PlaneGeometry(1.5, 3.2);
+        const headMat = new THREE.MeshBasicMaterial({
+          color: 0xfff3d1,
+          transparent: true,
+          opacity: 0,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+        });
+        const headMesh = new THREE.Mesh(headGeo, headMat);
+        headMesh.rotation.x = -Math.PI / 2;
+        headMesh.rotation.z = -Math.PI / 2;
+        headMesh.position.set(isBike ? 1.4 : 2.2, 0.02, 0);
+        mesh.add(headMesh);
+        record.headlightMesh = headMesh;
+
+        // Taillight ground glow
+        const tailGeo = new THREE.PlaneGeometry(0.9, 0.9);
+        const tailMat = new THREE.MeshBasicMaterial({
+          color: 0xff3838,
+          transparent: true,
+          opacity: 0,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+        });
+        const tailMesh = new THREE.Mesh(tailGeo, tailMat);
+        tailMesh.rotation.x = -Math.PI / 2;
+        tailMesh.position.set(isBike ? -0.8 : -1.4, 0.02, 0);
+        mesh.add(tailMesh);
+        record.taillightMesh = tailMesh;
+
+        // 3. Amber turn blinker mesh on corner
+        const blinkerGeo = new THREE.SphereGeometry(0.08, 6, 4);
+        const blinkerMat = new THREE.MeshBasicMaterial({ color: 0xffa502 });
+        const blinkerMesh = new THREE.Mesh(blinkerGeo, blinkerMat);
+        blinkerMesh.position.set(isBike ? 0.35 : 1.15, 0.45, isBike ? 0.2 : 0.52);
+        blinkerMesh.visible = false;
+        mesh.add(blinkerMesh);
+        record.blinkerMesh = blinkerMesh;
+
+        this.trafficVehicles.set(v.id, record);
+      }
+
+      // Smooth position and angular lerp for turns
+      record.mesh.position.x = v.x;
+      record.mesh.position.z = v.z;
+
+      const targetRot = v.rotationY;
+      const currentRot = record.mesh.rotation.y;
+      const diff = ((targetRot - currentRot + Math.PI) % (Math.PI * 2)) - Math.PI;
+      record.mesh.rotation.y += diff * Math.min(1, frameDelta * 10);
+
+      // Micro-animations: suspension bounce, banking on turns
+      if (v.wheelsMoving && !this.reducedMotion.matches) {
+        record.mesh.position.y = Math.sin(this.visualTime * 25 + (v.x * 2)) * 0.015;
+        const isTwoWheeler = v.type === 'bicycle' || v.type === 'motorcycle' || v.type === 'scooter';
+        const leanFactor = isTwoWheeler ? 0.35 : 0.06;
+        record.mesh.rotation.z = Math.max(-0.25, Math.min(0.25, -diff * leanFactor));
+
+        // 2. Acceleration / driving dust puff
+        if (!state.paused && this.visualTime - (record.lastPuff ?? 0) > 0.38) {
+          record.lastPuff = this.visualTime;
+          const rearDist = v.type === 'bicycle' ? 0.75 : 1.35;
+          const rearX = v.x - Math.cos(record.mesh.rotation.y) * rearDist;
+          const rearZ = v.z + Math.sin(record.mesh.rotation.y) * rearDist;
+          this.#emitGlint(rearX, rearZ, 'dust');
+        }
+      } else if (v.state === 'boarding' && !this.reducedMotion.matches) {
+        record.mesh.position.y = Math.sin(this.visualTime * 12) * 0.03;
+        record.mesh.rotation.z = 0;
+      } else {
+        record.mesh.position.y = 0;
+        record.mesh.rotation.z = 0;
+      }
+
+      // 1. Day / Night lighting update
+      if (record.headlightMesh) {
+        record.headlightMesh.material.opacity = (v.state === 'parked' ? 0.06 : 0.35) * nightIntensity;
+      }
+      if (record.taillightMesh) {
+        const braking = v.state === 'boarding' || (v.state === 'departing' && Math.abs(v.z - 24.5) > 0.4);
+        record.taillightMesh.material.opacity = (braking ? 0.55 : 0.2) * (nightIntensity > 0 ? nightIntensity : 0.35);
+      }
+
+      // 3. Maneuvering amber blinker indicator (parking or reversing out)
+      const isManeuvering = v.state === 'parking' || v.state === 'boarding' || (v.state === 'departing' && Math.abs(v.z - 24.5) > 0.35);
+      if (record.blinkerMesh) {
+        if (isManeuvering && !this.reducedMotion.matches && !state.paused) {
+          record.blinkerMesh.visible = (Math.floor(this.visualTime * 7) % 2) === 0;
+        } else {
+          record.blinkerMesh.visible = false;
+        }
+      }
+    }
+  }
+
   #addUpgradeMarker(upgrade, language = 'tr') {
     if (this.upgradeMarkers.has(upgrade.id)) return;
     const group = new THREE.Group();
@@ -1925,6 +2064,8 @@ export class WorldScene {
       }
       updateWorkerEnergyBar(actor, worker, this.engine.camera.quaternion);
     });
+
+    this.#syncTrafficVehicles(state, frameDelta);
 
     if (this.lastCompletedUpgrades) {
       for (const id of state.completedUpgrades) if (!this.lastCompletedUpgrades.has(id)) {

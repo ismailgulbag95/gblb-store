@@ -680,6 +680,176 @@ export class EnvironmentProps {
     return group;
   }
 
+  createBicycle(x, z, rotationY = 0, bikeColor = 0x3b82f6) {
+    const group = new THREE.Group();
+    group.position.set(x, 0, z);
+    group.rotation.y = rotationY;
+
+    const frameMat = new THREE.MeshStandardMaterial({ color: bikeColor, roughness: 0.35, metalness: 0.2 });
+    const chromeMat = new THREE.MeshStandardMaterial({ color: 0xdcdde1, metalness: 0.85, roughness: 0.2 });
+    const tireMat = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.9 });
+    const saddleMat = new THREE.MeshStandardMaterial({ color: 0x3d2314, roughness: 0.7 });
+
+    const wheelGeo = new THREE.CylinderGeometry(0.28, 0.28, 0.05, 14);
+    for (const wx of [-0.48, 0.48]) {
+      const tire = new THREE.Mesh(wheelGeo, tireMat);
+      tire.rotation.x = Math.PI / 2;
+      tire.position.set(wx, 0.28, 0);
+      group.add(tire);
+
+      const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.06, 8), chromeMat);
+      hub.rotation.x = Math.PI / 2;
+      hub.position.set(wx, 0.28, 0);
+      group.add(hub);
+    }
+
+    const seatTube = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.46, 6), frameMat);
+    seatTube.rotation.z = -0.22;
+    seatTube.position.set(-0.06, 0.46, 0);
+    group.add(seatTube);
+
+    const downTube = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.52, 6), frameMat);
+    downTube.rotation.z = 0.88;
+    downTube.position.set(0.12, 0.42, 0);
+    group.add(downTube);
+
+    const topTube = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.44, 6), frameMat);
+    topTube.rotation.z = 0.08;
+    topTube.position.set(0.12, 0.62, 0);
+    group.add(topTube);
+
+    const chainStay = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.48, 6), frameMat);
+    chainStay.rotation.z = Math.PI / 2;
+    chainStay.position.set(-0.25, 0.28, 0);
+    group.add(chainStay);
+
+    const seatStay = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.46, 6), frameMat);
+    seatStay.rotation.z = 0.82;
+    seatStay.position.set(-0.27, 0.46, 0);
+    group.add(seatStay);
+
+    const fork = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.52, 6), chromeMat);
+    fork.rotation.z = -0.26;
+    fork.position.set(0.42, 0.48, 0);
+    group.add(fork);
+
+    const bar = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.48, 6), chromeMat);
+    bar.position.set(0.38, 0.74, 0);
+    group.add(bar);
+
+    const saddle = new THREE.Mesh(new RoundedBoxGeometry(0.24, 0.05, 0.16, 2, 0.02), saddleMat);
+    saddle.position.set(-0.11, 0.71, 0);
+    group.add(saddle);
+
+    const basket = new THREE.Mesh(
+      new RoundedBoxGeometry(0.22, 0.18, 0.26, 2, 0.02),
+      new THREE.MeshStandardMaterial({ color: 0x8d6e63, roughness: 0.8 })
+    );
+    basket.position.set(0.46, 0.66, 0);
+    group.add(basket);
+
+    this.scene.add(group);
+    return group;
+  }
+
+  createMotorcycle(x, z, rotationY = 0, motoColor = 0x2ed573) {
+    const group = new THREE.Group();
+    group.position.set(x, 0, z);
+    group.rotation.y = rotationY;
+
+    const paintMat = new THREE.MeshStandardMaterial({ color: motoColor, roughness: 0.25, metalness: 0.1 });
+    const frameMat = new THREE.MeshStandardMaterial({ color: 0x1e272e, roughness: 0.7, metalness: 0.5 });
+    const chromeMat = new THREE.MeshStandardMaterial({ color: 0xdcdde1, metalness: 0.9, roughness: 0.15 });
+    const tireMat = new THREE.MeshStandardMaterial({ color: 0x1e1e1e, roughness: 0.85 });
+    const leatherMat = new THREE.MeshStandardMaterial({ color: 0x2d3436, roughness: 0.8 });
+    const lampMat = new THREE.MeshBasicMaterial({ color: 0xfffa65 });
+
+    const wheelGeo = new THREE.CylinderGeometry(0.32, 0.32, 0.14, 14);
+    for (const wx of [-0.62, 0.62]) {
+      const tire = new THREE.Mesh(wheelGeo, tireMat);
+      tire.rotation.x = Math.PI / 2;
+      tire.position.set(wx, 0.32, 0);
+      tire.castShadow = true;
+      group.add(tire);
+
+      const rim = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.15, 8), chromeMat);
+      rim.rotation.x = Math.PI / 2;
+      rim.position.set(wx, 0.32, 0);
+      group.add(rim);
+    }
+
+    const engine = new THREE.Mesh(new RoundedBoxGeometry(0.48, 0.36, 0.28, 2, 0.04), frameMat);
+    engine.position.set(-0.06, 0.36, 0);
+    group.add(engine);
+
+    const exhaust = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.92, 8), chromeMat);
+    exhaust.rotation.z = Math.PI / 2;
+    exhaust.position.set(-0.22, 0.22, 0.16);
+    group.add(exhaust);
+
+    const tank = new THREE.Mesh(new RoundedBoxGeometry(0.56, 0.26, 0.34, 3, 0.06), paintMat);
+    tank.position.set(0.14, 0.64, 0);
+    tank.castShadow = true;
+    group.add(tank);
+
+    const saddle = new THREE.Mesh(new RoundedBoxGeometry(0.44, 0.1, 0.28, 2, 0.03), leatherMat);
+    saddle.position.set(-0.24, 0.58, 0);
+    group.add(saddle);
+
+    for (const pz of [0.1, -0.1]) {
+      const fork = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.72, 8), chromeMat);
+      fork.rotation.z = -0.36;
+      fork.position.set(0.52, 0.54, pz);
+      group.add(fork);
+    }
+
+    const bars = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.68, 8), chromeMat);
+    bars.position.set(0.44, 0.86, 0);
+    group.add(bars);
+
+    const light = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.1, 10), lampMat);
+    light.rotation.z = Math.PI / 2;
+    light.position.set(0.66, 0.76, 0);
+    group.add(light);
+
+    const tailLight = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.08, 0.12), new THREE.MeshBasicMaterial({ color: 0xff4757 }));
+    tailLight.position.set(-0.54, 0.52, 0);
+    group.add(tailLight);
+
+    this.scene.add(group);
+    return group;
+  }
+
+  createBicycleRack(x, z, rotationY = 0) {
+    const group = new THREE.Group();
+    group.position.set(x, 0, z);
+    group.rotation.y = rotationY;
+
+    const metalMat = new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.75, roughness: 0.3 });
+    const groundBeam = new THREE.Mesh(new THREE.BoxGeometry(3.6, 0.06, 0.12), metalMat);
+    groundBeam.position.set(0, 0.03, 0);
+    group.add(groundBeam);
+
+    for (let i = 0; i < 4; i += 1) {
+      const rx = -1.35 + i * 0.9;
+      const postL = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.72, 8), metalMat);
+      postL.position.set(rx - 0.22, 0.36, 0);
+      group.add(postL);
+
+      const postR = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.72, 8), metalMat);
+      postR.position.set(rx + 0.22, 0.36, 0);
+      group.add(postR);
+
+      const topBar = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.44, 8), metalMat);
+      topBar.rotation.z = Math.PI / 2;
+      topBar.position.set(rx, 0.72, 0);
+      group.add(topBar);
+    }
+
+    this.scene.add(group);
+    return group;
+  }
+
   createModernStreetLamp(x, z) {
     const group = new THREE.Group();
     group.position.set(x, 0, z);

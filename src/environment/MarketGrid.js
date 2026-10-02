@@ -172,15 +172,8 @@ export class MarketGrid {
     this.props.createStoreAwning(-37, 2.3, 9.1, 12, 1.8);
     this.createRestaurantSign(-37, 3.4, 9.0);
 
-    // 10. Procedural Vehicle Fleet in Parking Lot & Service Bays
-    this.props.createDeliveryTruck(-20.5, 16.8, -Math.PI / 2); // Commercial Supermarket Box Truck
-    this.props.createSedan(14.5, 16.5, -Math.PI / 2, 0xff4757); // Crimson Red Sedan
-    this.props.createSedan(7.5, 16.5, -Math.PI / 2, 0xffa502);  // Taxi Gold Sedan
-    this.props.createSedan(-6.5, 16.5, -Math.PI / 2, 0x1e90ff); // Electric Blue Sedan
-    this.props.createSedan(-13.5, 16.5, -Math.PI / 2, 0xf1f2f6);// Pearl White Sedan
-    this.props.createDeliveryVan(21.5, 16.8, -Math.PI / 2, 0xffffff); // GBLB Express Delivery Van
-    this.props.createPickupTruck(-27.5, 16.8, -Math.PI / 2, 0xd63031); // Farm Harvest Pickup
-    this.props.createDeliveryScooter(8.6, 10.6, 0.15, 0xe74c3c); // Courier Delivery Scooter near entrance
+    // 10. Compact 4-Vehicle Bicycle/Scooter Rack near Supermarket Entrance
+    this.props.createBicycleRack(15.0, 10.8, 0);
 
     // 11. Street Lamps, Outdoor Furniture & Entrance Totem
     this.props.createModernStreetLamp(14, 13.2);

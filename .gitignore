@@ -11,3 +11,6 @@ tools/
 .agents/
 scratch/
 neobrutalism-components/
+*.log
+*.txt
+__pycache__/
