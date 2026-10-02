@@ -9,12 +9,13 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700;800;900&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet" />
     <title>Tohumdan Sofraya: Market Oyunu</title>
-    <script type="module" crossorigin src="./assets/index-_9SsSCtb.js"></script>
-    <link rel="modulepreload" crossorigin href="./assets/three-DT7PEnyd.js">
-    <link rel="stylesheet" crossorigin href="./assets/index-CBlc6uZr.css">
+    <script type="module" crossorigin src="./assets/index-B8Onh-pm.js"></script>
+    <link rel="modulepreload" crossorigin href="./assets/three-C4SrrhVc.js">
+    <link rel="stylesheet" crossorigin href="./assets/index-f8BQvM4a.css">
   </head>
   <body>
     <main id="game-container" aria-label="Tohumdan Sofraya oyun dünyası" aria-busy="true"></main>
+    <section id="pending-placement-panel" class="pending-placement-panel hidden" data-ui="true" aria-label="Yerleştirmeyi bekleyen yapılar"></section>
     <section id="loading-screen" class="loading-screen" role="region" aria-label="Oyun yükleniyor">
       <div class="loading-landscape" aria-hidden="true">
         <span class="loading-sun"></span>
@@ -143,6 +144,7 @@
             <label class="setting-row"><span>Otomatik üstüne alma</span><input type="checkbox" id="setting-autopickup" checked /></label>
             <div class="setting-note">Oyun arka plana geçtiğinde simülasyon durur. Döndüğünde kaldığın yerden devam eder.</div>
             <button class="secondary-button" id="btn-resume">Oyuna dön</button>
+            <button class="reset-button" id="btn-reset">Yeni oyuna başla</button>
           </div>
           <div class="settings-content hidden" data-panel="character">
             <p class="modal-intro">Oyuncu karakterini seç</p>
@@ -161,7 +163,6 @@
             <div class="debug-grid"><button class="debug-button" data-debug="credit"><span data-asset-icon="money" data-asset-size="28"></span> +$1.000</button><button class="debug-button" data-debug="creditLarge"><span data-asset-icon="money" data-asset-size="28"></span> +$99.999</button><button class="debug-button" data-debug="capacity"><span data-asset-icon="capacity" data-asset-size="28"></span> +50 kapasite</button><button class="debug-button" data-debug="speed2"><span data-asset-icon="clock" data-asset-size="28"></span> 2× hız</button><button class="debug-button" data-debug="speed5"><span data-asset-icon="clock" data-asset-size="28"></span> 5× hız</button><button class="debug-button" data-debug="speed1"><span data-asset-icon="clock" data-asset-size="28"></span> Normal hız</button></div>
             <button class="debug-button debug-button-wide" data-debug="allUpgrades"><span data-asset-icon="upgrade" data-asset-size="28"></span><span data-debug-label="allUpgrades">Tüm geliştirmeleri aç</span></button>
             <p class="setting-note" id="debug-all-note">Tüm üretim yapıları, ithal reyonlar ve personel tesisleri ücretsiz kurulur.</p>
-            <button class="reset-button" id="btn-reset">Yeni oyuna başla</button>
             <p class="setting-note">Geliştirici araçları kayıtlı oyun durumunu değiştirir.</p>
           </div>
         </section>
