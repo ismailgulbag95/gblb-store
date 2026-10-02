@@ -2,9 +2,9 @@ import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { STATIONS } from '../domain/catalog.js';
 
-export function createRegisterModel() {
+export function createRegisterModel({ x = STATIONS.register.x, z = STATIONS.register.z, number = 1 } = {}) {
   const group = new THREE.Group();
-  group.position.set(STATIONS.register.x, 0, STATIONS.register.z);
+  group.position.set(x, 0, z);
 
   // High-Grade Materials
   const counterRed = new THREE.MeshStandardMaterial({ color: 0xd63031, roughness: 0.35, metalness: 0.1 });
@@ -315,7 +315,7 @@ export function createRegisterModel() {
     lctx.font = 'bold 84px Fredoka, sans-serif';
     lctx.textAlign = 'center';
     lctx.textBaseline = 'middle';
-    lctx.fillText('1', 64, 64);
+    lctx.fillText(String(number), 64, 64);
   }
   const laneSignTexture = new THREE.CanvasTexture(laneSignCanvas);
   laneSignTexture.colorSpace = THREE.SRGBColorSpace;

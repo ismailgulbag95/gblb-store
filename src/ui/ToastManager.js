@@ -23,9 +23,10 @@ export class ToastManager {
   }
 
   showEvent(event) {
+    if (event.type === 'production') return;
     let message = event.message;
     let iconId = null;
-    if (event.type === 'sale' || event.type === 'production' || event.type === 'tip-ready') {
+    if (event.type === 'sale' || event.type === 'cash-collected' || event.type === 'tip-ready') {
       this.playEventSound(event.type);
     }
     if (event.type === 'payroll') {
@@ -42,16 +43,18 @@ export class ToastManager {
           : `Gün ${event.day} maaş ödemesi: ${paid}${event.waitingCount ? ` · ${event.waitingCount} personel bekliyor` : ''}.`;
       }
     }
+    if (event.type === 'cash-collected') {
+      const english = this.app.getState().settings.language === 'en';
+      const locale = english ? 'en-US' : 'tr-TR';
+      const collected = `$${(event.amountAtoms / MONEY_ATOMS).toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      message = english ? `${collected} collected from the register.` : `Kasadan ${collected} toplandı.`;
+    }
     if (this.app.getState().settings.language === 'en') {
       if (event.type === 'sale') {
         const itemIds = event.items ?? [event.item];
         iconId = ITEMS[itemIds[0]]?.icon ?? 'stock';
         const sold = itemIds.map((itemId) => this.itemNameEnglish(itemId, ITEMS[itemId]?.name ?? itemId));
-        message = `+$${event.amount.toFixed(2)} · ${sold.join(', ')} sold${event.decorationBonus ? ` · +${(event.decorationBonus * 100).toFixed(1)}% decor bonus` : ''}.`;
-      }
-      if (event.type === 'production') {
-        iconId = ITEMS[event.item]?.icon ?? 'stock';
-        message = `${this.itemNameEnglish(event.item, ITEMS[event.item]?.name ?? event.item)} ready.`;
+        message = `Checkout cash $${event.amount.toFixed(2)} · ${sold.join(', ')} sold${event.decorationBonus ? ` · +${(event.decorationBonus * 100).toFixed(1)}% decor bonus` : ''}.`;
       }
       if (event.type === 'tip-ready') {
         iconId = 'tip';

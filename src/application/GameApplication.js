@@ -5,7 +5,7 @@ import { createInitialState, hydrateState } from '../domain/state.js';
 import { advanceSimulation } from '../domain/simulation.js';
 import { gameDayNumber } from '../domain/dayCycle.js';
 import { createFarmState, removeFarmReady, syncFarmHarvest } from '../domain/farm.js';
-import { ZONES, canPlaceDecoration, canPlaceHangingSign, canPlaceStation, getAllStationIds, getDecorationDimensions, getDecorationZone, getMarketCollisionBoxes, getShelfLocations, getStationDimensions, isStationUnlocked, nextShelfStagingPosition, stationPosition, syncCatalogLayout } from '../domain/layout.js';
+import { ZONES, canPlaceDecoration, canPlaceHangingSign, canPlaceStation, getAllStationIds, getDecorationDimensions, getDecorationZone, getMarketCollisionBoxes, getShelfLocations, getStationDimensions, isStationUnlocked, nextShelfStagingPosition, registerCashierPosition, stationPosition, syncCatalogLayout } from '../domain/layout.js';
 import { DECORATIONS } from '../domain/decorCatalog.js';
 import { decorationPrice, nextOrder } from '../domain/orders.js';
 import { machineProductionSeconds, machineSpeedMultiplier, machineUpgradeCost, percentGain, staffSpeedMultiplier, staffUpgradeCost } from '../domain/progression.js';
@@ -16,6 +16,12 @@ import { placeWholesaleOrder, configureProcurementAutomation } from '../domain/p
 
 const LOGISTICS_KINDS = ['office', 'dock', 'warehouse'];
 const UPGRADE_MARKER_PURCHASE_SECONDS = 3;
+const ADDITIONAL_REGISTER_POSITIONS = Object.freeze([
+  Object.freeze({ x: 1.25, z: -5.75 }),
+  Object.freeze({ x: 9.25, z: 5.75 }),
+  Object.freeze({ x: 1.25, z: 5.75 }),
+  Object.freeze({ x: 9.25, z: -5.75 }),
+]);
 
 function clone(value) {
   return structuredClone(value);
@@ -104,12 +110,18 @@ export class GameApplication {
     const previousAvailableUpgrades = this.state.availableUpgrades.join(',');
     this.#refreshUpgrades(this.state);
     const needsUnlockRefresh = previousAvailableUpgrades !== this.state.availableUpgrades.join(',');
-    const cashierPosition = { x: STATIONS.register.x, z: STATIONS.register.z - 1.75 };
-    const movedCashier = this.state.workers.some((worker) => worker.type === 'cashier' && !worker.break
-      && (worker.x !== cashierPosition.x || worker.z !== cashierPosition.z));
+    const cashierPosition = (worker) => {
+      const register = stationPosition(this.state, worker.registerId ?? 'register') ?? STATIONS.register;
+      return registerCashierPosition(register);
+    };
+    const movedCashier = this.state.workers.some((worker) => {
+      if (worker.type !== 'cashier' || worker.break) return false;
+      const position = cashierPosition(worker);
+      return worker.x !== position.x || worker.z !== position.z || worker.facing !== position.facing;
+    });
     if (movedCashier) {
       for (const worker of this.state.workers) {
-        if (worker.type === 'cashier' && !worker.break) Object.assign(worker, cashierPosition, { facing: 0 });
+        if (worker.type === 'cashier' && !worker.break) Object.assign(worker, cashierPosition(worker));
       }
     }
     this.recovered = loaded.recovered;
@@ -265,8 +277,10 @@ export class GameApplication {
     }
     if (placement === 'staff-hire') {
       const hire = STAFF_HIRES.find((entry) => entry.upgradeId === payload.role);
-      const canHireFirstByAd = state.availableUpgrades.includes(payload.role);
-      const canHireExtraByAd = state.completedUpgrades.includes(payload.role) && getStaffCount(state, payload.role) > 0;
+      const canHireFirstByAd = payload.role !== 'cashier' && state.availableUpgrades.includes(payload.role);
+      const canHireExtraByAd = state.completedUpgrades.includes(payload.role) && getStaffCount(state, payload.role) > 0
+        && (payload.role !== 'cashier' || ADDITIONAL_REGISTER_POSITIONS.some(({ x, z }) =>
+          canPlaceStation(state, 'register_reward_preview', x, z, 0)));
       return Boolean(hire && (canHireFirstByAd || canHireExtraByAd));
     }
     return false;
@@ -444,7 +458,8 @@ export class GameApplication {
     if (placement === 'staff-hire') {
       const role = payload.role;
       const hire = STAFF_HIRES.find((entry) => entry.upgradeId === role);
-      if (!hire || (!state.availableUpgrades.includes(role) && !state.completedUpgrades.includes(role))) return { ok: false };
+      if (!hire || (!state.availableUpgrades.includes(role) && !state.completedUpgrades.includes(role))
+        || role === 'cashier' && !state.completedUpgrades.includes(role)) return { ok: false };
       if (!state.completedUpgrades.includes(role)) {
         state.completedUpgrades.push(role);
         state.unlocked[role] = true;
@@ -452,10 +467,16 @@ export class GameApplication {
       } else if (role === 'chefWaiter') {
         this.#hire(state, 'chefWaiter');
         this.#hire(state, 'waiter');
+      } else if (role === 'cashier') {
+        const registerId = this.#addCheckoutRegister(state);
+        if (!registerId) return { ok: false };
+        this.#hire(state, role, null, registerId);
       } else {
         this.#hire(state, role);
       }
-      return { ok: true, amount: 0, details: { role }, message: `${STAFF[role]?.title ?? role} reklamla ekibe katıldı.` };
+      return { ok: true, amount: 0, details: { role }, message: role === 'cashier'
+        ? 'Kasiyer reklamla kasaya atandı.'
+        : `${STAFF[role]?.title ?? role} reklamla ekibe katıldı.` };
     }
     if (placement === 'character-unlock') {
       return this.#grantCharacterUnlock(state, payload.characterId);
@@ -564,9 +585,13 @@ export class GameApplication {
     const result = this.#command(`layout:${id}:${this.state.revision + 1}`, (draft) => {
       const existing = draft.layout[id] ?? {};
       draft.layout[id] = { ...existing, x: snappedX, z: snappedZ };
-      if (id === 'register') {
+      if (id === 'register' || draft.checkoutRegisters?.[id]) {
+        const register = stationPosition(draft, id);
+        const cashierPosition = registerCashierPosition(register);
         for (const worker of draft.workers) {
-          if (worker.type === 'cashier' && !worker.break) { worker.x = snappedX; worker.z = snappedZ - 1.75; }
+          if (worker.type === 'cashier' && (worker.registerId ?? 'register') === id && !worker.break) {
+            Object.assign(worker, cashierPosition);
+          }
         }
       }
       this.#stageNextPendingShelf(draft);
@@ -604,9 +629,18 @@ export class GameApplication {
       });
     }
     return this.#command(`layout-rotate:${id}:${this.state.revision + 1}`, (draft) => {
-      const current = draft.layout[id] ?? { x: STATIONS[id]?.x ?? 0, z: STATIONS[id]?.z ?? 0 };
+      const current = stationPosition(draft, id) ?? { x: STATIONS[id]?.x ?? 0, z: STATIONS[id]?.z ?? 0 };
       const nextRot = ((current.rotation ?? 0) + Math.PI / 2) % (Math.PI * 2);
       draft.layout[id] = { ...current, rotation: nextRot };
+      if (id === 'register' || draft.checkoutRegisters?.[id]) {
+        const register = stationPosition(draft, id);
+        const cashierPosition = registerCashierPosition(register);
+        for (const worker of draft.workers) {
+          if (worker.type === 'cashier' && (worker.registerId ?? 'register') === id && !worker.break && !worker.waitingForSalary) {
+            Object.assign(worker, cashierPosition);
+          }
+        }
+      }
       return { ok: true, rotation: nextRot, message: `${STATIONS[id]?.title ?? 'Yapı'} döndürüldü.` };
     });
   }
@@ -674,7 +708,9 @@ export class GameApplication {
 
   openStaffCandidates(role) {
     if (!STAFF_HIRES.some(hire => hire.upgradeId === role)
-      || !this.state.availableUpgrades.includes(role) && !this.state.completedUpgrades.includes(role)) return { ok: false, reason: 'locked' };
+      || !this.state.availableUpgrades.includes(role) && !this.state.completedUpgrades.includes(role)) {
+      return { ok: false, reason: 'locked' };
+    }
     if (this.state.staffCandidates[role]?.length === 3) return { ok: true, candidates: clone(this.state.staffCandidates[role]) };
     const result = this.#command(`staff-candidates:${role}:${this.state.revision + 1}`, draft => ({ ok: true,
       candidates: generateStaffCandidates(draft, role) }));
@@ -685,7 +721,10 @@ export class GameApplication {
     return this.#command(`staff-candidate:${candidateId}`, draft => {
       const hire = STAFF_HIRES.find(entry => entry.upgradeId === role);
       const candidate = draft.staffCandidates[role]?.find(entry => entry.id === candidateId);
-      if (!hire || !candidate || !draft.availableUpgrades.includes(role) && !draft.completedUpgrades.includes(role)) return { ok: false, reason: 'invalid-candidate' };
+      if (!hire || !candidate
+        || (!draft.availableUpgrades.includes(role) && !draft.completedUpgrades.includes(role))) {
+        return { ok: false, reason: 'invalid-candidate' };
+      }
       if (draft.economy.balanceAtoms < candidate.hireCostAtoms) return { ok: false, reason: 'insufficient-funds' };
       new EconomyLedger(draft.economy).debit(`hire:${candidate.id}`, candidate.hireCostAtoms / MONEY_ATOMS, `staff-hire:${role}`);
       for (const type of hire.staffTypes) this.#hire(draft, type, candidate);
@@ -948,25 +987,47 @@ export class GameApplication {
     return true;
   }
 
-  #hire(state, type, candidate = null) {
+  #hire(state, type, candidate = null, registerId = null) {
+    const fallbackCashierPosition = registerCashierPosition(STATIONS.register);
     const positions = {
-      cashier: [STATIONS.register.x, STATIONS.register.z - 1.75], harvester: [-10, 7], factoryFeeder: [-10, 0],
+      cashier: [fallbackCashierPosition.x, fallbackCashierPosition.z], harvester: [-10, 7], factoryFeeder: [-10, 0],
       caretaker: [-18, 0], chefWaiter: [-30, 0], waiter: [-35, 0],
       warehouseOperator: [STATIONS.loadingDock.access.x, STATIONS.loadingDock.access.z],
       storeManager: [STATIONS.managerOffice.access.x, STATIONS.managerOffice.access.z],
     };
-    const [x, z] = positions[type] ?? [-8, 0];
+    const workerRegisterId = type === 'cashier' ? registerId ?? 'register' : null;
+    const register = workerRegisterId ? stationPosition(state, workerRegisterId) : null;
+    const cashierPosition = type === 'cashier' && register ? registerCashierPosition(register) : null;
+    const [x, z] = cashierPosition
+      ? [cashierPosition.x, cashierPosition.z]
+      : positions[type] ?? [-8, 0];
     state.workers.push(normalizeWorkerWelfare({
-      id: `worker-${state.nextEntityId++}`, type, x, z, facing: 0, unlocked: true,
+      id: `worker-${state.nextEntityId++}`, type, x, z, facing: cashierPosition?.facing ?? 0, unlocked: true,
       upgradeLevel: 0, speedModifier: 1, salaryDebtAtoms: 0, salaryDueDay: null,
       waitingForSalary: false, task: null,
+      ...(workerRegisterId ? { registerId: workerRegisterId } : {}),
       ...(candidate ? { name: candidate.name, archetypeId: candidate.archetypeId, salaryAtoms: candidate.salaryAtoms } : {}),
     }));
   }
 
+  #addCheckoutRegister(state) {
+    state.checkoutRegisters ??= {};
+    state.cashAtRegisters ??= { register: 0 };
+    const registerId = `register_${state.nextEntityId++}`;
+    const registerNumber = Object.keys(state.checkoutRegisters).length + 2;
+    for (const candidate of ADDITIONAL_REGISTER_POSITIONS) {
+      state.checkoutRegisters[registerId] = { ...candidate, rotation: 0, number: registerNumber };
+      if (!canPlaceStation(state, registerId, candidate.x, candidate.z, 0)) continue;
+      state.cashAtRegisters[registerId] = 0;
+      return registerId;
+    }
+    delete state.checkoutRegisters[registerId];
+    return null;
+  }
+
   #refreshUpgrades(state) {
     const statRequirements = {
-      cashier: state.stats.tomatoSold > 0,
+      cashier: state.stats.pasteSold > 0,
       paste: state.stats.tomatoSold > 0,
       harvester: state.stats.pasteSold > 0,
       orange: state.stats.pasteSold > 0,
@@ -990,6 +1051,9 @@ export class GameApplication {
       warehouseOperator: state.completedUpgrades.includes('logisticsOffice'),
       storeManager: state.completedUpgrades.includes('logisticsOffice'),
     };
+    if (!statRequirements.cashier && !state.completedUpgrades.includes('cashier')) {
+      state.availableUpgrades = state.availableUpgrades.filter((id) => id !== 'cashier');
+    }
     for (const [id, available] of Object.entries(statRequirements)) {
       if (available && !state.completedUpgrades.includes(id) && !state.availableUpgrades.includes(id)) {
         state.availableUpgrades.push(id);
@@ -1378,6 +1442,7 @@ export class GameApplication {
     const state = this.state;
     for (const id of getAllStationIds(state)) {
       const station = STATIONS[id] ?? state.customStations?.[id]
+        ?? (state.checkoutRegisters?.[id] ? { ...state.checkoutRegisters[id], kind: 'register', title: 'Kasa' } : null)
         ?? (state.selfRegisters?.[id] ? { ...state.selfRegisters[id], kind: 'selfRegister', title: 'Otomatik Kasa' } : null);
       if (!station || station.kind === 'selfRegister') continue;
       const unlocked = station.kind === 'farm' ? Boolean(this.state.farms[id])

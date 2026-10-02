@@ -1,6 +1,6 @@
 # GBLB Store 3D Procedural World Transformation — proje bağlamı
 
-Revision: 96 · Yetkili kaynak: .project/state.json
+Revision: 99 · Yetkili kaynak: .project/state.json
 
 Bu görünüm türetilmiştir. Güncel kanıt kontrolü için context komutunu çalıştır.
 
@@ -60,6 +60,7 @@ Hedef kitle: Game developers and players of Tohumdan Sofraya / GBLB Store
 - asset-restaurant-furniture-redesign (procedural_asset): Restoran Masa ve Sandalye Takımları
 - asset-staff-animations-redesign (procedural_asset): Personel Meslekleri ve Yaşayan İş Pozları
 - asset-customer-animations-redesign (procedural_asset): Müşteri Arketipleri ve Alışveriş Pozları
+- asset-checkout-cash-pile (procedural_asset): Kasada Biriken Para Desteleri
 - mod-supermarket → Barındırır → asset-produce-shelf
 - mod-supermarket → Barındırır → asset-checkout-counter
 - mod-supermarket → Barındırır → asset-beverage-cooler
@@ -82,6 +83,7 @@ Hedef kitle: Game developers and players of Tohumdan Sofraya / GBLB Store
 - mod-supermarket → Barındırır → asset-restaurant-furniture-redesign
 - mod-supermarket → Barındırır → asset-staff-animations-redesign
 - mod-supermarket → Barındırır → asset-customer-animations-redesign
+- mod-supermarket → Barındırır → asset-checkout-cash-pile
 
 ### Somut nesne değerleri
 
@@ -111,6 +113,7 @@ Hedef kitle: Game developers and players of Tohumdan Sofraya / GBLB Store
 - asset-restaurant-furniture-redesign: {"category": "interior", "file_ref": "src/presentation/DiningTableModel.js", "name": "Restoran Masa ve Sandalye Takımları"}
 - asset-staff-animations-redesign: {"category": "character", "file_ref": "src/presentation/HumanoidFactory.js", "name": "Personel Meslekleri ve Yaşayan İş Pozları"}
 - asset-customer-animations-redesign: {"category": "character", "file_ref": "src/presentation/HumanoidFactory.js", "name": "Müşteri Arketipleri ve Alışveriş Pozları"}
+- asset-checkout-cash-pile: {"category": "interior", "file_ref": "src/presentation/CashPileModel.js", "name": "Checkout Cash Pile"}
 
 Türler ve bağlantı kuralları: `ontology` komutu / `ONTOLOJİ.md`.
 
@@ -119,7 +122,7 @@ Türler ve bağlantı kuralları: `ontology` komutu / `ONTOLOJİ.md`.
 
 ## Görevler
 
-- T-PHASE-1 [done] Faz 1: Süpermarket İç Mekan ve Ekipman Mimarisinin Kurulması (kayıt: done)
+- T-PHASE-1 [needs_review] Faz 1: Süpermarket İç Mekan ve Ekipman Mimarisinin Kurulması (kayıt: done)
   - Ölçüt: Süpermarket içi cilalı porselen fayans ve açık mağaza düzenine kavuşturuldu.
   - Ölçüt: Manav tezgâhları, gondol reyonlar ve cam kapaklı içecek dolapları referans görseldeki gibi konumlandırıldı.
   - Ölçüt: Konveyör bantlı kasa masası, market arabaları ve alışveriş sepetleri yerleştirildi.
@@ -127,16 +130,22 @@ Türler ve bağlantı kuralları: `ontology` komutu / `ONTOLOJİ.md`.
   - Girdiler: mod-supermarket
   - Ürettiği nesneler: ms-phase1
   - Etkin önkoşullar: yok
-  - Kabul güncelliği: güncel · tamamlanma sayısı: 1
-- T-PHASE-2 [done] Faz 2: 3D Ürün Varlıklarının Geliştirilmesi ve Reyon Yerleşimi (kayıt: done)
+  - Kabul güncelliği: yeniden inceleme gerekli · tamamlanma sayısı: 1
+  - Kontrol: stale evidence: docs/FAZ_1_INSPECTION_REPORT.md
+  - Kontrol: stale evidence: docs/FAZ_1_INSPECTION_REPORT.md
+  - Kontrol: stale evidence: docs/FAZ_1_INSPECTION_REPORT.md
+- T-PHASE-2 [needs_review] Faz 2: 3D Ürün Varlıklarının Geliştirilmesi ve Reyon Yerleşimi (kayıt: done)
   - Ölçüt: Meyve-sebze, paketli gıdalar, içecekler, unlu mamüller ve et-süt kategorileri için 3D düşük poligonlu ürün modelleri oluşturuldu.
   - Ölçüt: Ürünler reyon raflarına düzenli ve renkli biçimde istiflendi.
   - İlgili nesneler: item-tomato, item-milk
   - Girdiler: item-tomato
   - Ürettiği nesneler: yok
   - Etkin önkoşullar: T-PHASE-1
-  - Kabul güncelliği: güncel · tamamlanma sayısı: 1
-- T-PHASE-3 [done] Faz 3: Dış Mekan, Otopark, Yollar ve Araç Filosu (kayıt: done)
+  - Kabul güncelliği: yeniden inceleme gerekli · tamamlanma sayısı: 1
+  - Kontrol: stale evidence: docs/FAZ_2_INSPECTION_REPORT.md
+  - Kontrol: stale evidence: docs/FAZ_2_INSPECTION_REPORT.md
+  - Kontrol: dependency T-PHASE-1: needs_review
+- T-PHASE-3 [needs_review] Faz 3: Dış Mekan, Otopark, Yollar ve Araç Filosu (kayıt: done)
   - Ölçüt: Asfalt otopark çizgileri ve park cepleri tamamlandı.
   - Ölçüt: Farklı renklerde sedanlar, teslimat kamyonu, kargo vanı ve scooter modellendi.
   - Ölçüt: Sokak lambaları, oturma bankları, çöp kutuları ve GBLB Store totem tabelası yerleştirildi.
@@ -144,31 +153,44 @@ Türler ve bağlantı kuralları: `ontology` komutu / `ONTOLOJİ.md`.
   - Girdiler: mod-parking-road
   - Ürettiği nesneler: yok
   - Etkin önkoşullar: T-PHASE-1
-  - Kabul güncelliği: güncel · tamamlanma sayısı: 1
-- T-PHASE-4 [done] Faz 4: Tarım ve Üretim Çiftliği Bölgesi (kayıt: done)
+  - Kabul güncelliği: yeniden inceleme gerekli · tamamlanma sayısı: 1
+  - Kontrol: stale evidence: docs/FAZ_3_INSPECTION_REPORT.md
+  - Kontrol: stale evidence: docs/FAZ_3_INSPECTION_REPORT.md
+  - Kontrol: stale evidence: docs/FAZ_3_INSPECTION_REPORT.md
+  - Kontrol: dependency T-PHASE-1: needs_review
+- T-PHASE-4 [needs_review] Faz 4: Tarım ve Üretim Çiftliği Bölgesi (kayıt: done)
   - Ölçüt: Sera, buğday tarlası yatakları ve sebze parselleri modellendi.
   - Ölçüt: Kırmızı çiftlik ahırı, su kulesi ve inek/tavuk modelleri eklendi.
   - İlgili nesneler: mod-farm-production
   - Girdiler: mod-farm-production
   - Ürettiği nesneler: yok
   - Etkin önkoşullar: T-PHASE-1
-  - Kabul güncelliği: güncel · tamamlanma sayısı: 1
-- T-PHASE-5 [done] Faz 5: Arka Alan, Depo ve Lojistik Tesisleri (kayıt: done)
+  - Kabul güncelliği: yeniden inceleme gerekli · tamamlanma sayısı: 1
+  - Kontrol: stale evidence: docs/FAZ_4_INSPECTION_REPORT.md
+  - Kontrol: stale evidence: docs/FAZ_4_INSPECTION_REPORT.md
+  - Kontrol: dependency T-PHASE-1: needs_review
+- T-PHASE-5 [needs_review] Faz 5: Arka Alan, Depo ve Lojistik Tesisleri (kayıt: done)
   - Ölçüt: Yükleme iskelesi, sarı forklift, transpalet ve ahşap palet istifleri kuruldu.
   - Ölçüt: Depo binası, soğuk hava deposu ve geri dönüşüm konteynerleri yerleştirildi.
   - İlgili nesneler: mod-logistics-backend, asset-forklift
   - Girdiler: mod-logistics-backend
   - Ürettiği nesneler: yok
   - Etkin önkoşullar: T-PHASE-3
-  - Kabul güncelliği: güncel · tamamlanma sayısı: 1
-- T-PHASE-6 [done] Faz 6: 10 Personel Mesleği ve 20+ Zengin Müşteri Tipi (kayıt: done)
+  - Kabul güncelliği: yeniden inceleme gerekli · tamamlanma sayısı: 1
+  - Kontrol: stale evidence: docs/FAZ_5_INSPECTION_REPORT.md
+  - Kontrol: stale evidence: docs/FAZ_5_INSPECTION_REPORT.md
+  - Kontrol: dependency T-PHASE-3: needs_review
+- T-PHASE-6 [needs_review] Faz 6: 10 Personel Mesleği ve 20+ Zengin Müşteri Tipi (kayıt: done)
   - Ölçüt: 10 farklı personel mesleği (Kasiyer, Reyon Görevlisi, Depocu, Müdür, Temizlikçi, Güvenlik, Aşçı, Teknisyen, Kurye, Bahçıvan) özgün üniforma ve aksesuarlarıyla modellendi.
   - Ölçüt: 20+ müşteri arketipi (çocuk, yaşlı, iş insanı, genç, alışveriş arabası/sepeti kullananlar, çeşitli ten ve saç renkleri) oluşturuldu.
   - İlgili nesneler: asset-staff-roster, asset-customer-archetypes, mod-supermarket
   - Girdiler: mod-supermarket
   - Ürettiği nesneler: asset-staff-roster, asset-customer-archetypes
   - Etkin önkoşullar: T-PHASE-1
-  - Kabul güncelliği: güncel · tamamlanma sayısı: 1
+  - Kabul güncelliği: yeniden inceleme gerekli · tamamlanma sayısı: 1
+  - Kontrol: stale evidence: tests/characters-archetypes.test.js
+  - Kontrol: stale evidence: docs/FAZ_6_INSPECTION_REPORT.md
+  - Kontrol: dependency T-PHASE-1: needs_review
 - T-NEOBRUTALISM-UI [needs_review] Kullanıcı Arayüzünün Neobrutalism Bileşen Mimarisine Dönüştürülmesi (kayıt: done)
   - Ölçüt: Tüm HUD kartları, pill'leri, butonları ve modalleri ekmas/neobrutalism-components standartlarına uygun katı siyah kenarlıklar ve sıfır bulanıklıklı sert ofset gölgelerle yapılandırıldı.
   - Ölçüt: Butonlar, sekmeler ve tıklanabilir bileşenlerde aşağı-sağa ötelenen (translate) ve gölgesi sıfırlanan mekanik dokunsal basma fiziği sağlandı.
@@ -181,6 +203,7 @@ Türler ve bağlantı kuralları: `ontology` komutu / `ONTOLOJİ.md`.
   - Kontrol: stale evidence: src/style.css
   - Kontrol: stale evidence: src/style.css
   - Kontrol: stale evidence: src/style.css
+  - Kontrol: dependency T-PHASE-1: needs_review
 - T-NEOBRUTALISM-ICONS-LOGOS [needs_review] İkon, Logo ve Simgelerin Neobrutalist SVG Sistemine Dönüştürülmesi ve Emojilerin Temizlenmesi (kayıt: done)
   - Ölçüt: Tüm arayüzdeki unicode semboller ve emojiler (▦, ⌃, ⌄, ↻, ✕, ×, ›) temizlenerek yerlerine kalın hatlı neobrutalist SVG simgeleri yerleştirildi.
   - Ölçüt: Market logosu kalın siyah konturlar, sert 2D gölge ve doygun blok renklerle neobrutalist SVG vektörüne dönüştürüldü.
@@ -191,6 +214,8 @@ Türler ve bağlantı kuralları: `ontology` komutu / `ONTOLOJİ.md`.
   - Etkin önkoşullar: T-NEOBRUTALISM-UI
   - Kabul güncelliği: yeniden inceleme gerekli · tamamlanma sayısı: 1
   - Kontrol: stale evidence: index.html
+  - Kontrol: stale evidence: public/assets/branding/seed-to-serve/market-stall-color.svg
+  - Kontrol: stale evidence: src/ui/AssetIcons.js
   - Kontrol: dependency T-NEOBRUTALISM-UI: needs_review
 - T-NEOBRUTALISM-STATION-BADGES [needs_review] İstasyon ve Üretim Etiketlerinin Neobrutalist Kompakt İkonlu Göstergelere Dönüştürülmesi (kayıt: done)
   - Ölçüt: İstasyon etiketlerinin boyutu %50 küçültüldü; kalın siyah kontur, krem zemin, 2D sert gölge ve binaya bağlanan dikey ok/gövde eklendi.
@@ -214,6 +239,8 @@ Türler ve bağlantı kuralları: `ontology` komutu / `ONTOLOJİ.md`.
   - Ürettiği nesneler: asset-production-stations
   - Etkin önkoşullar: yok
   - Kabul güncelliği: yeniden inceleme gerekli · tamamlanma sayısı: 4
+  - Kontrol: stale evidence: src/presentation/ProductionBuildModel.js
+  - Kontrol: stale evidence: src/presentation/ProductionBuildModel.js
   - Kontrol: stale evidence: src/presentation/WorldScene.js
 - T-FARM-ASSETS-ANIMATIONS-REDESIGN [needs_review] Tarla Yatakları, Meyve Bahçesi, Tavuk Kümesi ve Ahır Detaylarının Referansa Göre Yenilenmesi ve Canlı Animasyonları (kayıt: done)
   - Ölçüt: Domates sırıkları, mısır koçanları, dalgalanan buğday tarlası, sebze parselleri ve portakal ağaçları (sepetler, merdiven, kasalar) referans görsele göre prosedürel olarak modellendi.
@@ -225,8 +252,9 @@ Türler ve bağlantı kuralları: `ontology` komutu / `ONTOLOJİ.md`.
   - Etkin önkoşullar: yok
   - Kabul güncelliği: yeniden inceleme gerekli · tamamlanma sayısı: 3
   - Kontrol: stale evidence: src/environment/EnvironmentProps.js
+  - Kontrol: stale evidence: src/presentation/ChickenCoopModel.js
   - Kontrol: stale evidence: src/presentation/WorldScene.js
-- T-SUPERMARKET-FIXTURES-REDESIGN [done] Market Demirbaşlarının Referans Görsele Göre Yeniden Tasarlanması (Manav, Gondol, Soğuk Dolap, Pastane, Kasa, Restoran) (kayıt: done)
+- T-SUPERMARKET-FIXTURES-REDESIGN [needs_review] Market Demirbaşlarının Referans Görsele Göre Yeniden Tasarlanması (Manav, Gondol, Soğuk Dolap, Pastane, Kasa, Restoran) (kayıt: done)
   - Ölçüt: Eğimli ahşap manav tezgâhı (3 kademeli meyve-sebze kasaları, elma fıçısı, kara tahta etiketler) ve gondol reyon rafları (metal şasi, ahşap bitiş panelleri, ürün istifleri, askılı cips reyonu) referans görsele göre Three.js ile modellendi.
   - Ölçüt: 3 kapılı camlı soğuk içecek dolabı (şeffaf cam kapaklar, kollar, iç aydınlatma, içecek sıraları) ve camlı fırın/pastane tezgâhı (kavisli vitrin camı, çok katlı tatlı tepsileri, üst ahşap ekmek kasaları) Three.js ile modellendi.
   - Ölçüt: Konveyör bantlı kasa masası (motorlu bant, POS monitörü, barkod tarayıcı, kart terminali, kasa önü atıştırmalık rafı, kraft kağıt poşetler) ve restoran masa-sandalye takımları (kare, yuvarlak bistro ve uzun ziyafet masası, yeşil/kırmızı minderli sandalyeler, saksı/peçetelikler) Three.js ile modellendi.
@@ -234,7 +262,10 @@ Türler ve bağlantı kuralları: `ontology` komutu / `ONTOLOJİ.md`.
   - Girdiler: mod-supermarket
   - Ürettiği nesneler: asset-produce-shelf-redesign, asset-gondola-shelf-redesign, asset-beverage-cooler-redesign, asset-bakery-counter-redesign, asset-checkout-counter-redesign, asset-restaurant-furniture-redesign
   - Etkin önkoşullar: yok
-  - Kabul güncelliği: güncel · tamamlanma sayısı: 1
+  - Kabul güncelliği: yeniden inceleme gerekli · tamamlanma sayısı: 1
+  - Kontrol: stale evidence: src/presentation/ShelfModel.js
+  - Kontrol: stale evidence: src/presentation/ShelfModel.js
+  - Kontrol: stale evidence: src/presentation/RegisterModel.js
 - T-CHARACTERS-ANIMATIONS-LIVING-WORLD [needs_review] Personel ve Müşteri Varlıklarının Referans Görsele Göre Geliştirilmesi, Özgün Poz ve Sinematik Hareket Animasyonlarının Uygulanması (kayıt: review)
   - Ölçüt: Personel meslekleri (Kasiyer, Reyon Görevlisi, Aşçı, Depocu, Temizlikçi, Güvenlik, Bahçıvan, Müdür, Kasap, Fırıncı, Garson, Teknisyen) referans görseldeki üniforma, şapka ve aksesuarlarıyla Three.js ile modellendi ve mesleğe özel animasyonlar (kutu taşıma, raf düzenleme, paspasla temizlik, tava/yemek hazırlama, anahtarla onarım, barkod okutma, tepsi taşıma) entegre edildi.
   - Ölçüt: Müşteri arketipleri (Alışveriş arabalı, sepetli, çocuk, yaşlı, anne-çocuk, genç kadın, aile babası, turist, öğrenci, ofis çalışanı, hamile, influencer, sporcu) zengin aksesuarlarıyla modellendi ve referanstaki 5 temel poz (yürüme, sepet taşıma, araba sürme, raftan ürün inceleme ve raftan sepete ürün alma) ile restoran yeme/oturma animasyonları uygulandı.
@@ -246,6 +277,8 @@ Türler ve bağlantı kuralları: `ontology` komutu / `ONTOLOJİ.md`.
   - Kabul güncelliği: yeniden inceleme gerekli · tamamlanma sayısı: 1
   - Kontrol: stale evidence: src/presentation/HumanoidFactory.js
   - Kontrol: stale evidence: src/presentation/CharacterAnimator.js
+  - Kontrol: stale evidence: tests/character-animation.test.js
+  - Kontrol: stale evidence: tests/fixtures/character-animation-verification.md
   - Kontrol: stale evidence: src/presentation/WorldScene.js
 - T-STAFF-WELFARE-FACILITIES [needs_review] Personel adayları, yorulma ve kuzey sosyal tesisleri (kayıt: review)
   - Ölçüt: Beş arketipten üç aday, kişisel maaş ve ücretli seçim; v9 kayıtları güvenle v10 olarak yüklenir.
@@ -257,12 +290,18 @@ Türler ve bağlantı kuralları: `ontology` komutu / `ONTOLOJİ.md`.
   - Ürettiği nesneler: yok
   - Etkin önkoşullar: yok
   - Kabul güncelliği: henüz doğrulanmadı · tamamlanma sayısı: 0
+  - Kontrol: stale evidence: src/domain/staff.js
   - Kontrol: stale evidence: src/domain/state.js
   - Kontrol: stale evidence: src/domain/simulation.js
   - Kontrol: stale evidence: src/application/GameApplication.js
   - Kontrol: stale evidence: src/environment/MarketGrid.js
+  - Kontrol: stale evidence: src/presentation/StaffFacilityModel.js
   - Kontrol: stale evidence: src/presentation/HUD.js
-- T-EAST-LOGISTICS-PROCUREMENT [review] Doğu lojistik ofisi, CRT toptan terminal ve kamyon teslimatı (kayıt: review)
+  - Kontrol: stale evidence: tests/staff-welfare.test.js
+  - Kontrol: stale evidence: tests/staff-hud.test.js
+  - Kontrol: stale evidence: tests/staff-facilities-visual.test.js
+  - Kontrol: stale evidence: tests/fixtures/staff-welfare-verification.md
+- T-EAST-LOGISTICS-PROCUREMENT [needs_review] Doğu lojistik ofisi, CRT toptan terminal ve kamyon teslimatı (kayıt: review)
   - Ölçüt: Ücretli 22 ürün toptan kataloğu, sekiz ithal ürün ve reyon alımı; v2-v10 kayıtları v11 olarak korunur.
   - Ölçüt: Sipariş kuyruğu, bir kez ödeme/teslimat, depocu ve oyuncu taşıması; müdür eşiği yolda/depo stoğunu sayar.
   - Ölçüt: Doğu ofisi/cam/ahşap/CRT etkileşimi, CSS retro terminal ve tick tabanlı kamyon/rampa/palet modelleri çalışır.
@@ -272,41 +311,122 @@ Türler ve bağlantı kuralları: `ontology` komutu / `ONTOLOJİ.md`.
   - Ürettiği nesneler: yok
   - Etkin önkoşullar: yok
   - Kabul güncelliği: henüz doğrulanmadı · tamamlanma sayısı: 0
+  - Kontrol: stale evidence: src/domain/state.js
+  - Kontrol: stale evidence: tests/procurement-catalog.test.js
+  - Kontrol: stale evidence: src/domain/procurement.js
+  - Kontrol: stale evidence: src/domain/simulation.js
+  - Kontrol: stale evidence: src/application/GameApplication.js
+  - Kontrol: stale evidence: src/environment/LogisticsModels.js
+  - Kontrol: stale evidence: src/environment/MarketGrid.js
+  - Kontrol: stale evidence: src/presentation/HUD.js
+  - Kontrol: stale evidence: src/style.css
+  - Kontrol: stale evidence: tests/procurement.test.js
+  - Kontrol: stale evidence: tests/procurement-hud.test.js
+  - Kontrol: stale evidence: tests/procurement-input.test.js
+  - Kontrol: stale evidence: tests/procurement-visual.test.js
+  - Kontrol: stale evidence: tests/fixtures/procurement-verification.md
+- T-CHECKOUT-CASH-LOOP [review] Ürün sayısına bağlı kasa süresi ve toplanan nakit akışı (kayıt: review)
+  - Ölçüt: Müşterinin ödeme süresi aldığı ürün sayısıyla artar ve uzayan kuyruklar bağımsız ikinci kasada da işlenebilir.
+  - Ölçüt: Reklamla eklenen kasiyer kendisine atanmış, sahnede görünen ve müşteri yönlendirmesinde kullanılan çalışan bir kasayla gelir.
+  - Ölçüt: Hasat ve makine üretimi ürün hazır olduğunda bildirim/toast çıkarmaz; ürün ve stok akışı sürer.
+  - Ölçüt: Satış tutarı ilgili kasa yanında para desteleri olarak birikir; oyuncu yaklaştığında tutar bir kez bakiyeye aktarılır ve kayıt/kasa düzeni korunur.
+  - İlgili nesneler: mod-supermarket, asset-checkout-cash-pile
+  - Girdiler: mod-supermarket
+  - Ürettiği nesneler: asset-checkout-cash-pile
+  - Etkin önkoşullar: yok
+  - Kabul güncelliği: henüz doğrulanmadı · tamamlanma sayısı: 0
 
 ## Çalışılabilir görevler
 
-T-EAST-LOGISTICS-PROCUREMENT
+T-CHECKOUT-CASH-LOOP
 
 ## Uyarılar
 
+- T-PHASE-1: stale evidence: docs/FAZ_1_INSPECTION_REPORT.md
+- T-PHASE-1: stale evidence: docs/FAZ_1_INSPECTION_REPORT.md
+- T-PHASE-1: stale evidence: docs/FAZ_1_INSPECTION_REPORT.md
+- T-PHASE-2: stale evidence: docs/FAZ_2_INSPECTION_REPORT.md
+- T-PHASE-2: stale evidence: docs/FAZ_2_INSPECTION_REPORT.md
+- T-PHASE-2: dependency T-PHASE-1: needs_review
+- T-PHASE-3: stale evidence: docs/FAZ_3_INSPECTION_REPORT.md
+- T-PHASE-3: stale evidence: docs/FAZ_3_INSPECTION_REPORT.md
+- T-PHASE-3: stale evidence: docs/FAZ_3_INSPECTION_REPORT.md
+- T-PHASE-3: dependency T-PHASE-1: needs_review
+- T-PHASE-4: stale evidence: docs/FAZ_4_INSPECTION_REPORT.md
+- T-PHASE-4: stale evidence: docs/FAZ_4_INSPECTION_REPORT.md
+- T-PHASE-4: dependency T-PHASE-1: needs_review
+- T-PHASE-5: stale evidence: docs/FAZ_5_INSPECTION_REPORT.md
+- T-PHASE-5: stale evidence: docs/FAZ_5_INSPECTION_REPORT.md
+- T-PHASE-5: dependency T-PHASE-3: needs_review
+- T-PHASE-6: stale evidence: tests/characters-archetypes.test.js
+- T-PHASE-6: stale evidence: docs/FAZ_6_INSPECTION_REPORT.md
+- T-PHASE-6: dependency T-PHASE-1: needs_review
 - T-NEOBRUTALISM-UI: stale evidence: src/style.css
 - T-NEOBRUTALISM-UI: stale evidence: src/style.css
 - T-NEOBRUTALISM-UI: stale evidence: src/style.css
+- T-NEOBRUTALISM-UI: dependency T-PHASE-1: needs_review
 - T-NEOBRUTALISM-ICONS-LOGOS: stale evidence: index.html
+- T-NEOBRUTALISM-ICONS-LOGOS: stale evidence: public/assets/branding/seed-to-serve/market-stall-color.svg
+- T-NEOBRUTALISM-ICONS-LOGOS: stale evidence: src/ui/AssetIcons.js
 - T-NEOBRUTALISM-ICONS-LOGOS: dependency T-NEOBRUTALISM-UI: needs_review
 - T-NEOBRUTALISM-STATION-BADGES: stale evidence: src/presentation/WorldScene.js
 - T-NEOBRUTALISM-STATION-BADGES: stale evidence: src/presentation/WorldScene.js
 - T-NEOBRUTALISM-STATION-BADGES: stale evidence: src/presentation/WorldScene.js
 - T-NEOBRUTALISM-STATION-BADGES: dependency T-NEOBRUTALISM-ICONS-LOGOS: needs_review
+- T-PRODUCTION-STATIONS-REDESIGN: stale evidence: src/presentation/ProductionBuildModel.js
+- T-PRODUCTION-STATIONS-REDESIGN: stale evidence: src/presentation/ProductionBuildModel.js
 - T-PRODUCTION-STATIONS-REDESIGN: stale evidence: src/presentation/WorldScene.js
 - T-FARM-ASSETS-ANIMATIONS-REDESIGN: stale evidence: src/environment/EnvironmentProps.js
+- T-FARM-ASSETS-ANIMATIONS-REDESIGN: stale evidence: src/presentation/ChickenCoopModel.js
 - T-FARM-ASSETS-ANIMATIONS-REDESIGN: stale evidence: src/presentation/WorldScene.js
+- T-SUPERMARKET-FIXTURES-REDESIGN: stale evidence: src/presentation/ShelfModel.js
+- T-SUPERMARKET-FIXTURES-REDESIGN: stale evidence: src/presentation/ShelfModel.js
+- T-SUPERMARKET-FIXTURES-REDESIGN: stale evidence: src/presentation/RegisterModel.js
 - T-CHARACTERS-ANIMATIONS-LIVING-WORLD: stale evidence: src/presentation/HumanoidFactory.js
 - T-CHARACTERS-ANIMATIONS-LIVING-WORLD: stale evidence: src/presentation/CharacterAnimator.js
+- T-CHARACTERS-ANIMATIONS-LIVING-WORLD: stale evidence: tests/character-animation.test.js
+- T-CHARACTERS-ANIMATIONS-LIVING-WORLD: stale evidence: tests/fixtures/character-animation-verification.md
 - T-CHARACTERS-ANIMATIONS-LIVING-WORLD: stale evidence: src/presentation/WorldScene.js
+- T-STAFF-WELFARE-FACILITIES: stale evidence: src/domain/staff.js
 - T-STAFF-WELFARE-FACILITIES: stale evidence: src/domain/state.js
 - T-STAFF-WELFARE-FACILITIES: stale evidence: src/domain/simulation.js
 - T-STAFF-WELFARE-FACILITIES: stale evidence: src/application/GameApplication.js
 - T-STAFF-WELFARE-FACILITIES: stale evidence: src/environment/MarketGrid.js
+- T-STAFF-WELFARE-FACILITIES: stale evidence: src/presentation/StaffFacilityModel.js
 - T-STAFF-WELFARE-FACILITIES: stale evidence: src/presentation/HUD.js
+- T-STAFF-WELFARE-FACILITIES: stale evidence: tests/staff-welfare.test.js
+- T-STAFF-WELFARE-FACILITIES: stale evidence: tests/staff-hud.test.js
+- T-STAFF-WELFARE-FACILITIES: stale evidence: tests/staff-facilities-visual.test.js
+- T-STAFF-WELFARE-FACILITIES: stale evidence: tests/fixtures/staff-welfare-verification.md
+- T-EAST-LOGISTICS-PROCUREMENT: stale evidence: src/domain/state.js
+- T-EAST-LOGISTICS-PROCUREMENT: stale evidence: tests/procurement-catalog.test.js
+- T-EAST-LOGISTICS-PROCUREMENT: stale evidence: src/domain/procurement.js
+- T-EAST-LOGISTICS-PROCUREMENT: stale evidence: src/domain/simulation.js
+- T-EAST-LOGISTICS-PROCUREMENT: stale evidence: src/application/GameApplication.js
+- T-EAST-LOGISTICS-PROCUREMENT: stale evidence: src/environment/LogisticsModels.js
+- T-EAST-LOGISTICS-PROCUREMENT: stale evidence: src/environment/MarketGrid.js
+- T-EAST-LOGISTICS-PROCUREMENT: stale evidence: src/presentation/HUD.js
+- T-EAST-LOGISTICS-PROCUREMENT: stale evidence: src/style.css
+- T-EAST-LOGISTICS-PROCUREMENT: stale evidence: tests/procurement.test.js
+- T-EAST-LOGISTICS-PROCUREMENT: stale evidence: tests/procurement-hud.test.js
+- T-EAST-LOGISTICS-PROCUREMENT: stale evidence: tests/procurement-input.test.js
+- T-EAST-LOGISTICS-PROCUREMENT: stale evidence: tests/procurement-visual.test.js
+- T-EAST-LOGISTICS-PROCUREMENT: stale evidence: tests/fixtures/procurement-verification.md
 
 ## Onarım işlemleri
 
 Bunlar öneridir; gerekçeyi değerlendir, actor ekle ve güncel revision ile uygula.
-- reopen_task → T-NEOBRUTALISM-UI: Recorded completion needs review: stale evidence: src/style.css; stale evidence: src/style.css; stale evidence: src/style.css
-- reopen_task → T-NEOBRUTALISM-ICONS-LOGOS: Recorded completion needs review: stale evidence: index.html; dependency T-NEOBRUTALISM-UI: needs_review
+- reopen_task → T-PHASE-1: Recorded completion needs review: stale evidence: docs/FAZ_1_INSPECTION_REPORT.md; stale evidence: docs/FAZ_1_INSPECTION_REPORT.md; stale evidence: docs/FAZ_1_INSPECTION_REPORT.md
+- reopen_task → T-PHASE-2: Recorded completion needs review: stale evidence: docs/FAZ_2_INSPECTION_REPORT.md; stale evidence: docs/FAZ_2_INSPECTION_REPORT.md; dependency T-PHASE-1: needs_review
+- reopen_task → T-PHASE-3: Recorded completion needs review: stale evidence: docs/FAZ_3_INSPECTION_REPORT.md; stale evidence: docs/FAZ_3_INSPECTION_REPORT.md; stale evidence: docs/FAZ_3_INSPECTION_REPORT.md; dependency T-PHASE-1: needs_review
+- reopen_task → T-PHASE-4: Recorded completion needs review: stale evidence: docs/FAZ_4_INSPECTION_REPORT.md; stale evidence: docs/FAZ_4_INSPECTION_REPORT.md; dependency T-PHASE-1: needs_review
+- reopen_task → T-PHASE-5: Recorded completion needs review: stale evidence: docs/FAZ_5_INSPECTION_REPORT.md; stale evidence: docs/FAZ_5_INSPECTION_REPORT.md; dependency T-PHASE-3: needs_review
+- reopen_task → T-PHASE-6: Recorded completion needs review: stale evidence: tests/characters-archetypes.test.js; stale evidence: docs/FAZ_6_INSPECTION_REPORT.md; dependency T-PHASE-1: needs_review
+- reopen_task → T-NEOBRUTALISM-UI: Recorded completion needs review: stale evidence: src/style.css; stale evidence: src/style.css; stale evidence: src/style.css; dependency T-PHASE-1: needs_review
+- reopen_task → T-NEOBRUTALISM-ICONS-LOGOS: Recorded completion needs review: stale evidence: index.html; stale evidence: public/assets/branding/seed-to-serve/market-stall-color.svg; stale evidence: src/ui/AssetIcons.js; dependency T-NEOBRUTALISM-UI: needs_review
 - reopen_task → T-NEOBRUTALISM-STATION-BADGES: Recorded completion needs review: stale evidence: src/presentation/WorldScene.js; stale evidence: src/presentation/WorldScene.js; stale evidence: src/presentation/WorldScene.js; dependency T-NEOBRUTALISM-ICONS-LOGOS: needs_review
-- reopen_task → T-PRODUCTION-STATIONS-REDESIGN: Recorded completion needs review: stale evidence: src/presentation/WorldScene.js
-- reopen_task → T-FARM-ASSETS-ANIMATIONS-REDESIGN: Recorded completion needs review: stale evidence: src/environment/EnvironmentProps.js; stale evidence: src/presentation/WorldScene.js
+- reopen_task → T-PRODUCTION-STATIONS-REDESIGN: Recorded completion needs review: stale evidence: src/presentation/ProductionBuildModel.js; stale evidence: src/presentation/ProductionBuildModel.js; stale evidence: src/presentation/WorldScene.js
+- reopen_task → T-FARM-ASSETS-ANIMATIONS-REDESIGN: Recorded completion needs review: stale evidence: src/environment/EnvironmentProps.js; stale evidence: src/presentation/ChickenCoopModel.js; stale evidence: src/presentation/WorldScene.js
+- reopen_task → T-SUPERMARKET-FIXTURES-REDESIGN: Recorded completion needs review: stale evidence: src/presentation/ShelfModel.js; stale evidence: src/presentation/ShelfModel.js; stale evidence: src/presentation/RegisterModel.js
 
 Kanıt hash'i dosya sürümünü denetler; kalite veya insan kabulünü ispatlamaz.

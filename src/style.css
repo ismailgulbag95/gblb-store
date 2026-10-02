@@ -130,10 +130,16 @@ button { color: inherit; }
 /* Business Live Sidebar */
 .business-card { position: absolute; top: 84px; right: max(14px, env(safe-area-inset-right)); width: 200px; padding: 14px 14px 10px; border: 2px solid #000; border-radius: var(--radius); background: #ffffff; box-shadow: var(--shadow); }
 .business-toggle { display: none; }
-.business-heading { display: flex; align-items: center; gap: 7px; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 2px solid #000; font-size: 12px; }
+.business-heading { display: flex; align-items: center; gap: 7px; width: 100%; margin-bottom: 8px; padding: 0 0 6px; border: 0; border-bottom: 2px solid #000; color: inherit; background: transparent; text-align: left; font-family: inherit; font-size: 12px; cursor: pointer; }
 .business-heading > span:first-child { display: grid; place-items: center; width: 32px; height: 32px; }
 .business-heading strong { color: #000; font-family: var(--font-heading); font-weight: 800; letter-spacing: .6px; }
 .business-heading small { border: 1.5px solid #000; border-radius: 3px; background: #ffd35e; padding: 1px 4px; color: #000; font-size: 9px; font-weight: 800; letter-spacing: .5px; }
+.business-heading:focus-visible { outline: 3px solid #000; outline-offset: 2px; }
+.business-disclosure-icon { display: grid; place-items: center; margin-left: 0; transition: transform .18s ease; }
+.business-card.collapsed { padding-bottom: 14px; }
+.business-card.collapsed .business-heading { margin-bottom: 0; }
+.business-card.collapsed .business-disclosure-icon { transform: rotate(-90deg); }
+.business-card.collapsed .business-content { display: none; }
 .live-dot { width: 8px; height: 8px; margin-left: auto; border: 1.5px solid #000; border-radius: 50%; background: #2ed573; box-shadow: 0 0 0 2px #dcfce7; }
 .business-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-top: 1.5px solid #000; color: #000; font-size: 12px; font-weight: 700; }
 .business-row > span:first-child { display: flex; align-items: center; gap: 5px; }
@@ -144,7 +150,6 @@ button { color: inherit; }
 .decor-score-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-top: 1.5px solid #000; color: #000; font-size: 11px; font-weight: 700; }
 .decor-score-row > span { display: flex; align-items: center; gap: 5px; }
 .decor-score-row strong { color: #000; font-size: 12px; font-weight: 800; }
-.decor-button { background: #dbeafe; }
 
 /* Order Card */
 .order-card { position: absolute; top: 162px; left: 0; width: min(300px, calc(100vw - 28px)); padding: 12px 14px; border: 2px solid #000; border-radius: var(--radius); background: #ffffff; box-shadow: var(--shadow); }
@@ -210,19 +215,22 @@ kbd { display: inline-grid; place-items: center; min-width: 26px; min-height: 24
 .upgrade-tab.active, .settings-tab.active { color: #000; background: #ffd35e; border-color: #000; box-shadow: var(--shadow-xs); }
 
 .upgrade-panel { display: flex; flex: 1; min-height: 0; }
-.upgrade-list, .inventory-list { display: grid; gap: 10px; overflow: auto; padding: 4px 6px 8px 0; overscroll-behavior: contain; }
+.upgrade-list, .inventory-list { display: grid; grid-auto-rows: max-content; align-content: start; gap: 10px; overflow: auto; padding: 4px 6px 8px 0; overscroll-behavior: contain; }
 .upgrade-panel .upgrade-list { flex: 1; min-height: 0; }
 
 /* Upgrade & Staff Cards */
-.upgrade-card { display: grid; grid-template-columns: 46px minmax(0, 1fr) auto; gap: 12px; align-items: center; min-height: 72px; padding: 10px 12px; border: 2px solid #000; border-radius: var(--radius); background: #ffffff; box-shadow: var(--shadow-sm); }
+.upgrade-card { display: grid; grid-template-columns: 46px minmax(0, 1fr) auto; gap: 12px; align-items: center; min-width: 0; min-height: 72px; padding: 10px 12px; border: 2px solid #000; border-radius: var(--radius); background: #ffffff; box-shadow: var(--shadow-sm); }
 .staff-card, .staff-upgrade-card { grid-template-columns: 52px minmax(0, 1fr) minmax(94px, 136px); gap: 10px; }
+.staff-upgrade-card { min-height: 132px; }
 .staff-card.hired { border-color: #000; background: #ecfdf5; }
 .staff-card .upgrade-icon, .staff-upgrade-card .upgrade-icon { width: 50px; height: 50px; justify-items: center; }
 .staff-card .buy-button, .farm-ad-card .buy-button { width: 100%; min-width: 0; max-width: 148px; min-height: 48px; justify-self: end; line-height: 1.15; white-space: normal; overflow-wrap: anywhere; }
+.staff-card-actions { display: grid; justify-items: end; gap: 6px; }
 .upgrade-icon { display: grid; place-items: center; width: 46px; height: 46px; border: 2px solid #000; border-radius: var(--radius-sm); background: #fef08a; box-shadow: var(--shadow-xs); }
-.upgrade-copy { display: grid; gap: 3px; }
+.upgrade-copy { display: grid; min-width: 0; gap: 3px; overflow-wrap: anywhere; }
 .upgrade-copy strong { color: #000; font-family: var(--font-heading); font-size: 14px; font-weight: 800; }
-.upgrade-copy small { color: #4b5563; font-size: 11px; font-weight: 600; line-height: 1.35; }
+.upgrade-copy small { color: #4b5563; font-size: 11px; font-weight: 600; line-height: 1.35; overflow-wrap: anywhere; }
+.staff-upgrade-card > .buy-button { width: 100%; min-width: 0; max-width: 148px; justify-self: end; white-space: normal; overflow-wrap: anywhere; }
 
 .staff-energy { display: grid; gap: 4px; margin-top: 3px; color: #000; font-size: 11px; font-weight: 800; }
 .staff-energy progress { width: 100%; height: 12px; overflow: hidden; border: 2px solid #000; border-radius: 3px; background: #e2e8f0; accent-color: #2ed573; }
@@ -413,6 +421,7 @@ kbd { display: inline-grid; place-items: center; min-width: 26px; min-height: 24
   .settings-tab { min-height: 44px; padding-inline: 3px; font-size: 11px; }
   .upgrade-card, .decor-item { grid-template-columns: 42px minmax(0, 1fr) auto; gap: 8px; min-height: 68px; padding: 8px; }
   .staff-card, .staff-upgrade-card { grid-template-columns: 50px minmax(0, 1fr) minmax(72px, 108px); gap: 6px; }
+  .staff-card-actions { gap: 5px; }
   .staff-card .upgrade-icon, .staff-upgrade-card .upgrade-icon { width: 48px; height: 48px; justify-items: center; }
   .upgrade-icon, .decor-item-icon { width: 42px; height: 42px; }
   .upgrade-copy strong { font-size: 13px; }

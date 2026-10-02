@@ -1,6 +1,6 @@
 # GBLB Store 3D Procedural World Transformation — Ontoloji
 
-Revizyon: 96. Canlı görünüm için `ontology` komutunu çalıştır.
+Revizyon: 99. Canlı görünüm için `ontology` komutunu çalıştır.
 
 ## Türler ve özellikler
 
@@ -41,22 +41,23 @@ Revizyon: 96. Canlı görünüm için `ontology` komutunu çalıştır.
 - **Endüstriyel Forklift** (`asset-forklift`, procedural_asset): {"category": "logistics", "file_ref": "src/environment/EnvironmentProps.js", "name": "Yellow Warehouse Forklift"}; durum: input; üretici: dış girdi
 - **Taze Domates** (`item-tomato`, product_item): {"category": "produce", "name": "Fresh Tomato"}; durum: input; üretici: dış girdi
 - **Paket Süt** (`item-milk`, product_item): {"category": "packaged", "name": "Carton Milk"}; durum: input; üretici: dış girdi
-- **Faz 1: Market İç Mekanı** (`ms-phase1`, milestone): {"phase_number": 1, "verdict": "completed"}; durum: current; üretici: T-PHASE-1
-- **10 Personel Mesleği Kadrosu** (`asset-staff-roster`, procedural_asset): {"category": "character", "file_ref": "src/presentation/HumanoidFactory.js", "name": "10 Staff Professions Roster"}; durum: current; üretici: T-PHASE-6
-- **20+ Zengin Müşteri Arketipi** (`asset-customer-archetypes`, procedural_asset): {"category": "character", "file_ref": "src/presentation/HumanoidFactory.js", "name": "20+ Diverse Customer Archetypes"}; durum: current; üretici: T-PHASE-6
+- **Faz 1: Market İç Mekanı** (`ms-phase1`, milestone): {"phase_number": 1, "verdict": "completed"}; durum: needs_review; üretici: T-PHASE-1
+- **10 Personel Mesleği Kadrosu** (`asset-staff-roster`, procedural_asset): {"category": "character", "file_ref": "src/presentation/HumanoidFactory.js", "name": "10 Staff Professions Roster"}; durum: needs_review; üretici: T-PHASE-6
+- **20+ Zengin Müşteri Arketipi** (`asset-customer-archetypes`, procedural_asset): {"category": "character", "file_ref": "src/presentation/HumanoidFactory.js", "name": "20+ Diverse Customer Archetypes"}; durum: needs_review; üretici: T-PHASE-6
 - **Neobrutalism UI Bileşen Sistemi** (`asset-neobrutalism-ui`, procedural_asset): {"category": "utility", "file_ref": "src/style.css", "name": "Neobrutalism Design System & Components"}; durum: needs_review; üretici: T-NEOBRUTALISM-UI
 - **9 Prosedürel Üretim İstasyonu** (`asset-production-stations`, procedural_asset): {"category": "farm", "file_ref": "src/presentation/ProductionBuildModel.js", "name": "9 Procedural Production Stations & Living Animations"}; durum: needs_review; üretici: T-PRODUCTION-STATIONS-REDESIGN
 - **Tarla Yatakları ve Sebze Parselleri** (`asset-farm-fields`, procedural_asset): {"category": "farm", "file_ref": "src/presentation/FarmBuildModel.js", "name": "Procedural Farm Fields & Vegetable Plots"}; durum: needs_review; üretici: T-FARM-ASSETS-ANIMATIONS-REDESIGN
 - **Tavuk Kümesi ve Yaşayan Tavuklar** (`asset-chicken-coop`, procedural_asset): {"category": "farm", "file_ref": "src/presentation/ChickenCoopModel.js", "name": "Chicken Coop & Living Chickens"}; durum: needs_review; üretici: T-FARM-ASSETS-ANIMATIONS-REDESIGN
 - **Kırmızı Ahır, Silo ve Çiftlik Detayları** (`asset-barn-silo-paddock`, procedural_asset): {"category": "farm", "file_ref": "src/environment/EnvironmentProps.js", "name": "Red Barn, Silo & Horse Paddock"}; durum: needs_review; üretici: T-FARM-ASSETS-ANIMATIONS-REDESIGN
-- **Eğimli Ahşap Manav Tezgâhı** (`asset-produce-shelf-redesign`, procedural_asset): {"category": "interior", "file_ref": "src/presentation/ShelfModel.js", "name": "Eğimli Ahşap Manav Tezgâhı"}; durum: current; üretici: T-SUPERMARKET-FIXTURES-REDESIGN
-- **Gondol Reyon Rafları** (`asset-gondola-shelf-redesign`, procedural_asset): {"category": "interior", "file_ref": "src/presentation/ShelfModel.js", "name": "Gondol Reyon Rafları"}; durum: current; üretici: T-SUPERMARKET-FIXTURES-REDESIGN
-- **Cam Kapaklı İçecek Dolabı** (`asset-beverage-cooler-redesign`, procedural_asset): {"category": "interior", "file_ref": "src/presentation/ShelfModel.js", "name": "Cam Kapaklı İçecek Dolabı"}; durum: current; üretici: T-SUPERMARKET-FIXTURES-REDESIGN
-- **Fırın ve Pastane Tezgâhı** (`asset-bakery-counter-redesign`, procedural_asset): {"category": "interior", "file_ref": "src/presentation/ShelfModel.js", "name": "Fırın ve Pastane Tezgâhı"}; durum: current; üretici: T-SUPERMARKET-FIXTURES-REDESIGN
-- **Konveyör Bantlı Kasa Masası** (`asset-checkout-counter-redesign`, procedural_asset): {"category": "interior", "file_ref": "src/presentation/RegisterModel.js", "name": "Konveyör Bantlı Kasa Masası"}; durum: current; üretici: T-SUPERMARKET-FIXTURES-REDESIGN
-- **Restoran Masa ve Sandalye Takımları** (`asset-restaurant-furniture-redesign`, procedural_asset): {"category": "interior", "file_ref": "src/presentation/DiningTableModel.js", "name": "Restoran Masa ve Sandalye Takımları"}; durum: current; üretici: T-SUPERMARKET-FIXTURES-REDESIGN
+- **Eğimli Ahşap Manav Tezgâhı** (`asset-produce-shelf-redesign`, procedural_asset): {"category": "interior", "file_ref": "src/presentation/ShelfModel.js", "name": "Eğimli Ahşap Manav Tezgâhı"}; durum: needs_review; üretici: T-SUPERMARKET-FIXTURES-REDESIGN
+- **Gondol Reyon Rafları** (`asset-gondola-shelf-redesign`, procedural_asset): {"category": "interior", "file_ref": "src/presentation/ShelfModel.js", "name": "Gondol Reyon Rafları"}; durum: needs_review; üretici: T-SUPERMARKET-FIXTURES-REDESIGN
+- **Cam Kapaklı İçecek Dolabı** (`asset-beverage-cooler-redesign`, procedural_asset): {"category": "interior", "file_ref": "src/presentation/ShelfModel.js", "name": "Cam Kapaklı İçecek Dolabı"}; durum: needs_review; üretici: T-SUPERMARKET-FIXTURES-REDESIGN
+- **Fırın ve Pastane Tezgâhı** (`asset-bakery-counter-redesign`, procedural_asset): {"category": "interior", "file_ref": "src/presentation/ShelfModel.js", "name": "Fırın ve Pastane Tezgâhı"}; durum: needs_review; üretici: T-SUPERMARKET-FIXTURES-REDESIGN
+- **Konveyör Bantlı Kasa Masası** (`asset-checkout-counter-redesign`, procedural_asset): {"category": "interior", "file_ref": "src/presentation/RegisterModel.js", "name": "Konveyör Bantlı Kasa Masası"}; durum: needs_review; üretici: T-SUPERMARKET-FIXTURES-REDESIGN
+- **Restoran Masa ve Sandalye Takımları** (`asset-restaurant-furniture-redesign`, procedural_asset): {"category": "interior", "file_ref": "src/presentation/DiningTableModel.js", "name": "Restoran Masa ve Sandalye Takımları"}; durum: needs_review; üretici: T-SUPERMARKET-FIXTURES-REDESIGN
 - **Personel Meslekleri ve Yaşayan İş Pozları** (`asset-staff-animations-redesign`, procedural_asset): {"category": "character", "file_ref": "src/presentation/HumanoidFactory.js", "name": "Personel Meslekleri ve Yaşayan İş Pozları"}; durum: needs_review; üretici: T-CHARACTERS-ANIMATIONS-LIVING-WORLD
 - **Müşteri Arketipleri ve Alışveriş Pozları** (`asset-customer-animations-redesign`, procedural_asset): {"category": "character", "file_ref": "src/presentation/HumanoidFactory.js", "name": "Müşteri Arketipleri ve Alışveriş Pozları"}; durum: needs_review; üretici: T-CHARACTERS-ANIMATIONS-LIVING-WORLD
+- **Kasada Biriken Para Desteleri** (`asset-checkout-cash-pile`, procedural_asset): {"category": "interior", "file_ref": "src/presentation/CashPileModel.js", "name": "Checkout Cash Pile"}; durum: needs_review; üretici: T-CHECKOUT-CASH-LOOP
 
 ## Nesne haritası
 
@@ -88,6 +89,7 @@ flowchart LR
   n23["Restoran Masa ve Sandalye Takımları"]
   n24["Personel Meslekleri ve Yaşayan İş Pozları"]
   n25["Müşteri Arketipleri ve Alışveriş Pozları"]
+  n26["Kasada Biriken Para Desteleri"]
   n0 -->|"Barındırır"| n4
   n0 -->|"Barındırır"| n5
   n0 -->|"Barındırır"| n6
@@ -110,26 +112,28 @@ flowchart LR
   n0 -->|"Barındırır"| n23
   n0 -->|"Barındırır"| n24
   n0 -->|"Barındırır"| n25
+  n0 -->|"Barındırır"| n26
 ```
 
 Oklar kayıtlı ilişki yönüdür; değişiklik etkisinin yönü üstte ayrıca tanımlıdır.
 
 ## Görevlerin veri bağları
 
-- **T-PHASE-1 — Faz 1: Süpermarket İç Mekan ve Ekipman Mimarisinin Kurulması**: girdiler [mod-supermarket], çıktılar [ms-phase1], durum done.
-- **T-PHASE-2 — Faz 2: 3D Ürün Varlıklarının Geliştirilmesi ve Reyon Yerleşimi**: girdiler [item-tomato], çıktılar [], durum done.
-- **T-PHASE-3 — Faz 3: Dış Mekan, Otopark, Yollar ve Araç Filosu**: girdiler [mod-parking-road], çıktılar [], durum done.
-- **T-PHASE-4 — Faz 4: Tarım ve Üretim Çiftliği Bölgesi**: girdiler [mod-farm-production], çıktılar [], durum done.
-- **T-PHASE-5 — Faz 5: Arka Alan, Depo ve Lojistik Tesisleri**: girdiler [mod-logistics-backend], çıktılar [], durum done.
-- **T-PHASE-6 — Faz 6: 10 Personel Mesleği ve 20+ Zengin Müşteri Tipi**: girdiler [mod-supermarket], çıktılar [asset-staff-roster, asset-customer-archetypes], durum done.
+- **T-PHASE-1 — Faz 1: Süpermarket İç Mekan ve Ekipman Mimarisinin Kurulması**: girdiler [mod-supermarket], çıktılar [ms-phase1], durum needs_review.
+- **T-PHASE-2 — Faz 2: 3D Ürün Varlıklarının Geliştirilmesi ve Reyon Yerleşimi**: girdiler [item-tomato], çıktılar [], durum needs_review.
+- **T-PHASE-3 — Faz 3: Dış Mekan, Otopark, Yollar ve Araç Filosu**: girdiler [mod-parking-road], çıktılar [], durum needs_review.
+- **T-PHASE-4 — Faz 4: Tarım ve Üretim Çiftliği Bölgesi**: girdiler [mod-farm-production], çıktılar [], durum needs_review.
+- **T-PHASE-5 — Faz 5: Arka Alan, Depo ve Lojistik Tesisleri**: girdiler [mod-logistics-backend], çıktılar [], durum needs_review.
+- **T-PHASE-6 — Faz 6: 10 Personel Mesleği ve 20+ Zengin Müşteri Tipi**: girdiler [mod-supermarket], çıktılar [asset-staff-roster, asset-customer-archetypes], durum needs_review.
 - **T-NEOBRUTALISM-UI — Kullanıcı Arayüzünün Neobrutalism Bileşen Mimarisine Dönüştürülmesi**: girdiler [mod-supermarket], çıktılar [asset-neobrutalism-ui], durum needs_review.
 - **T-NEOBRUTALISM-ICONS-LOGOS — İkon, Logo ve Simgelerin Neobrutalist SVG Sistemine Dönüştürülmesi ve Emojilerin Temizlenmesi**: girdiler [mod-supermarket], çıktılar [], durum needs_review.
 - **T-NEOBRUTALISM-STATION-BADGES — İstasyon ve Üretim Etiketlerinin Neobrutalist Kompakt İkonlu Göstergelere Dönüştürülmesi**: girdiler [mod-supermarket], çıktılar [], durum needs_review.
 - **T-PRODUCTION-STATIONS-REDESIGN — 9 Üretim İstasyonunun Referans Görsele Göre Yeniden Tasarlanması ve Sinematik Hareketli Animasyonlarının Eklenmesi**: girdiler [mod-farm-production], çıktılar [asset-production-stations], durum needs_review.
 - **T-FARM-ASSETS-ANIMATIONS-REDESIGN — Tarla Yatakları, Meyve Bahçesi, Tavuk Kümesi ve Ahır Detaylarının Referansa Göre Yenilenmesi ve Canlı Animasyonları**: girdiler [mod-farm-production], çıktılar [asset-farm-fields, asset-chicken-coop, asset-barn-silo-paddock], durum needs_review.
-- **T-SUPERMARKET-FIXTURES-REDESIGN — Market Demirbaşlarının Referans Görsele Göre Yeniden Tasarlanması (Manav, Gondol, Soğuk Dolap, Pastane, Kasa, Restoran)**: girdiler [mod-supermarket], çıktılar [asset-produce-shelf-redesign, asset-gondola-shelf-redesign, asset-beverage-cooler-redesign, asset-bakery-counter-redesign, asset-checkout-counter-redesign, asset-restaurant-furniture-redesign], durum done.
+- **T-SUPERMARKET-FIXTURES-REDESIGN — Market Demirbaşlarının Referans Görsele Göre Yeniden Tasarlanması (Manav, Gondol, Soğuk Dolap, Pastane, Kasa, Restoran)**: girdiler [mod-supermarket], çıktılar [asset-produce-shelf-redesign, asset-gondola-shelf-redesign, asset-beverage-cooler-redesign, asset-bakery-counter-redesign, asset-checkout-counter-redesign, asset-restaurant-furniture-redesign], durum needs_review.
 - **T-CHARACTERS-ANIMATIONS-LIVING-WORLD — Personel ve Müşteri Varlıklarının Referans Görsele Göre Geliştirilmesi, Özgün Poz ve Sinematik Hareket Animasyonlarının Uygulanması**: girdiler [mod-supermarket], çıktılar [asset-staff-animations-redesign, asset-customer-animations-redesign], durum needs_review.
 - **T-STAFF-WELFARE-FACILITIES — Personel adayları, yorulma ve kuzey sosyal tesisleri**: girdiler [mod-supermarket], çıktılar [], durum needs_review.
-- **T-EAST-LOGISTICS-PROCUREMENT — Doğu lojistik ofisi, CRT toptan terminal ve kamyon teslimatı**: girdiler [mod-logistics-backend, mod-supermarket], çıktılar [], durum review.
+- **T-EAST-LOGISTICS-PROCUREMENT — Doğu lojistik ofisi, CRT toptan terminal ve kamyon teslimatı**: girdiler [mod-logistics-backend, mod-supermarket], çıktılar [], durum needs_review.
+- **T-CHECKOUT-CASH-LOOP — Ürün sayısına bağlı kasa süresi ve toplanan nakit akışı**: girdiler [mod-supermarket], çıktılar [asset-checkout-cash-pile], durum review.
 
 Etki yeniden inceleme ihtiyacıdır; nesnenin yanlış olduğu hükmü değildir.

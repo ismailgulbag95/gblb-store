@@ -7,18 +7,20 @@ import { MarketGrid } from '../environment/MarketGrid.js';
 import { ITEMS, RECIPES, SHELVES, STATIONS } from '../domain/catalog.js';
 import { gameDaylight } from '../domain/dayCycle.js';
 import { workerWorkSpeed } from '../domain/staff.js';
+import { getAvailableRegisters } from '../domain/simulation.js';
 import { CharacterFactory } from './CharacterFactory.js';
 import { animateCoopChicken, createChickenCoopModel } from './ChickenCoopModel.js';
 import { createFarmBuildModel } from './FarmBuildModel.js';
 import { buildFarmDecorationModel } from './FarmDecorationModels.js';
 import { createProductionBuildModel } from './ProductionBuildModel.js';
-import { ZONES, canPlaceDecoration, canPlaceHangingSign, canPlaceStation, getAllStationIds, getDecorationDimensions, getStationDimensions, HANGING_SIGN_FOOTPRINT, hangingSignPosition, isStationUnlocked, stationPosition } from '../domain/layout.js';
+import { ZONES, canPlaceDecoration, canPlaceHangingSign, canPlaceStation, getAllStationIds, getDecorationDimensions, getStationDimensions, HANGING_SIGN_FOOTPRINT, hangingSignPosition, isStationUnlocked, registerCashPosition, stationPosition } from '../domain/layout.js';
 import { DECORATIONS } from '../domain/decorCatalog.js';
 import { drawAssetIcon } from '../ui/AssetIcons.js';
 
 import { LightingManager } from './LightingManager.js';
 import { Item3DFactory } from './Item3DFactory.js';
 import { createRegisterModel } from './RegisterModel.js';
+import { createCashPileModel, updateCashPileModel } from './CashPileModel.js';
 import { createShelfModel } from './ShelfModel.js';
 import { buildDecorationModel } from './DecorationModel.js';
 import { createWorkerMesh, createCustomerMesh, updateWorkerEnergyBar } from './HumanoidFactory.js';
@@ -44,6 +46,8 @@ export class WorldScene {
     this.shelves = new Map();
     this.customShelves = new Map();
     this.selfRegisters = new Map();
+    this.checkoutRegisters = new Map();
+    this.cashPiles = new Map();
     this.customers = new Map();
     this.workers = new Map();
     this.animationClaims = new Set();
@@ -162,6 +166,21 @@ export class WorldScene {
     const group = createRegisterModel();
     this.scene.add(group);
     this.registerMesh = group;
+  }
+
+  #createCheckoutRegister(id, state) {
+    const register = state.checkoutRegisters[id];
+    const group = createRegisterModel({ x: register.x, z: register.z, number: register.number ?? 2 });
+    this.scene.add(group);
+    this.checkoutRegisters.set(id, group);
+    return group;
+  }
+
+  #createCashPile(id) {
+    const pile = createCashPileModel();
+    this.scene.add(pile.group);
+    this.cashPiles.set(id, pile);
+    return pile;
   }
 
   #createSelfRegister(id) {
@@ -355,6 +374,7 @@ export class WorldScene {
     if (id.startsWith('decor:')) return this.decorItems.get(id.slice(6))?.group;
     if (id === 'register') return this.registerMesh;
     if (id.startsWith('selfRegister') || this.selfRegisters.has(id)) return this.selfRegisters.get(id);
+    if (this.checkoutRegisters.has(id)) return this.checkoutRegisters.get(id);
     if (id === 'coop') return this.coop?.group;
     if (this.customShelves.has(id)) return this.customShelves.get(id)?.group;
     if (this.farms.has(id)) return this.farms.get(id)?.group;
@@ -1333,6 +1353,9 @@ export class WorldScene {
     const shelfItems = state.unlockedProducts.filter((item) => SHELVES[item]);
     if (!shelfItems.includes('TOMATO')) shelfItems.push('TOMATO');
     const selfRegIds = Object.keys(state.selfRegisters ?? {});
+    const checkoutRegisterIds = Object.keys(state.checkoutRegisters ?? {});
+    const availableRegisters = getAvailableRegisters(state);
+    const cashPileIds = availableRegisters.map((register) => register.id);
     const customShelfIds = Object.keys(state.customStations ?? {})
       .filter((id) => state.customStations[id].kind === 'shelf');
     const upgradeIds = availableUpgrades.map((entry) => entry.id);
@@ -1344,6 +1367,8 @@ export class WorldScene {
       + countMissingVisuals(this.shelves, shelfItems)
       + countMissingVisuals(this.tables, Object.keys(state.diningTables))
       + countMissingVisuals(this.selfRegisters, selfRegIds)
+      + countMissingVisuals(this.checkoutRegisters, checkoutRegisterIds)
+      + countMissingVisuals(this.cashPiles, cashPileIds)
       + countMissingVisuals(this.customShelves, customShelfIds)
       + countMissingVisuals(this.upgradeMarkers, upgradeIds)
       + countMissingVisuals(this.customers, customerIds)
@@ -1472,6 +1497,15 @@ export class WorldScene {
       this.registerMesh.position.set(p.x, 0, p.z);
       if (p.rotation !== undefined) this.registerMesh.rotation.y = p.rotation;
     }
+    this.#syncCollection(this.checkoutRegisters, checkoutRegisterIds,
+      (id) => this.#createCheckoutRegister(id, state), (entry) => this.#disposeVisual(entry));
+    for (const [id, registerGroup] of this.checkoutRegisters) {
+      const p = stationPosition(state, id);
+      if (p) {
+        registerGroup.position.set(p.x, 0, p.z);
+        if (p.rotation !== undefined) registerGroup.rotation.y = p.rotation;
+      }
+    }
     // Otomatik Kasalar (Self-Checkouts)
     this.#syncCollection(this.selfRegisters, selfRegIds, (id) => this.#createSelfRegister(id), (entry) => this.#disposeVisual(entry));
     for (const [id, regGroup] of this.selfRegisters) {
@@ -1480,6 +1514,17 @@ export class WorldScene {
         regGroup.position.set(p.x, 0, p.z);
         if (p.rotation !== undefined) regGroup.rotation.y = p.rotation;
       }
+    }
+    this.#syncCollection(this.cashPiles, cashPileIds, (id) => this.#createCashPile(id), (entry) => this.#disposeVisual(entry));
+    for (const register of availableRegisters) {
+      const pile = this.cashPiles.get(register.id);
+      if (!pile) continue;
+      const point = registerCashPosition(register);
+      const amountAtoms = state.cashAtRegisters?.[register.id] ?? 0;
+      const bundleCount = state.cashBundleCounts?.[register.id] ?? 0;
+      updateCashPileModel(pile, amountAtoms, bundleCount);
+      pile.group.rotation.y = register.rotation ?? 0;
+      pile.group.position.set(point.x, 0.025 + (amountAtoms > 0 ? Math.sin(time * 4) * 0.018 : 0), point.z);
     }
     // Ekstra Satın Alınan Reyonlar (Custom Shelves)
     this.#syncCollection(this.customShelves, customShelfIds, (id) => this.#addCustomShelf(id, state.customStations[id]), (entry) => this.#disposeVisual(entry));
@@ -1538,6 +1583,10 @@ export class WorldScene {
       const upgrade = availableUpgrades.find((entry) => entry.id === id);
       if (upgrade) this.#addUpgradeMarker(upgrade, state.settings.language);
     }, (marker) => this.#disposeVisual(marker));
+    for (const upgrade of availableUpgrades) {
+      const marker = this.upgradeMarkers.get(upgrade.id);
+      if (marker) marker.group.position.set(upgrade.x, 0, upgrade.z);
+    }
     this.#syncUpgradeMarkerFocus(this.upgradeMarkers, state, nearbyAction, time, frameDelta);
 
     for (const [itemId, shelf] of this.shelves) {
@@ -1751,7 +1800,8 @@ export class WorldScene {
         items: state.stock['worker:' + worker.id]?.items ?? {},
         speed: state.speedMultiplier * workerWorkSpeed(worker),
         resolveTarget: (cue) => this.#animationTarget(cue, state, actor),
-        paying: worker.type === 'cashier' && state.customers.some((customer) => customer.phase === 'paying'),
+        paying: worker.type === 'cashier' && state.customers.some((customer) => customer.phase === 'paying'
+          && (customer.targetRegisterId ?? 'register') === (worker.registerId ?? 'register')),
       });
       updateWorkerEnergyBar(actor, worker, this.engine.camera.quaternion);
     });

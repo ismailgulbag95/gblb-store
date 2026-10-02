@@ -203,7 +203,26 @@ export function stationZone(id) {
 export function stationPosition(state, id) {
   if (id.startsWith('staff-')) return state.layout?.[id] ?? STAFF_FACILITIES[id.slice(6)];
   if (state.pendingShelfIds?.includes(id) && !state.layout?.[id]) return null;
-  return state.layout?.[id] ?? state.customStations?.[id] ?? STATIONS[id];
+  return state.layout?.[id] ?? state.checkoutRegisters?.[id] ?? state.customStations?.[id] ?? STATIONS[id];
+}
+
+export function registerCashierPosition(register) {
+  const rotation = register.rotation ?? 0;
+  const behindOffset = 1.75;
+  return {
+    x: register.x - Math.sin(rotation) * behindOffset,
+    z: register.z - Math.cos(rotation) * behindOffset,
+    facing: rotation,
+  };
+}
+
+export function registerCashPosition(register) {
+  const rotation = register.rotation ?? 0;
+  const sideOffset = register.isSelfCheckout ? 1.05 : 1.75;
+  return {
+    x: register.x + Math.cos(rotation) * sideOffset,
+    z: register.z - Math.sin(rotation) * sideOffset,
+  };
 }
 
 export function getShelfLocations(state, item) {
@@ -232,6 +251,9 @@ export function getAllStationIds(state) {
   if (state?.selfRegisters) {
     for (const id of Object.keys(state.selfRegisters)) ids.add(id);
   }
+  if (state?.checkoutRegisters) {
+    for (const id of Object.keys(state.checkoutRegisters)) ids.add(id);
+  }
   if (state?.layout) {
     for (const id of Object.keys(state.layout)) ids.add(id);
   }
@@ -252,6 +274,7 @@ export function syncCatalogLayout(state) {
 
 export function isStationUnlocked(state, id) {
   if (id.startsWith('staff-')) return Boolean(state.staffLandCleared && state.staffFacilities?.[id.slice(6)]);
+  if (state.checkoutRegisters?.[id]) return true;
   if (state.customStations?.[id]) return true;
   if (id.startsWith('selfRegister')) return true;
   const baseId = resolveStationBaseId(id);
@@ -406,7 +429,11 @@ export function getMarketCollisionBoxes(state) {
   const GAP_THRESHOLD = 0.49; // 1 grid (0.5) altındaki boşluklar bitişik sayılır
 
   // 1. Açık market istasyonlarının sınır kutuları ve duvar bitişikliği kontrolü
-  const allStations = { ...STATIONS, ...(state.customStations ?? {}) };
+  const allStations = {
+    ...STATIONS,
+    ...(state.customStations ?? {}),
+    ...Object.fromEntries(Object.entries(state.checkoutRegisters ?? {}).map(([id, register]) => [id, { ...register, kind: 'register' }])),
+  };
   for (const regId of Object.keys(state.selfRegisters ?? {})) {
     if (!allStations[regId]) {
       allStations[regId] = { kind: 'selfRegister', title: 'Otomatik Kasa' };

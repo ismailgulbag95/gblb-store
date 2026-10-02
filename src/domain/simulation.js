@@ -1,10 +1,10 @@
-import { ITEMS, RECIPES, SHELVES, STATIONS } from './catalog.js';
-import { getDecorationDimensions, getMarketCollisionBoxes, getShelfLocations, getStationDimensions, stationPosition, getStaffFacilityAccess, getStaffFacilityCollisionBoxes } from './layout.js';
+import { ITEMS, MONEY_ATOMS, RECIPES, SHELVES, STATIONS } from './catalog.js';
+import { getDecorationDimensions, getMarketCollisionBoxes, getShelfLocations, getStationDimensions, registerCashPosition, registerCashierPosition, stationPosition, getStaffFacilityAccess, getStaffFacilityCollisionBoxes } from './layout.js';
 import { chooseStaffFacility, tickWorkerNeeds, workerWorkSpeed, recoverWorker } from './staff.js';
 import { EconomyLedger } from './ledger.js';
 import { decorBonus, decorScore } from './decorCatalog.js';
 import { FARM_CAPACITY, ensureFarmState, removeFarmReady, syncFarmHarvest } from './farm.js';
-import { customerMood, saleMoodMultiplier, tipForMood } from './customerExperience.js';
+import { adjustCustomerSatisfaction, customerMood, customerSpawnIntervalTicks, saleMoodMultiplier, tipForMood } from './customerExperience.js';
 import { nextOrder } from './orders.js';
 import { cancelReservation, capacityAt, makeLocation, pickUpReservedStock, quantityAt, reserveStock, totalAt, transferStock } from './inventory.js';
 import { staffSpeedMultiplier } from './progression.js';
@@ -12,7 +12,8 @@ import { STAFF_WAITING_AREA } from './dayCycle.js';
 import { advanceProcurement } from './procurement.js';
 
 const TICKS_PER_SECOND = 10;
-const CUSTOMER_SPAWN_TICKS = 40;
+const CHECKOUT_BASE_SECONDS = 1;
+const CHECKOUT_SECONDS_PER_ITEM = 1;
 const MAX_CUSTOMERS = 8;
 const CUSTOMER_SPEED = 0.36;
 const CUSTOMER_RADIUS = 0.32;
@@ -716,7 +717,8 @@ function workerTick(state, environmentObstacles) {
   const obstacleSignature = workerObstacleSignature(obstacles);
   for (const [workerIndex, worker] of state.workers.entries()) {
     tickWorkerNeeds(worker, Boolean(worker.task || worker.type === 'cashier'
-      && state.customers.some(customer => ['queueing', 'paying'].includes(customer.phase) && !customer.registerId?.startsWith('selfRegister'))
+      && state.customers.some(customer => ['queueing', 'paying'].includes(customer.phase)
+        && (customer.targetRegisterId ?? 'register') === (worker.registerId ?? 'register'))
       || worker.type === 'chefWaiter' && Object.entries(state.machines).some(([id, machine]) =>
         ['burgerKitchen', 'pizzaKitchen'].includes(id) && machine.blocked === false)));
     if (worker.waitingForSalary) {
@@ -754,8 +756,8 @@ function workerTick(state, environmentObstacles) {
         }
         continue;
       } else {
-        const register = stationPosition(state, 'register');
-        const home = worker.type === 'cashier' ? { x: register.x, z: register.z - 1.75 } : rest.returnTo;
+        const register = stationPosition(state, worker.registerId ?? 'register') ?? STATIONS.register;
+        const home = worker.type === 'cashier' ? registerCashierPosition(register) : rest.returnTo;
         const target = rest.phase === 'returning' ? home : access;
         if (!rest.route || rest.routeObstacles !== obstacleSignature || rest.routeTarget?.x !== target.x || rest.routeTarget?.z !== target.z) {
           rest.route = findWorkerRoute(worker, target, obstacles); rest.routeIndex = 0;
@@ -763,7 +765,10 @@ function workerTick(state, environmentObstacles) {
         }
         if (!rest.route.length) { worker.break = null; worker.breakCooldownUntil = state.tick + 80; durable = true; }
         else if (moveWorkerAlongRoute(worker, rest, 0.34 * workerWorkSpeed(worker))) {
-          if (rest.phase === 'returning') { worker.break = null; worker.breakCooldownUntil = state.tick + 100; }
+          if (rest.phase === 'returning') {
+            worker.break = null; worker.breakCooldownUntil = state.tick + 100;
+            if (worker.type === 'cashier') worker.facing = home.facing;
+          }
           else { rest.phase = 'resting'; rest.ticks = 0; worker.facing = 0; }
           durable = true;
         }
@@ -1301,6 +1306,18 @@ export function getAvailableRegisters(state) {
     isSelfCheckout: false,
   });
 
+  for (const [id, register] of Object.entries(state.checkoutRegisters ?? {})) {
+    const pos = state.layout?.[id] ?? register;
+    registers.push({
+      id,
+      x: pos.x,
+      z: pos.z,
+      rotation: pos.rotation ?? 0,
+      number: register.number,
+      isSelfCheckout: false,
+    });
+  }
+
   for (const [id, reg] of Object.entries(state.selfRegisters ?? {})) {
     const pos = state.layout?.[id] ?? reg;
     registers.push({
@@ -1379,7 +1396,7 @@ function claimTable(state, customer) {
 function customerTick(state, events) {
   let durable = false;
   state.customerSpawnTicks += 1;
-  if (state.customerSpawnTicks >= CUSTOMER_SPAWN_TICKS) {
+  if (state.customerSpawnTicks >= customerSpawnIntervalTicks(state.customerSatisfaction)) {
     state.customerSpawnTicks = 0;
     if (state.customers.length < MAX_CUSTOMERS) addCustomer(state);
   }
@@ -1428,6 +1445,7 @@ function customerTick(state, events) {
         if ((customer.tableWaitIndex ?? 0) === 0 && claimTable(state, customer)) durable = true;
         else if (customer.waitTicks > 450) {
           state.stats.customersUnhappy += 1;
+          adjustCustomerSatisfaction(state, -5);
           customer.reaction = 'unhappy';
           leaveDiner(state, customer);
           durable = true;
@@ -1444,6 +1462,7 @@ function customerTick(state, events) {
         ));
         if (customer.waitTicks > 300 && !mealInTransit) {
           state.stats.customersUnhappy += 1;
+          adjustCustomerSatisfaction(state, -5);
           customer.reaction = 'unhappy';
           leaveDiner(state, customer);
           durable = true;
@@ -1455,6 +1474,7 @@ function customerTick(state, events) {
         if (customer.eatTicks >= 80 && table && table.tipAtoms === 0) {
           table.tipAtoms = tipForMood(customer) * 10_000;
           state.stats[customerMood(customer) < 85 ? 'customersUnhappy' : 'customersSatisfied'] += 1;
+          adjustCustomerSatisfaction(state, 1);
           customer.reaction = customerMood(customer) < 85 ? 'unhappy' : 'happy';
           customer.phase = 'ready-tip';
           const stock = state.stock[`customer:${customer.id}`];
@@ -1493,6 +1513,7 @@ function customerTick(state, events) {
         if (customer.routeBlockedTicks > 180) {
           customer.missedItems = (customer.missedItems ?? 0) + 1;
           state.stats.customersUnhappy += 1;
+          adjustCustomerSatisfaction(state, -5);
           customer.reaction = 'unhappy';
           leaveShopper(customer, state);
           durable = true;
@@ -1541,11 +1562,14 @@ function customerTick(state, events) {
       } else if (customer.waitTicks > 180) {
         if (customer.basket.length) {
           customer.missedItems = (customer.missedItems ?? 0) + 1;
+          adjustCustomerSatisfaction(state, -3);
           customer.demand = customer.basket[0];
           queueForCheckout(state, customer);
+          durable = true;
         } else {
           customer.missedItems = (customer.missedItems ?? 0) + 1;
           state.stats.customersUnhappy += 1;
+          adjustCustomerSatisfaction(state, -5);
           customer.reaction = 'unhappy';
           leaveShopper(customer, state);
           durable = true;
@@ -1557,6 +1581,7 @@ function customerTick(state, events) {
         if (customer.checkoutWaitTicks % 30 === 0) queueForCheckout(state, customer);
         if (customer.routeBlocked && customer.checkoutWaitTicks > 180) {
           state.stats.customersUnhappy += 1;
+          adjustCustomerSatisfaction(state, -5);
           customer.reaction = 'unhappy';
           leaveShopper(customer, state);
           durable = true;
@@ -1587,36 +1612,37 @@ function customerTick(state, events) {
       }
       customer.facing = Math.atan2(reg.x - customer.x, reg.z - customer.z);
       const isSelfCheckout = reg.isSelfCheckout;
-      const cashier = isSelfCheckout
-        || state.workers.some((worker) => worker.type === 'cashier' && !worker.break && !worker.waitingForSalary)
-        || Math.hypot(state.player.x - registerQueuePosition(reg, -1.1).x,
+      const activeCashier = state.workers.find((worker) => worker.type === 'cashier'
+        && (worker.registerId ?? 'register') === reg.id && !worker.break && !worker.waitingForSalary);
+      const playerAtRegister = Math.hypot(state.player.x - registerQueuePosition(reg, -1.1).x,
           state.player.z - registerQueuePosition(reg, -1.1).z) <= 1.8;
-      if (customer.queueIndex === 0 && cashier) {
-        customer.payTicks += 1;
-      } else if (customer.queueIndex === 0 && !cashier) {
+      const cashier = isSelfCheckout || Boolean(activeCashier) || playerAtRegister;
+      if (customer.queueIndex === 0) {
+        customer.payTicks = (customer.payTicks ?? 0) + 1;
+      }
+      if (customer.queueIndex === 0 && !cashier) {
         customer.checkoutWaitTicks = (customer.checkoutWaitTicks ?? 0) + 1;
         if (customer.checkoutWaitTicks > 450) {
           state.stats.customersUnhappy += 1;
+          adjustCustomerSatisfaction(state, -5);
           customer.reaction = 'unhappy';
           leaveShopper(customer, state);
           durable = true;
         }
       }
-      const activeCashier = state.workers.find(worker => worker.type === 'cashier' && !worker.break && !worker.waitingForSalary);
-      const payThreshold = isSelfCheckout ? 7 : activeCashier ? 5 / workerWorkSpeed(activeCashier) : 14;
-      if (customer.payTicks >= payThreshold) {
-        const ledger = new EconomyLedger(state.economy);
+      const itemCount = customer.basket?.length ?? 0;
+      const payThreshold = TICKS_PER_SECOND * (CHECKOUT_BASE_SECONDS + CHECKOUT_SECONDS_PER_ITEM * itemCount);
+      if (cashier && customer.queueIndex === 0 && customer.payTicks >= payThreshold) {
         const soldItems = [...customer.basket];
-        let saleAmount = 0;
+        let saleAmountAtoms = 0;
         for (let itemIndex = 0; itemIndex < soldItems.length; itemIndex += 1) {
           const item = soldItems[itemIndex];
           const stock = state.stock[`customer:${customer.id}`];
           if (quantityAt(state.stock, `customer:${customer.id}`, item) < 1) continue;
           stock.items[item] -= 1;
           if (!stock.items[item]) delete stock.items[item];
-          const unitPrice = Math.round(ITEMS[item].price * (1 + decorBonus(state)) * saleMoodMultiplier(customer) * 10_000) / 10_000;
-          ledger.credit(`sale:${customer.id}:${itemIndex}`, unitPrice, `sale:${item}`);
-          saleAmount += unitPrice;
+          const unitPriceAtoms = Math.round(ITEMS[item].price * (1 + decorBonus(state)) * saleMoodMultiplier(customer) * MONEY_ATOMS);
+          saleAmountAtoms += unitPriceAtoms;
           const statMap = {
             TOMATO: 'tomatoSold', TOMATO_PASTE: 'pasteSold', ORANGE_JUICE: 'juiceSold', CORN: 'cornSold',
             POPCORN: 'popcornSold', EGG: 'eggSold', FLOUR: 'flourSold', BREAD: 'breadSold',
@@ -1624,14 +1650,21 @@ function customerTick(state, events) {
           };
           if (statMap[item]) state.stats[statMap[item]] += 1;
         }
-        if (saleAmount) {
+        if (saleAmountAtoms) {
+          adjustCustomerSatisfaction(state, 1);
+          const registerId = state.checkoutRegisters?.[regId] || state.selfRegisters?.[regId] ? regId : 'register';
+          state.cashAtRegisters ??= { register: 0 };
+          state.cashAtRegisters[registerId] = (state.cashAtRegisters[registerId] ?? 0) + saleAmountAtoms;
+          state.cashBundleCounts ??= { register: 0 };
+          state.cashBundleCounts[registerId] = (state.cashBundleCounts[registerId] ?? 0) + 1;
+          const saleAmount = saleAmountAtoms / MONEY_ATOMS;
           const mood = customerMood(customer);
           state.stats[mood < 85 ? 'customersUnhappy' : 'customersSatisfied'] += 1;
           customer.reaction = mood < 85 ? 'unhappy' : 'happy';
           const firstItem = soldItems[0];
           events.push({ type: 'sale', item: firstItem, items: soldItems, amount: saleAmount,
             mood,
-            message: '+ $' + saleAmount.toFixed(2) + ' · ' + soldItems.map((item) => ITEMS[item].name).join(', ') + ' satıldı.',
+            message: 'Kasada $' + saleAmount.toFixed(2) + ' birikti · ' + soldItems.map((item) => ITEMS[item].name).join(', ') + ' satıldı.',
             decorationScore: decorScore(state), decorationBonus: decorBonus(state) });
           durable = true;
         }
@@ -1647,6 +1680,26 @@ function customerTick(state, events) {
       delete state.stock[`customer:${customer.id}`];
       state.customers.splice(index, 1);
     }
+  }
+  return durable;
+}
+
+function collectRegisterCash(state, events) {
+  let durable = false;
+  state.cashAtRegisters ??= { register: 0 };
+  state.cashBundleCounts ??= { register: 0 };
+  for (const register of getAvailableRegisters(state)) {
+    const amountAtoms = state.cashAtRegisters[register.id] ?? 0;
+    if (!Number.isSafeInteger(amountAtoms) || amountAtoms <= 0) continue;
+    const pickup = registerCashPosition(register);
+    if (Math.hypot(state.player.x - pickup.x, state.player.z - pickup.z) > 1.35) continue;
+    const transactionId = `register-cash:${register.id}:${state.nextEntityId++}`;
+    new EconomyLedger(state.economy).credit(transactionId, amountAtoms / MONEY_ATOMS, `register-cash:${register.id}`);
+    state.cashAtRegisters[register.id] = 0;
+    state.cashBundleCounts[register.id] = 0;
+    events.push({ type: 'cash-collected', registerId: register.id, amountAtoms,
+      message: `Kasadan $${(amountAtoms / MONEY_ATOMS).toFixed(2)} toplandı.` });
+    durable = true;
   }
   return durable;
 }
@@ -1678,6 +1731,7 @@ export function advanceSimulation(state, environmentObstacles = []) {
   durable = workerTick(state, environmentObstacles) || durable;
   syncFarmHarvest(state);
   durable = customerTick(state, events) || durable;
+  durable = collectRegisterCash(state, events) || durable;
   if (!state.activeOrder) {
     state.activeOrder = nextOrder(state);
     if (state.activeOrder) durable = true;

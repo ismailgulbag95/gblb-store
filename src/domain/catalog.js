@@ -118,7 +118,7 @@ export const SHELVES = Object.freeze({
 
 export const UPGRADES = Object.freeze([
   { id: 'tomatoFarm2', title: '2. Domates tarlası', price: 25, x: -6.5, z: 5, visible: true, unlocks: ['tomatoFarm2'] },
-  { id: 'cashier', title: 'Kasiyer işe al', price: 35, x: 8.5, z: -4, when: 'tomatoSold', unlocks: ['cashier'] },
+  { id: 'cashier', title: 'Kasiyer işe al', price: 35, x: 5, z: -5.75, when: 'pasteSold', unlocks: ['cashier'] },
   { id: 'paste', title: 'Salça kazanı ve reyon', price: 45, x: 0, z: -4, when: 'tomatoSold', unlocks: ['paste'] },
   { id: 'harvester', title: 'Tarla işçisi işe al', price: 60, x: -5, z: -4, when: 'pasteSold', unlocks: ['harvester'] },
   { id: 'orange', title: 'Portakal bahçesi ve sıkacak', price: 85, x: -10, z: -7, when: 'pasteSold', unlocks: ['orange'] },
@@ -154,7 +154,7 @@ export const STAFF = Object.freeze({
 });
 
 export const STAFF_HIRES = Object.freeze([
-  { upgradeId: 'cashier', staffTypes: ['cashier'], effect: 'Kasada müşteri ödemelerini otomatik alır.', unlock: 'İlk domates satışından sonra açılır.' },
+  { upgradeId: 'cashier', staffTypes: ['cashier'], effect: 'Kasada müşteri ödemelerini otomatik alır.', unlock: 'İlk salça satışından sonra personel yönetiminden alınabilir.' },
   { upgradeId: 'harvester', staffTypes: ['harvester'], effect: 'Önce reyonları doldurur, ardından üretim hatlarına malzeme taşır.', unlock: 'İlk salça satışından sonra açılır.' },
   { upgradeId: 'factoryFeeder', staffTypes: ['factoryFeeder'], effect: 'Reyon stoklarını tamamlayıp üretim hatlarını besler.', unlock: 'İlk portakal suyu satışından sonra açılır.' },
   { upgradeId: 'caretaker', staffTypes: ['caretaker'], effect: 'Yemi kümese, yumurtaları reyona taşır.', unlock: 'İlk yumurta satışından sonra açılır.' },

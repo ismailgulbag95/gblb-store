@@ -28,7 +28,7 @@
     <div id="ui-layer">
       <header class="top-bar" data-ui>
         <div class="top-primary-row">
-          <div class="brand-pill"><img class="brand-mark" src="/assets/branding/seed-to-serve/market-stall-color.svg" alt="" /><span>SEED TO SERVE</span></div>
+          <div class="brand-pill"><img class="brand-mark" src="/assets/branding/seed-to-serve/market-stall-color.svg" alt="" /><span id="brand-satisfaction">Memnuniyet 50/100</span></div>
           <div class="stat-group">
             <div class="stat-pill day-pill" aria-label="Oyun günü"><strong id="day-display">Gün 1</strong></div>
             <div class="stat-pill money-pill"><span data-asset-icon="money" data-asset-size="20"></span><strong id="money-display">$100</strong></div>
@@ -42,7 +42,7 @@
           </div>
         </div>
         <div class="top-secondary-row">
-          <button class="business-toggle" id="btn-business-toggle" data-ui aria-label="İşletme özetini aç" aria-expanded="false"><span data-asset-icon="business" data-asset-size="26"></span><span id="business-toggle-score">—</span></button>
+          <button class="business-toggle" id="btn-business-toggle" data-ui aria-label="İşletme özetini aç" aria-expanded="false"><span data-asset-icon="business" data-asset-size="26"></span><span id="business-toggle-score">50%</span></button>
           <section class="quest-card" aria-live="polite" data-ui>
             <div class="quest-icon"><span data-asset-icon="goal" data-asset-size="42"></span></div>
             <div class="quest-copy"><span class="eyebrow">SIRADAKİ HEDEF</span><strong id="quest-text">Domates topla, reyonu doldur ve ilk satışını yap.</strong></div>
@@ -68,15 +68,19 @@
       </div>
 
       <aside class="business-card" id="business-card" data-ui>
-        <div class="business-heading"><span data-asset-icon="business" data-asset-size="34"></span><strong>İŞLETME</strong><span class="live-dot"></span><small>CANLI</small></div>
-        <div class="business-row"><span><span data-asset-icon="customers" data-asset-size="28"></span> Müşteriler</span><strong id="customer-count">0</strong></div>
-        <div class="business-row"><span><span data-asset-icon="staff" data-asset-size="28"></span> Çalışanlar</span><strong id="worker-count">0</strong></div>
-        <div class="business-row"><span><span data-asset-icon="stock" data-asset-size="28"></span> Reyon stoğu</span><strong id="shelf-count">0</strong></div>
-        <div class="business-row"><span id="mood-label"><span data-asset-icon="satisfied" data-asset-size="28"></span> Memnuniyet</span><strong id="mood-count">—</strong></div>
-        <button id="btn-inventory" class="text-button"><span>Ürünleri gör</span><span data-asset-icon="chevronRight" data-asset-size="18"></span></button>
-        <div class="decor-score-row"><span><span data-asset-icon="decorScore" data-asset-size="26"></span> Dekor puanı</span><strong id="decor-score">0 · +0%</strong></div>
-        <button id="btn-decor" class="text-button decor-button"><span><span data-asset-icon="decoration" data-asset-size="26"></span> Dekorasyon mağazası</span><span data-asset-icon="chevronRight" data-asset-size="18"></span></button>
-        <button id="btn-procurement" class="text-button hidden">Toptan sipariş terminali</button>
+        <button class="business-heading" id="btn-business-card-toggle" type="button" aria-expanded="true" aria-controls="business-content" aria-label="İşletme canlı panelini daralt">
+          <span data-asset-icon="business" data-asset-size="34"></span><strong>İŞLETME</strong><span class="live-dot"></span><small>CANLI</small>
+          <span class="business-disclosure-icon" data-asset-icon="chevronDown" data-asset-size="18" aria-hidden="true"></span>
+        </button>
+        <div class="business-content" id="business-content">
+          <div class="business-row"><span><span data-asset-icon="customers" data-asset-size="28"></span> Müşteriler</span><strong id="customer-count">0</strong></div>
+          <div class="business-row"><span><span data-asset-icon="staff" data-asset-size="28"></span> Çalışanlar</span><strong id="worker-count">0</strong></div>
+          <div class="business-row"><span><span data-asset-icon="stock" data-asset-size="28"></span> Reyon stoğu</span><strong id="shelf-count">0</strong></div>
+          <div class="business-row"><span id="mood-label"><span data-asset-icon="satisfied" data-asset-size="28"></span> Memnuniyet</span><strong id="mood-count">50/100</strong></div>
+          <button id="btn-inventory" class="text-button"><span>Ürünleri gör</span><span data-asset-icon="chevronRight" data-asset-size="18"></span></button>
+          <div class="decor-score-row"><span><span data-asset-icon="decorScore" data-asset-size="26"></span> Dekor puanı</span><strong id="decor-score">0 · +0%</strong></div>
+          <button id="btn-procurement" class="text-button hidden">Toptan sipariş terminali</button>
+        </div>
       </aside>
 
       <div class="bottom-controls" data-ui>

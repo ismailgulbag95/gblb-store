@@ -1,10 +1,11 @@
-import { ITEMS, SHELVES, STATIONS, STAFF_FACILITIES, STAFF_HIRES } from './catalog.js';
+import { ITEMS, MONEY_ATOMS, SHELVES, STATIONS, STAFF_FACILITIES, STAFF_HIRES } from './catalog.js';
 import { normalizeWorkerWelfare } from './staff.js';
 import { createFarmState, ensureFarmState, syncFarmHarvest } from './farm.js';
 import { canPlaceDecoration, HANGING_SIGN_DEFAULT_POSITIONS, normalizeHangingSignPositions } from './layout.js';
 import { machineSpeedMultiplier, staffSpeedMultiplier } from './progression.js';
 import { PLAYER_CHARACTER_IDS } from './characters.js';
 import { normalizeProcurement } from './procurement.js';
+import { DEFAULT_CUSTOMER_SATISFACTION, normalizeCustomerSatisfaction } from './customerExperience.js';
 
 export const SAVE_VERSION = 12;
 
@@ -30,6 +31,7 @@ export function createInitialState(seed = 0x51f15e) {
     revision: 0,
     tick: 0,
     customerSpawnTicks: 0,
+    customerSatisfaction: DEFAULT_CUSTOMER_SATISFACTION,
     customerDemandBag: [],
     rng: seed >>> 0,
     paused: false,
@@ -62,6 +64,9 @@ export function createInitialState(seed = 0x51f15e) {
     machines: {},
     customStations: {},
     selfRegisters: {},
+    checkoutRegisters: {},
+    cashAtRegisters: { register: 0 },
+    cashBundleCounts: { register: 0 },
     layout: {},
     hangingSigns: normalizeHangingSignPositions(HANGING_SIGN_DEFAULT_POSITIONS),
     pendingShelfIds: [],
@@ -299,6 +304,13 @@ export function hydrateState(candidate) {
   hydrated.settings = { ...initial.settings, ...(candidate.settings ?? {}) };
   hydrated.unlocked = { ...initial.unlocked, ...(candidate.unlocked ?? {}) };
   hydrated.stats = { ...initial.stats, ...(candidate.stats ?? {}) };
+  const satisfiedReviews = Number.isSafeInteger(hydrated.stats.customersSatisfied) && hydrated.stats.customersSatisfied > 0
+    ? hydrated.stats.customersSatisfied : 0;
+  const unhappyReviews = Number.isSafeInteger(hydrated.stats.customersUnhappy) && hydrated.stats.customersUnhappy > 0
+    ? hydrated.stats.customersUnhappy : 0;
+  const reviewCount = satisfiedReviews + unhappyReviews;
+  const legacySatisfaction = reviewCount ? Math.round(satisfiedReviews / reviewCount * 100) : DEFAULT_CUSTOMER_SATISFACTION;
+  hydrated.customerSatisfaction = normalizeCustomerSatisfaction(candidate.customerSatisfaction, legacySatisfaction);
   hydrated.availableUpgrades = Array.isArray(candidate.availableUpgrades) ? [...candidate.availableUpgrades] : [...initial.availableUpgrades];
   hydrated.completedUpgrades = Array.isArray(candidate.completedUpgrades) ? [...candidate.completedUpgrades] : [];
   hydrated.stock = { ...initial.stock, ...(candidate.stock ?? {}) };
@@ -314,6 +326,33 @@ export function hydrateState(candidate) {
     }];
   }));
   hydrated.customStations = { ...(candidate.customStations ?? {}) };
+  hydrated.selfRegisters = { ...(candidate.selfRegisters ?? {}) };
+  hydrated.checkoutRegisters = Object.fromEntries(Object.entries(candidate.checkoutRegisters ?? {})
+    .filter(([id, register]) => /^register_\d+$/.test(id) && Number.isFinite(register?.x) && Number.isFinite(register?.z))
+    .map(([id, register]) => [id, {
+      x: register.x,
+      z: register.z,
+      rotation: Number.isFinite(register.rotation) ? register.rotation : 0,
+      number: Number.isSafeInteger(register.number) && register.number > 1 ? register.number : 2,
+    }]));
+  hydrated.cashAtRegisters = Object.fromEntries([...new Set([
+    'register',
+    ...Object.keys(hydrated.checkoutRegisters),
+    ...Object.keys(hydrated.selfRegisters),
+  ])].map((id) => [id,
+    Number.isSafeInteger(candidate.cashAtRegisters?.[id]) && candidate.cashAtRegisters[id] >= 0
+      ? candidate.cashAtRegisters[id] : 0]));
+  hydrated.cashBundleCounts = Object.fromEntries([...new Set([
+    'register',
+    ...Object.keys(hydrated.checkoutRegisters),
+    ...Object.keys(hydrated.selfRegisters),
+  ])].map((id) => {
+    const savedCount = candidate.cashBundleCounts?.[id];
+    const amountAtoms = hydrated.cashAtRegisters[id] ?? 0;
+    const count = Number.isSafeInteger(savedCount) && savedCount >= 0
+      ? savedCount : Math.min(10, Math.ceil(amountAtoms / (5 * MONEY_ATOMS)));
+    return [id, count];
+  }));
   hydrated.staffLandCleared = candidate.staffLandCleared === true;
   hydrated.staffFacilities = hydrated.staffLandCleared ? Object.fromEntries(Object.keys(candidate.staffFacilities ?? {})
     .filter(id => STAFF_FACILITIES[id]).map(id => [id, { id }])) : {};
@@ -323,7 +362,6 @@ export function hydrateState(candidate) {
         && entry.role === hire.upgradeId && normalizeWorkerWelfare({ type: hire.staffTypes[0], archetypeId: entry.archetypeId }).archetypeId
         && Number.isSafeInteger(entry.salaryAtoms) && entry.salaryAtoms > 0
         && Number.isSafeInteger(entry.hireCostAtoms) && entry.hireCostAtoms > 0).slice(0, 3)]));
-  hydrated.selfRegisters = { ...(candidate.selfRegisters ?? {}) };
   hydrated.layout = Object.fromEntries(Object.entries(candidate.layout ?? {}).filter(([id, point]) =>
     (STATIONS[id] || hydrated.staffFacilities[id.slice(6)] && id.startsWith('staff-') || candidate.customStations?.[id] || candidate.selfRegisters?.[id] || id.includes('_') || id.startsWith('selfRegister') || id.startsWith('custom_')) && Number.isFinite(point?.x) && Number.isFinite(point?.z)));
   hydrated.hangingSigns = normalizeHangingSignPositions(candidate.hangingSigns);
@@ -401,6 +439,10 @@ export function hydrateState(candidate) {
     ensureFarmState({ ...farm }, hydrated.tick, id)]));
   hydrated.workers = hydrated.workers.map((worker) => normalizeWorkerWelfare({
     ...worker,
+    ...(worker.type === 'cashier' ? {
+      registerId: worker.registerId === 'register' || hydrated.checkoutRegisters[worker.registerId]
+        ? (worker.registerId ?? 'register') : 'register',
+    } : {}),
     unlocked: true,
     upgradeLevel: Number.isSafeInteger(worker.upgradeLevel) && worker.upgradeLevel >= 0 ? worker.upgradeLevel : 0,
     speedModifier: staffSpeedMultiplier(Number.isSafeInteger(worker.upgradeLevel) && worker.upgradeLevel >= 0 ? worker.upgradeLevel : 0),

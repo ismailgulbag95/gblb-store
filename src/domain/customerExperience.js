@@ -1,3 +1,21 @@
+export const DEFAULT_CUSTOMER_SATISFACTION = 50;
+
+export function normalizeCustomerSatisfaction(value, fallback = DEFAULT_CUSTOMER_SATISFACTION) {
+  const score = Number.isFinite(value) ? value : fallback;
+  return Math.max(0, Math.min(100, Math.round(Number.isFinite(score) ? score : DEFAULT_CUSTOMER_SATISFACTION)));
+}
+
+export function adjustCustomerSatisfaction(state, amount) {
+  state.customerSatisfaction = normalizeCustomerSatisfaction(state.customerSatisfaction) + amount;
+  state.customerSatisfaction = normalizeCustomerSatisfaction(state.customerSatisfaction);
+  return state.customerSatisfaction;
+}
+
+export function customerSpawnIntervalTicks(satisfaction) {
+  const score = normalizeCustomerSatisfaction(satisfaction);
+  return 60 - Math.round(score * 0.4);
+}
+
 export function customerMood(customer) {
   const missed = customer.missedItems ?? 0;
   const wait = customer.checkoutWaitTicks ?? 0;

@@ -224,6 +224,7 @@ async function boot() {
   }
 
   app.setEventHandler((event) => {
+    if (event.type === 'production') return;
     if (event.type === 'procurement-open') { hud.openProcurement(); return; }
     if (event.type === 'bonus-offer-ready') {
       if (!pauseReasons.size && !document.hidden && !app.getState().ads.pending) hud.openBonusOffer(event.offer);
@@ -237,7 +238,7 @@ async function boot() {
       pauseReasons.delete('rewarded-ad');
       setPaused();
     }
-    if (event.type === 'toast' || event.type === 'sale' || event.type === 'production'
+    if (event.type === 'toast' || event.type === 'sale'
       || event.type === 'tip-ready' || event.type === 'payroll') {
       hud.showEvent(event);
       if (event.type !== 'payroll' && event.tone !== 'error') world.playEvent(event, app.getState());

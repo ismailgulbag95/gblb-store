@@ -1,6 +1,6 @@
 {
   "schema_version": 3,
-  "revision": 96,
+  "revision": 99,
   "project": {
     "id": "gblb-store-3d",
     "name": "GBLB Store 3D Procedural World Transformation",
@@ -415,6 +415,16 @@
         "category": "character",
         "file_ref": "src/presentation/HumanoidFactory.js"
       }
+    },
+    {
+      "id": "asset-checkout-cash-pile",
+      "type": "procedural_asset",
+      "label": "Kasada Biriken Para Desteleri",
+      "properties": {
+        "name": "Checkout Cash Pile",
+        "category": "interior",
+        "file_ref": "src/presentation/CashPileModel.js"
+      }
     }
   ],
   "relations": [
@@ -549,6 +559,12 @@
       "from": "mod-supermarket",
       "type": "contains",
       "to": "asset-customer-animations-redesign"
+    },
+    {
+      "id": "rel-supermarket-checkout-cash-pile",
+      "from": "mod-supermarket",
+      "type": "contains",
+      "to": "asset-checkout-cash-pile"
     }
   ],
   "tasks": [
@@ -4040,6 +4056,292 @@
           "object_types": [],
           "relation_types": [],
           "relations": [],
+          "files": []
+        }
+      }
+    },
+    {
+      "id": "T-CHECKOUT-CASH-LOOP",
+      "title": "Ürün sayısına bağlı kasa süresi ve toplanan nakit akışı",
+      "status": "review",
+      "object_ids": [
+        "mod-supermarket",
+        "asset-checkout-cash-pile"
+      ],
+      "depends_on": [],
+      "decision_ids": [],
+      "acceptance": [
+        "Müşterinin ödeme süresi aldığı ürün sayısıyla artar ve uzayan kuyruklar bağımsız ikinci kasada da işlenebilir.",
+        "Reklamla eklenen kasiyer kendisine atanmış, sahnede görünen ve müşteri yönlendirmesinde kullanılan çalışan bir kasayla gelir.",
+        "Hasat ve makine üretimi ürün hazır olduğunda bildirim/toast çıkarmaz; ürün ve stok akışı sürer.",
+        "Satış tutarı ilgili kasa yanında para desteleri olarak birikir; oyuncu yaklaştığında tutar bir kez bakiyeye aktarılır ve kayıt/kasa düzeni korunur."
+      ],
+      "evidence": [
+        {
+          "criterion": 0,
+          "path": "src/domain/simulation.js",
+          "note": "Ödeme eşiği sepet ürün sayısına göre ölçekleniyor; kasiyer, oyuncu ve self-checkout şeritleri ayrı işleniyor. Çalışma zamanı doğrulaması yapılmadı.",
+          "reviewer": "agent",
+          "sha256": "e3cc19e8d682dd9d49ff3f8994ec62f7db026c88798c113c6c5fd1b8370181bc"
+        },
+        {
+          "criterion": 1,
+          "path": "src/application/GameApplication.js",
+          "note": "İlk reklamlı kasiyer ana kasaya, ek reklamlı kasiyer boş konuma yerleştirilen yeni kasaya atanıyor; uygun konum yoksa ek reklam teklifi gösterilmiyor.",
+          "reviewer": "agent",
+          "sha256": "f97986c8a8b505d7ec8c589a3b07a25addb6cd0d69c76405a906337313c00a49"
+        },
+        {
+          "criterion": 1,
+          "path": "src/presentation/HUD.js",
+          "note": "Kasiyer kartından reklamlı işe alım erişilebilir; ek kasiyer butonu yeni kasayı açıkça belirtiyor.",
+          "reviewer": "agent",
+          "sha256": "f3082df3b3e5703eac68deb2b1d02fb5b5055844b0695ac0ec8f9737b7f68b60"
+        },
+        {
+          "criterion": 1,
+          "path": "src/presentation/WorldScene.js",
+          "note": "Ek kasa ve kasada biriken nakit yığınları sahnede oluşturulup simülasyon durumuna göre güncelleniyor.",
+          "reviewer": "agent",
+          "sha256": "91f1107f54c2b5459608500593126c112c78af3578a4ea4628aaa0eae1d2c07d"
+        },
+        {
+          "criterion": 2,
+          "path": "src/main.js",
+          "note": "Üretim hazır olayı HUD ve dünya efektlerine aktarılmadan kesiliyor; simülasyonun ürün/hasat event üretimi ve stok akışı korunuyor.",
+          "reviewer": "agent",
+          "sha256": "c3089bb05b54f03bb26aeecb129fd7be707fe2eb95d7780a2f4e7b39885ef4e1"
+        },
+        {
+          "criterion": 2,
+          "path": "src/ui/ToastManager.js",
+          "note": "ToastManager üretim eventlerine erken dönerek toast ve sesi engelliyor.",
+          "reviewer": "agent",
+          "sha256": "e9d3736be7bc07963899c38dc77e00b1da59aac0778fafee7082b688d83ea791"
+        },
+        {
+          "criterion": 3,
+          "path": "src/domain/simulation.js",
+          "note": "Satış tutarı kasa başına bekleyen atom bakiyesine yazılıyor; oyuncu kasaya yaklaşınca ledger'a aktarılıyor ve bekleyen tutar sıfırlanıyor.",
+          "reviewer": "agent",
+          "sha256": "e3cc19e8d682dd9d49ff3f8994ec62f7db026c88798c113c6c5fd1b8370181bc"
+        },
+        {
+          "criterion": 3,
+          "path": "src/presentation/CashPileModel.js",
+          "note": "Kasa bakiyesini görünür para destelerine dönüştüren model eklendi.",
+          "reviewer": "agent",
+          "sha256": "dc41b240bc5eff68832b3f1addd0deb4c7e5ea6ce0391b066f200e725338139e"
+        },
+        {
+          "criterion": 3,
+          "path": "src/domain/state.js",
+          "note": "Ek kasalar ve kasa yanındaki bekleyen nakit hydrate edilip eski kayıtlar için varsayılanlarla normalize ediliyor.",
+          "reviewer": "agent",
+          "sha256": "567ea23125c76393cfa3345a37321b3d3a26e3700e05c644ec828dff5dfdfb47"
+        }
+      ],
+      "input_ids": [
+        "mod-supermarket"
+      ],
+      "output_ids": [
+        "asset-checkout-cash-pile"
+      ],
+      "input_snapshot": {
+        "sha256": "a6a1bb7cdb8ba0e58c63a3ff82f4d67657b31fda76d2b52c1decbc20cce2c673",
+        "manifest": {
+          "graph": {
+            "inputs": [
+              "mod-supermarket"
+            ],
+            "objects": [
+              {
+                "id": "mod-supermarket",
+                "type": "scene_module",
+                "properties": {
+                  "name": "Supermarket Interior",
+                  "description": "Cilalı fayans zemin, manav stantları, gondol reyonlar, içecek dolapları, kasa konveyör hattı",
+                  "phase": 1
+                }
+              }
+            ],
+            "object_types": [
+              {
+                "id": "scene_module",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "required": true,
+                    "enum": null
+                  },
+                  "description": {
+                    "type": "string",
+                    "required": true,
+                    "enum": null
+                  },
+                  "phase": {
+                    "type": "integer",
+                    "required": true,
+                    "enum": null
+                  }
+                }
+              }
+            ],
+            "relation_types": [
+              {
+                "id": "contains",
+                "from_type": "scene_module",
+                "to_type": "procedural_asset",
+                "from_min": 0,
+                "from_max": null,
+                "to_min": 0,
+                "to_max": null,
+                "impact": "forward"
+              }
+            ],
+            "relations": [],
+            "files": []
+          },
+          "producer_generations": {},
+          "contract": {
+            "input_fields": {},
+            "acceptance_rules": [],
+            "support_groups": []
+          }
+        }
+      },
+      "generation": 0,
+      "review_reasons": [],
+      "run_snapshot": {
+        "sha256": "a6a1bb7cdb8ba0e58c63a3ff82f4d67657b31fda76d2b52c1decbc20cce2c673",
+        "manifest": {
+          "graph": {
+            "inputs": [
+              "mod-supermarket"
+            ],
+            "objects": [
+              {
+                "id": "mod-supermarket",
+                "type": "scene_module",
+                "properties": {
+                  "name": "Supermarket Interior",
+                  "description": "Cilalı fayans zemin, manav stantları, gondol reyonlar, içecek dolapları, kasa konveyör hattı",
+                  "phase": 1
+                }
+              }
+            ],
+            "object_types": [
+              {
+                "id": "scene_module",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "required": true,
+                    "enum": null
+                  },
+                  "description": {
+                    "type": "string",
+                    "required": true,
+                    "enum": null
+                  },
+                  "phase": {
+                    "type": "integer",
+                    "required": true,
+                    "enum": null
+                  }
+                }
+              }
+            ],
+            "relation_types": [
+              {
+                "id": "contains",
+                "from_type": "scene_module",
+                "to_type": "procedural_asset",
+                "from_min": 0,
+                "from_max": null,
+                "to_min": 0,
+                "to_max": null,
+                "impact": "forward"
+              }
+            ],
+            "relations": [],
+            "files": []
+          },
+          "producer_generations": {},
+          "contract": {
+            "input_fields": {},
+            "acceptance_rules": [],
+            "support_groups": []
+          }
+        }
+      },
+      "output_snapshot": {
+        "sha256": "675a1e6be974717368e300487ced1eb05da737a2a8fffc46c6b9e2bfd22b4301",
+        "manifest": {
+          "inputs": [
+            "asset-checkout-cash-pile"
+          ],
+          "objects": [
+            {
+              "id": "asset-checkout-cash-pile",
+              "type": "procedural_asset",
+              "properties": {
+                "name": "Checkout Cash Pile",
+                "category": "interior",
+                "file_ref": "src/presentation/CashPileModel.js"
+              }
+            }
+          ],
+          "object_types": [
+            {
+              "id": "procedural_asset",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "required": true,
+                  "enum": null
+                },
+                "category": {
+                  "type": "string",
+                  "required": true,
+                  "enum": [
+                    "interior",
+                    "exterior",
+                    "vehicle",
+                    "character",
+                    "logistics",
+                    "farm",
+                    "utility"
+                  ]
+                },
+                "file_ref": {
+                  "type": "string",
+                  "required": true,
+                  "enum": null
+                }
+              }
+            }
+          ],
+          "relation_types": [
+            {
+              "id": "contains",
+              "from_type": "scene_module",
+              "to_type": "procedural_asset",
+              "from_min": 0,
+              "from_max": null,
+              "to_min": 0,
+              "to_max": null,
+              "impact": "forward"
+            }
+          ],
+          "relations": [
+            {
+              "id": "rel-supermarket-checkout-cash-pile",
+              "from": "mod-supermarket",
+              "type": "contains",
+              "to": "asset-checkout-cash-pile"
+            }
+          ],
           "files": []
         }
       }
@@ -33456,6 +33758,632 @@
                   "object_types": [],
                   "relation_types": [],
                   "relations": [],
+                  "files": []
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "revision": 97,
+      "action": "extend_model",
+      "actor": "assistant",
+      "reason": "İstenen kasa kuyruğu, reklamla ikinci kasa, üretim bildirimi ve fiziksel nakit akışını proje kaydına ekle.",
+      "change": {
+        "objects": [
+          {
+            "id": "asset-checkout-cash-pile",
+            "type": "procedural_asset",
+            "label": "Kasada Biriken Para Desteleri",
+            "properties": {
+              "name": "Checkout Cash Pile",
+              "category": "interior",
+              "file_ref": "src/presentation/CashPileModel.js"
+            }
+          }
+        ],
+        "relations": [
+          {
+            "id": "rel-supermarket-checkout-cash-pile",
+            "from": "mod-supermarket",
+            "type": "contains",
+            "to": "asset-checkout-cash-pile"
+          }
+        ],
+        "tasks": [
+          {
+            "id": "T-CHECKOUT-CASH-LOOP",
+            "title": "Ürün sayısına bağlı kasa süresi ve toplanan nakit akışı",
+            "status": "todo",
+            "object_ids": [
+              "mod-supermarket",
+              "asset-checkout-cash-pile"
+            ],
+            "depends_on": [],
+            "decision_ids": [],
+            "acceptance": [
+              "Müşterinin ödeme süresi aldığı ürün sayısıyla artar ve uzayan kuyruklar bağımsız ikinci kasada da işlenebilir.",
+              "Reklamla eklenen kasiyer kendisine atanmış, sahnede görünen ve müşteri yönlendirmesinde kullanılan çalışan bir kasayla gelir.",
+              "Hasat ve makine üretimi ürün hazır olduğunda bildirim/toast çıkarmaz; ürün ve stok akışı sürer.",
+              "Satış tutarı ilgili kasa yanında para desteleri olarak birikir; oyuncu yaklaştığında tutar bir kez bakiyeye aktarılır ve kayıt/kasa düzeni korunur."
+            ],
+            "evidence": [],
+            "input_ids": [
+              "mod-supermarket"
+            ],
+            "output_ids": [
+              "asset-checkout-cash-pile"
+            ],
+            "input_snapshot": null,
+            "generation": 0,
+            "review_reasons": []
+          }
+        ],
+        "impact": {
+          "changed_objects": [
+            "asset-checkout-cash-pile"
+          ],
+          "changed_relations": [
+            "rel-supermarket-checkout-cash-pile"
+          ],
+          "affected_objects": [
+            "asset-checkout-cash-pile"
+          ],
+          "paths": {
+            "asset-checkout-cash-pile": [
+              "object changed: asset-checkout-cash-pile"
+            ]
+          },
+          "affected_tasks": []
+        },
+        "task_changes": [
+          {
+            "task_id": "T-CHECKOUT-CASH-LOOP",
+            "before": null,
+            "after": {
+              "id": "T-CHECKOUT-CASH-LOOP",
+              "title": "Ürün sayısına bağlı kasa süresi ve toplanan nakit akışı",
+              "status": "todo",
+              "object_ids": [
+                "mod-supermarket",
+                "asset-checkout-cash-pile"
+              ],
+              "depends_on": [],
+              "decision_ids": [],
+              "acceptance": [
+                "Müşterinin ödeme süresi aldığı ürün sayısıyla artar ve uzayan kuyruklar bağımsız ikinci kasada da işlenebilir.",
+                "Reklamla eklenen kasiyer kendisine atanmış, sahnede görünen ve müşteri yönlendirmesinde kullanılan çalışan bir kasayla gelir.",
+                "Hasat ve makine üretimi ürün hazır olduğunda bildirim/toast çıkarmaz; ürün ve stok akışı sürer.",
+                "Satış tutarı ilgili kasa yanında para desteleri olarak birikir; oyuncu yaklaştığında tutar bir kez bakiyeye aktarılır ve kayıt/kasa düzeni korunur."
+              ],
+              "evidence": [],
+              "input_ids": [
+                "mod-supermarket"
+              ],
+              "output_ids": [
+                "asset-checkout-cash-pile"
+              ],
+              "input_snapshot": null,
+              "generation": 0,
+              "review_reasons": []
+            }
+          }
+        ]
+      }
+    },
+    {
+      "revision": 98,
+      "action": "start_task",
+      "actor": "assistant",
+      "reason": "Dört oyun akışı değişikliği üzerinde uygulama çalışması sürüyor.",
+      "change": {
+        "task_changes": [
+          {
+            "task_id": "T-CHECKOUT-CASH-LOOP",
+            "before": {
+              "id": "T-CHECKOUT-CASH-LOOP",
+              "title": "Ürün sayısına bağlı kasa süresi ve toplanan nakit akışı",
+              "status": "todo",
+              "object_ids": [
+                "mod-supermarket",
+                "asset-checkout-cash-pile"
+              ],
+              "depends_on": [],
+              "decision_ids": [],
+              "acceptance": [
+                "Müşterinin ödeme süresi aldığı ürün sayısıyla artar ve uzayan kuyruklar bağımsız ikinci kasada da işlenebilir.",
+                "Reklamla eklenen kasiyer kendisine atanmış, sahnede görünen ve müşteri yönlendirmesinde kullanılan çalışan bir kasayla gelir.",
+                "Hasat ve makine üretimi ürün hazır olduğunda bildirim/toast çıkarmaz; ürün ve stok akışı sürer.",
+                "Satış tutarı ilgili kasa yanında para desteleri olarak birikir; oyuncu yaklaştığında tutar bir kez bakiyeye aktarılır ve kayıt/kasa düzeni korunur."
+              ],
+              "evidence": [],
+              "input_ids": [
+                "mod-supermarket"
+              ],
+              "output_ids": [
+                "asset-checkout-cash-pile"
+              ],
+              "input_snapshot": null,
+              "generation": 0,
+              "review_reasons": []
+            },
+            "after": {
+              "id": "T-CHECKOUT-CASH-LOOP",
+              "title": "Ürün sayısına bağlı kasa süresi ve toplanan nakit akışı",
+              "status": "doing",
+              "object_ids": [
+                "mod-supermarket",
+                "asset-checkout-cash-pile"
+              ],
+              "depends_on": [],
+              "decision_ids": [],
+              "acceptance": [
+                "Müşterinin ödeme süresi aldığı ürün sayısıyla artar ve uzayan kuyruklar bağımsız ikinci kasada da işlenebilir.",
+                "Reklamla eklenen kasiyer kendisine atanmış, sahnede görünen ve müşteri yönlendirmesinde kullanılan çalışan bir kasayla gelir.",
+                "Hasat ve makine üretimi ürün hazır olduğunda bildirim/toast çıkarmaz; ürün ve stok akışı sürer.",
+                "Satış tutarı ilgili kasa yanında para desteleri olarak birikir; oyuncu yaklaştığında tutar bir kez bakiyeye aktarılır ve kayıt/kasa düzeni korunur."
+              ],
+              "evidence": [],
+              "input_ids": [
+                "mod-supermarket"
+              ],
+              "output_ids": [
+                "asset-checkout-cash-pile"
+              ],
+              "input_snapshot": null,
+              "generation": 0,
+              "review_reasons": [],
+              "run_snapshot": {
+                "sha256": "a6a1bb7cdb8ba0e58c63a3ff82f4d67657b31fda76d2b52c1decbc20cce2c673",
+                "manifest": {
+                  "graph": {
+                    "inputs": [
+                      "mod-supermarket"
+                    ],
+                    "objects": [
+                      {
+                        "id": "mod-supermarket",
+                        "type": "scene_module",
+                        "properties": {
+                          "name": "Supermarket Interior",
+                          "description": "Cilalı fayans zemin, manav stantları, gondol reyonlar, içecek dolapları, kasa konveyör hattı",
+                          "phase": 1
+                        }
+                      }
+                    ],
+                    "object_types": [
+                      {
+                        "id": "scene_module",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "required": true,
+                            "enum": null
+                          },
+                          "description": {
+                            "type": "string",
+                            "required": true,
+                            "enum": null
+                          },
+                          "phase": {
+                            "type": "integer",
+                            "required": true,
+                            "enum": null
+                          }
+                        }
+                      }
+                    ],
+                    "relation_types": [
+                      {
+                        "id": "contains",
+                        "from_type": "scene_module",
+                        "to_type": "procedural_asset",
+                        "from_min": 0,
+                        "from_max": null,
+                        "to_min": 0,
+                        "to_max": null,
+                        "impact": "forward"
+                      }
+                    ],
+                    "relations": [],
+                    "files": []
+                  },
+                  "producer_generations": {},
+                  "contract": {
+                    "input_fields": {},
+                    "acceptance_rules": [],
+                    "support_groups": []
+                  }
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "revision": 99,
+      "action": "submit_evidence",
+      "actor": "agent",
+      "reason": "İstenen dört akış kaynak kodunda uygulandı ve inceleme kanıtları eklendi; oyun içi doğrulama yapılmadı.",
+      "change": {
+        "task_changes": [
+          {
+            "task_id": "T-CHECKOUT-CASH-LOOP",
+            "before": {
+              "id": "T-CHECKOUT-CASH-LOOP",
+              "title": "Ürün sayısına bağlı kasa süresi ve toplanan nakit akışı",
+              "status": "doing",
+              "object_ids": [
+                "mod-supermarket",
+                "asset-checkout-cash-pile"
+              ],
+              "depends_on": [],
+              "decision_ids": [],
+              "acceptance": [
+                "Müşterinin ödeme süresi aldığı ürün sayısıyla artar ve uzayan kuyruklar bağımsız ikinci kasada da işlenebilir.",
+                "Reklamla eklenen kasiyer kendisine atanmış, sahnede görünen ve müşteri yönlendirmesinde kullanılan çalışan bir kasayla gelir.",
+                "Hasat ve makine üretimi ürün hazır olduğunda bildirim/toast çıkarmaz; ürün ve stok akışı sürer.",
+                "Satış tutarı ilgili kasa yanında para desteleri olarak birikir; oyuncu yaklaştığında tutar bir kez bakiyeye aktarılır ve kayıt/kasa düzeni korunur."
+              ],
+              "evidence": [],
+              "input_ids": [
+                "mod-supermarket"
+              ],
+              "output_ids": [
+                "asset-checkout-cash-pile"
+              ],
+              "input_snapshot": null,
+              "generation": 0,
+              "review_reasons": [],
+              "run_snapshot": {
+                "sha256": "a6a1bb7cdb8ba0e58c63a3ff82f4d67657b31fda76d2b52c1decbc20cce2c673",
+                "manifest": {
+                  "graph": {
+                    "inputs": [
+                      "mod-supermarket"
+                    ],
+                    "objects": [
+                      {
+                        "id": "mod-supermarket",
+                        "type": "scene_module",
+                        "properties": {
+                          "name": "Supermarket Interior",
+                          "description": "Cilalı fayans zemin, manav stantları, gondol reyonlar, içecek dolapları, kasa konveyör hattı",
+                          "phase": 1
+                        }
+                      }
+                    ],
+                    "object_types": [
+                      {
+                        "id": "scene_module",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "required": true,
+                            "enum": null
+                          },
+                          "description": {
+                            "type": "string",
+                            "required": true,
+                            "enum": null
+                          },
+                          "phase": {
+                            "type": "integer",
+                            "required": true,
+                            "enum": null
+                          }
+                        }
+                      }
+                    ],
+                    "relation_types": [
+                      {
+                        "id": "contains",
+                        "from_type": "scene_module",
+                        "to_type": "procedural_asset",
+                        "from_min": 0,
+                        "from_max": null,
+                        "to_min": 0,
+                        "to_max": null,
+                        "impact": "forward"
+                      }
+                    ],
+                    "relations": [],
+                    "files": []
+                  },
+                  "producer_generations": {},
+                  "contract": {
+                    "input_fields": {},
+                    "acceptance_rules": [],
+                    "support_groups": []
+                  }
+                }
+              }
+            },
+            "after": {
+              "id": "T-CHECKOUT-CASH-LOOP",
+              "title": "Ürün sayısına bağlı kasa süresi ve toplanan nakit akışı",
+              "status": "review",
+              "object_ids": [
+                "mod-supermarket",
+                "asset-checkout-cash-pile"
+              ],
+              "depends_on": [],
+              "decision_ids": [],
+              "acceptance": [
+                "Müşterinin ödeme süresi aldığı ürün sayısıyla artar ve uzayan kuyruklar bağımsız ikinci kasada da işlenebilir.",
+                "Reklamla eklenen kasiyer kendisine atanmış, sahnede görünen ve müşteri yönlendirmesinde kullanılan çalışan bir kasayla gelir.",
+                "Hasat ve makine üretimi ürün hazır olduğunda bildirim/toast çıkarmaz; ürün ve stok akışı sürer.",
+                "Satış tutarı ilgili kasa yanında para desteleri olarak birikir; oyuncu yaklaştığında tutar bir kez bakiyeye aktarılır ve kayıt/kasa düzeni korunur."
+              ],
+              "evidence": [
+                {
+                  "criterion": 0,
+                  "path": "src/domain/simulation.js",
+                  "note": "Ödeme eşiği sepet ürün sayısına göre ölçekleniyor; kasiyer, oyuncu ve self-checkout şeritleri ayrı işleniyor. Çalışma zamanı doğrulaması yapılmadı.",
+                  "reviewer": "agent",
+                  "sha256": "e3cc19e8d682dd9d49ff3f8994ec62f7db026c88798c113c6c5fd1b8370181bc"
+                },
+                {
+                  "criterion": 1,
+                  "path": "src/application/GameApplication.js",
+                  "note": "İlk reklamlı kasiyer ana kasaya, ek reklamlı kasiyer boş konuma yerleştirilen yeni kasaya atanıyor; uygun konum yoksa ek reklam teklifi gösterilmiyor.",
+                  "reviewer": "agent",
+                  "sha256": "f97986c8a8b505d7ec8c589a3b07a25addb6cd0d69c76405a906337313c00a49"
+                },
+                {
+                  "criterion": 1,
+                  "path": "src/presentation/HUD.js",
+                  "note": "Kasiyer kartından reklamlı işe alım erişilebilir; ek kasiyer butonu yeni kasayı açıkça belirtiyor.",
+                  "reviewer": "agent",
+                  "sha256": "f3082df3b3e5703eac68deb2b1d02fb5b5055844b0695ac0ec8f9737b7f68b60"
+                },
+                {
+                  "criterion": 1,
+                  "path": "src/presentation/WorldScene.js",
+                  "note": "Ek kasa ve kasada biriken nakit yığınları sahnede oluşturulup simülasyon durumuna göre güncelleniyor.",
+                  "reviewer": "agent",
+                  "sha256": "91f1107f54c2b5459608500593126c112c78af3578a4ea4628aaa0eae1d2c07d"
+                },
+                {
+                  "criterion": 2,
+                  "path": "src/main.js",
+                  "note": "Üretim hazır olayı HUD ve dünya efektlerine aktarılmadan kesiliyor; simülasyonun ürün/hasat event üretimi ve stok akışı korunuyor.",
+                  "reviewer": "agent",
+                  "sha256": "c3089bb05b54f03bb26aeecb129fd7be707fe2eb95d7780a2f4e7b39885ef4e1"
+                },
+                {
+                  "criterion": 2,
+                  "path": "src/ui/ToastManager.js",
+                  "note": "ToastManager üretim eventlerine erken dönerek toast ve sesi engelliyor.",
+                  "reviewer": "agent",
+                  "sha256": "e9d3736be7bc07963899c38dc77e00b1da59aac0778fafee7082b688d83ea791"
+                },
+                {
+                  "criterion": 3,
+                  "path": "src/domain/simulation.js",
+                  "note": "Satış tutarı kasa başına bekleyen atom bakiyesine yazılıyor; oyuncu kasaya yaklaşınca ledger'a aktarılıyor ve bekleyen tutar sıfırlanıyor.",
+                  "reviewer": "agent",
+                  "sha256": "e3cc19e8d682dd9d49ff3f8994ec62f7db026c88798c113c6c5fd1b8370181bc"
+                },
+                {
+                  "criterion": 3,
+                  "path": "src/presentation/CashPileModel.js",
+                  "note": "Kasa bakiyesini görünür para destelerine dönüştüren model eklendi.",
+                  "reviewer": "agent",
+                  "sha256": "dc41b240bc5eff68832b3f1addd0deb4c7e5ea6ce0391b066f200e725338139e"
+                },
+                {
+                  "criterion": 3,
+                  "path": "src/domain/state.js",
+                  "note": "Ek kasalar ve kasa yanındaki bekleyen nakit hydrate edilip eski kayıtlar için varsayılanlarla normalize ediliyor.",
+                  "reviewer": "agent",
+                  "sha256": "567ea23125c76393cfa3345a37321b3d3a26e3700e05c644ec828dff5dfdfb47"
+                }
+              ],
+              "input_ids": [
+                "mod-supermarket"
+              ],
+              "output_ids": [
+                "asset-checkout-cash-pile"
+              ],
+              "input_snapshot": {
+                "sha256": "a6a1bb7cdb8ba0e58c63a3ff82f4d67657b31fda76d2b52c1decbc20cce2c673",
+                "manifest": {
+                  "graph": {
+                    "inputs": [
+                      "mod-supermarket"
+                    ],
+                    "objects": [
+                      {
+                        "id": "mod-supermarket",
+                        "type": "scene_module",
+                        "properties": {
+                          "name": "Supermarket Interior",
+                          "description": "Cilalı fayans zemin, manav stantları, gondol reyonlar, içecek dolapları, kasa konveyör hattı",
+                          "phase": 1
+                        }
+                      }
+                    ],
+                    "object_types": [
+                      {
+                        "id": "scene_module",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "required": true,
+                            "enum": null
+                          },
+                          "description": {
+                            "type": "string",
+                            "required": true,
+                            "enum": null
+                          },
+                          "phase": {
+                            "type": "integer",
+                            "required": true,
+                            "enum": null
+                          }
+                        }
+                      }
+                    ],
+                    "relation_types": [
+                      {
+                        "id": "contains",
+                        "from_type": "scene_module",
+                        "to_type": "procedural_asset",
+                        "from_min": 0,
+                        "from_max": null,
+                        "to_min": 0,
+                        "to_max": null,
+                        "impact": "forward"
+                      }
+                    ],
+                    "relations": [],
+                    "files": []
+                  },
+                  "producer_generations": {},
+                  "contract": {
+                    "input_fields": {},
+                    "acceptance_rules": [],
+                    "support_groups": []
+                  }
+                }
+              },
+              "generation": 0,
+              "review_reasons": [],
+              "run_snapshot": {
+                "sha256": "a6a1bb7cdb8ba0e58c63a3ff82f4d67657b31fda76d2b52c1decbc20cce2c673",
+                "manifest": {
+                  "graph": {
+                    "inputs": [
+                      "mod-supermarket"
+                    ],
+                    "objects": [
+                      {
+                        "id": "mod-supermarket",
+                        "type": "scene_module",
+                        "properties": {
+                          "name": "Supermarket Interior",
+                          "description": "Cilalı fayans zemin, manav stantları, gondol reyonlar, içecek dolapları, kasa konveyör hattı",
+                          "phase": 1
+                        }
+                      }
+                    ],
+                    "object_types": [
+                      {
+                        "id": "scene_module",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "required": true,
+                            "enum": null
+                          },
+                          "description": {
+                            "type": "string",
+                            "required": true,
+                            "enum": null
+                          },
+                          "phase": {
+                            "type": "integer",
+                            "required": true,
+                            "enum": null
+                          }
+                        }
+                      }
+                    ],
+                    "relation_types": [
+                      {
+                        "id": "contains",
+                        "from_type": "scene_module",
+                        "to_type": "procedural_asset",
+                        "from_min": 0,
+                        "from_max": null,
+                        "to_min": 0,
+                        "to_max": null,
+                        "impact": "forward"
+                      }
+                    ],
+                    "relations": [],
+                    "files": []
+                  },
+                  "producer_generations": {},
+                  "contract": {
+                    "input_fields": {},
+                    "acceptance_rules": [],
+                    "support_groups": []
+                  }
+                }
+              },
+              "output_snapshot": {
+                "sha256": "675a1e6be974717368e300487ced1eb05da737a2a8fffc46c6b9e2bfd22b4301",
+                "manifest": {
+                  "inputs": [
+                    "asset-checkout-cash-pile"
+                  ],
+                  "objects": [
+                    {
+                      "id": "asset-checkout-cash-pile",
+                      "type": "procedural_asset",
+                      "properties": {
+                        "name": "Checkout Cash Pile",
+                        "category": "interior",
+                        "file_ref": "src/presentation/CashPileModel.js"
+                      }
+                    }
+                  ],
+                  "object_types": [
+                    {
+                      "id": "procedural_asset",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "required": true,
+                          "enum": null
+                        },
+                        "category": {
+                          "type": "string",
+                          "required": true,
+                          "enum": [
+                            "interior",
+                            "exterior",
+                            "vehicle",
+                            "character",
+                            "logistics",
+                            "farm",
+                            "utility"
+                          ]
+                        },
+                        "file_ref": {
+                          "type": "string",
+                          "required": true,
+                          "enum": null
+                        }
+                      }
+                    }
+                  ],
+                  "relation_types": [
+                    {
+                      "id": "contains",
+                      "from_type": "scene_module",
+                      "to_type": "procedural_asset",
+                      "from_min": 0,
+                      "from_max": null,
+                      "to_min": 0,
+                      "to_max": null,
+                      "impact": "forward"
+                    }
+                  ],
+                  "relations": [
+                    {
+                      "id": "rel-supermarket-checkout-cash-pile",
+                      "from": "mod-supermarket",
+                      "type": "contains",
+                      "to": "asset-checkout-cash-pile"
+                    }
+                  ],
                   "files": []
                 }
               }

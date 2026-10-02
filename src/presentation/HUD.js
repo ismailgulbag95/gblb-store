@@ -3,6 +3,7 @@ import { DECORATIONS, decorBonus, decorScore } from '../domain/decorCatalog.js';
 import { decorationPrice, orderProgress } from '../domain/orders.js';
 import { machineProductionSeconds, machineSpeedMultiplier, machineUpgradeCost, percentGain, staffSpeedMultiplier, staffUpgradeCost } from '../domain/progression.js';
 import { gameDayNumber } from '../domain/dayCycle.js';
+import { normalizeCustomerSatisfaction } from '../domain/customerExperience.js';
 import { PLAYER_CHARACTERS } from '../domain/characters.js';
 import { assetIconMarkup, hydrateAssetIcons } from '../ui/AssetIcons.js';
 import { mountCharacterPreviews } from './CharacterPreviews.js';
@@ -32,7 +33,7 @@ const EN = {
     warehouseOperator: 'Carries incoming dock stock to retail shelves.', storeManager: 'Manages minimum stock orders from the office terminal.',
   },
   staffUnlock: {
-    cashier: 'Unlocks after your first tomato sale.', harvester: 'Unlocks after your first paste sale.',
+    cashier: 'Unlocks after your first paste sale; hire from Staff Management.', harvester: 'Unlocks after your first paste sale.',
     factoryFeeder: 'Unlocks after your first orange juice sale.', caretaker: 'Unlocks after your first egg sale.',
     chefWaiter: 'Unlocks after collecting a restaurant tip.',
     warehouseOperator: 'Unlocks with the office and logistics line.', storeManager: 'Unlocks with the office and logistics line.',
@@ -83,7 +84,7 @@ export class HUD {
   #cacheElements() {
     const ids = [
       'money-display', 'day-display', 'stack-display', 'walk-speed-buff',
-      'customer-count', 'worker-count', 'shelf-count', 'mood-count',
+      'customer-count', 'worker-count', 'shelf-count', 'mood-count', 'brand-satisfaction',
       'business-toggle-score', 'order-card', 'order-item', 'order-reward',
       'order-progress', 'order-progress-fill', 'btn-deliver-order',
       'order-bonus-progress', 'decor-score', 'quest-text', 'progress-count',
@@ -178,12 +179,24 @@ export class HUD {
     });
     document.getElementById('btn-settings').addEventListener('click', () => this.open('settings-modal'));
     document.getElementById('btn-inventory').addEventListener('click', () => this.open('inventory-modal'));
-    document.getElementById('btn-decor').addEventListener('click', () => this.open('decor-modal'));
     document.getElementById('btn-business-toggle').addEventListener('click', () => {
       const open = document.getElementById('business-card').classList.toggle('mobile-open');
       const button = document.getElementById('btn-business-toggle');
       button.setAttribute('aria-expanded', String(open));
-      button.setAttribute('aria-label', open ? 'İşletme özetini kapat' : 'İşletme özetini aç');
+      const english = this.app.getState().settings.language === 'en';
+      button.setAttribute('aria-label', open
+        ? (english ? 'Close business summary' : 'İşletme özetini kapat')
+        : (english ? 'Open business summary' : 'İşletme özetini aç'));
+    });
+    document.getElementById('btn-business-card-toggle').addEventListener('click', () => {
+      const card = document.getElementById('business-card');
+      const expanded = !card.classList.toggle('collapsed');
+      const button = document.getElementById('btn-business-card-toggle');
+      const english = this.app.getState().settings.language === 'en';
+      button.setAttribute('aria-expanded', String(expanded));
+      button.setAttribute('aria-label', expanded
+        ? (english ? 'Collapse business panel' : 'İşletme canlı panelini daralt')
+        : (english ? 'Expand business panel' : 'İşletme canlı panelini aç'));
     });
     orderToggle.addEventListener('click', toggleOrderCard);
     document.getElementById('btn-deliver-order').addEventListener('click', () => {
@@ -681,10 +694,10 @@ export class HUD {
     let shelfTotal = 0;
     for (const [id, stock] of Object.entries(state.stock)) if (id.startsWith('shelf:')) shelfTotal += Object.values(stock.items).reduce((a, b) => a + b, 0);
     if (this.elements['shelf-count']) this.elements['shelf-count'].textContent = String(shelfTotal);
-    const reviews = state.stats.customersSatisfied + state.stats.customersUnhappy;
-    const satisfaction = reviews ? Math.round(state.stats.customersSatisfied / reviews * 100) : null;
-    if (this.elements['mood-count']) this.elements['mood-count'].textContent = satisfaction === null ? '—' : `${satisfaction}%`;
-    if (this.elements['business-toggle-score']) this.elements['business-toggle-score'].textContent = satisfaction === null ? '—' : `${satisfaction}%`;
+    const satisfaction = normalizeCustomerSatisfaction(state.customerSatisfaction);
+    if (this.elements['mood-count']) this.elements['mood-count'].textContent = `${satisfaction}/100`;
+    if (this.elements['brand-satisfaction']) this.elements['brand-satisfaction'].textContent = `${language === 'en' ? 'Satisfaction' : 'Memnuniyet'} ${satisfaction}/100`;
+    if (this.elements['business-toggle-score']) this.elements['business-toggle-score'].textContent = `${satisfaction}%`;
     const order = state.activeOrder;
     const orderCard = this.elements['order-card'];
     if (orderCard) orderCard.classList.toggle('hidden', !order);
@@ -798,6 +811,19 @@ export class HUD {
     const english = language === 'en';
     document.title = english ? 'Seed to Serve: Market Tycoon' : 'Tohumdan Sofraya: Market Oyunu';
     document.getElementById('game-container').setAttribute('aria-label', english ? 'Seed to Serve game world' : 'Tohumdan Sofraya oyun dünyası');
+    const businessCard = document.getElementById('business-card');
+    const businessCardToggle = document.getElementById('btn-business-card-toggle');
+    const businessCardExpanded = !businessCard.classList.contains('collapsed');
+    const businessSummaryToggle = document.getElementById('btn-business-toggle');
+    const businessSummaryOpen = businessCard.classList.contains('mobile-open');
+    businessSummaryToggle.setAttribute('aria-expanded', String(businessSummaryOpen));
+    businessSummaryToggle.setAttribute('aria-label', businessSummaryOpen
+      ? (english ? 'Close business summary' : 'İşletme özetini kapat')
+      : (english ? 'Open business summary' : 'İşletme özetini aç'));
+    businessCardToggle.setAttribute('aria-expanded', String(businessCardExpanded));
+    businessCardToggle.setAttribute('aria-label', businessCardExpanded
+      ? (english ? 'Collapse business panel' : 'İşletme canlı panelini daralt')
+      : (english ? 'Expand business panel' : 'İşletme canlı panelini aç'));
     document.querySelector('.business-heading strong').textContent = english ? EN.business : 'İŞLETME';
     document.querySelector('.business-heading small').textContent = english ? EN.live : 'CANLI';
     document.querySelectorAll('.business-row')[0].children[0].innerHTML = `${assetIconMarkup('customers', 28)} ${english ? EN.customers : 'Müşteriler'}`;
@@ -821,7 +847,6 @@ export class HUD {
     document.getElementById('btn-expansions').setAttribute('aria-label', english ? EN.upgrades : 'İşletme geliştirmeleri');
     document.getElementById('btn-decor-top').setAttribute('aria-label', english ? 'Decoration shop' : 'Dekorasyon mağazası');
     document.getElementById('btn-decor-top').title = english ? 'Decoration shop' : 'Dekorasyon mağazası';
-    document.getElementById('btn-decor').innerHTML = `<span>${assetIconMarkup('decoration', 26)} ${english ? 'Decoration shop' : 'Dekorasyon mağazası'}</span> ${assetIconMarkup('chevronRight', 18)}`;
     document.getElementById('decor-title').textContent = english ? 'Decoration shop' : 'Dekorasyon mağazası';
     document.getElementById('decor-intro').textContent = english
       ? 'Add decorative pieces to your market and farm. Each placed piece adds style and a small sales bonus.'
@@ -1018,7 +1043,16 @@ export class HUD {
         ? `Base salary $${salary}/day${hire.staffTypes.length > 1 ? ' per person' : ''} · varies by candidate`
         : `Temel maaş $${salary}/gün${hire.staffTypes.length > 1 ? ' kişi başı' : ''} · adaya göre değişir`;
       const button = `<button class="buy-button" data-staff-candidates="${hire.upgradeId}" ${canHire ? '' : 'disabled'}>${canHire ? (english ? 'View 3 candidates' : '3 adayı gör') : (english ? 'Locked' : 'Kilitli')}</button>`;
-      return `<article class="upgrade-card staff-card${hired ? ' hired' : ''}"><div class="upgrade-icon">${assetIconMarkup(STAFF[hire.staffTypes[0]]?.icon ?? 'workerAvatar', 50)}</div><div class="upgrade-copy"><strong>${english ? englishTitle : title}</strong><small>${subtitle}</small><small>${salaryText}</small></div>${button}</article>`;
+      const adPayload = { role: hire.upgradeId };
+      const showCashierAd = hire.upgradeId === 'cashier' && canHire;
+      const adReady = showCashierAd && this.app.canOfferRewardedAd('staff-hire', adPayload);
+      if (adReady) this.app.markRewardedOfferShown('staff-hire', adPayload);
+      const adButton = showCashierAd
+        ? `<button class="buy-button ad-reward-button" data-ad-accept="staff-hire" data-ad-role="${hire.upgradeId}" ${adReady ? '' : 'disabled'}>${adReady
+          ? (state.completedUpgrades.includes('cashier') ? (english ? 'Add cashier + register' : 'Ek kasiyer + kasa') : (english ? 'Hire cashier by ad' : 'Reklamla kasiyer al'))
+          : (english ? 'Ad unavailable' : 'Reklam hazır değil')}</button>`
+        : '';
+      return `<article class="upgrade-card staff-card${hired ? ' hired' : ''}"><div class="upgrade-icon">${assetIconMarkup(STAFF[hire.staffTypes[0]]?.icon ?? 'workerAvatar', 50)}</div><div class="upgrade-copy"><strong>${english ? englishTitle : title}</strong><small>${subtitle}</small><small>${salaryText}</small></div><div class="staff-card-actions">${button}${adButton}</div></article>`;
     }).join('');
     const staffUpgrades = state.workers.map((worker) => {
       const level = worker.upgradeLevel ?? 0;
