@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="tr"><meta charset="utf-8"><title>Low poly personel tasarımları</title>
+<style>body{margin:0;background:#f8f3e8;color:#18332c;font:15px system-ui}h1{margin:14px 22px;font-size:22px}p{margin:8px 22px}canvas{display:block;width:100%}button{border:2px solid #18332c;border-radius:6px;background:#fff4bf;padding:7px 12px;font-weight:700;cursor:pointer}</style>
+<h1>Personel · müşteriyle aynı low poly stil</h1><p>Meslek kıyafetleri ve ekipmanlar · <button id="walk">Yürüyüşü göster</button></p>
+<script type="module">
+import * as THREE from 'three';
+import { createWorkerMesh, STAFF_PROFESSIONS, createCustomerMesh } from '../../src/presentation/HumanoidFactory.js';
+import { Item3DFactory } from '../../src/presentation/Item3DFactory.js';
+import { CharacterAnimator } from '../../src/presentation/CharacterAnimator.js';
+const factory=new Item3DFactory(), scene=new THREE.Scene(); scene.background=new THREE.Color(0xf8f3e8);
+const renderer=new THREE.WebGLRenderer({antialias:true}); renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.outputColorSpace=THREE.SRGBColorSpace; document.body.append(renderer.domElement);
+scene.add(new THREE.HemisphereLight(0xffffff,0xa2a987,2.5));
+const sun=new THREE.DirectionalLight(0xfff0d2,2.3); sun.position.set(-5,12,8); scene.add(sun);
+const camera=new THREE.OrthographicCamera(); camera.position.set(1,16,22); camera.lookAt(0,0.8,0);
+const actors=[], keys=Object.keys(STAFF_PROFESSIONS), cols=6, rows=Math.ceil((keys.length+1)/cols);
+function label(text,x,z) {
+ const canvas=document.createElement('canvas'); canvas.width=512;canvas.height=64;
+ const ctx=canvas.getContext('2d');ctx.fillStyle='#18332c';ctx.font='bold 28px sans-serif';ctx.textAlign='center';ctx.fillText(text,256,40);
+ const sprite=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(canvas),depthTest:false,toneMapped:false}));
+ sprite.position.set(x,0.02,z+0.5);sprite.scale.set(2.2,0.28,1);scene.add(sprite);
+}
+keys.forEach((type,i)=>{
+ const x=(i%cols-(cols-1)/2)*2.45,z=(Math.floor(i/cols)-(rows-1)/2)*3.2;
+ const actor=createWorkerMesh(type,factory);actor.group.position.set(x,0,z);actor.group.rotation.y=-0.22;
+ actor.energyBar.group.visible=false;actor.cargo.visible=false;scene.add(actor.group);
+ const entity={id:`preview-${type}`,type,x,z,facing:-0.22,task:null};
+ actors.push({actor,entity,animator:new CharacterAnimator(actor,factory,'worker'),origin:{x,z}});
+ label(STAFF_PROFESSIONS[type].title.tr,x,z);
+});
+const i=keys.length,x=(i%cols-(cols-1)/2)*2.45,z=(Math.floor(i/cols)-(rows-1)/2)*3.2;
+const customer=createCustomerMesh({id:'staff-comparison',kind:'shopper',archetype:'business'},null,factory);
+customer.bubble.visible=false;customer.group.position.set(x,0,z);customer.group.rotation.y=-0.22;scene.add(customer.group);label('Müşteri · stil referansı',x,z);
+const floor=new THREE.Mesh(new THREE.PlaneGeometry(30,24),new THREE.MeshStandardMaterial({color:0xf8f3e8}));floor.rotation.x=-Math.PI/2;floor.position.y=-0.02;scene.add(floor);
+let walking=false,time=0,last=performance.now();
+document.getElementById('walk').onclick=()=>{walking=!walking;document.getElementById('walk').textContent=walking?'Yürüyüşü durdur':'Yürüyüşü göster';};
+function resize(){const w=innerWidth,h=Math.max(300,innerHeight-105),aspect=w/h;camera.left=-8.2;camera.right=8.2;camera.top=8.2/aspect;camera.bottom=-8.2/aspect;camera.updateProjectionMatrix();renderer.setSize(w,h);}
+addEventListener('resize',resize);resize();
+function render(now){const dt=Math.min((now-last)/1000,0.05);last=now;if(walking)time+=dt;
+ if(walking) for(const f of actors){f.entity.x=f.origin.x+(walking?Math.sin(time*2)*0.18:0);f.entity.facing=-0.22;f.animator.update(f.entity,dt,{items:{}});}
+ renderer.render(scene,camera);requestAnimationFrame(render);}
+requestAnimationFrame(render);
+</script></html>

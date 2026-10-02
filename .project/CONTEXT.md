@@ -1,6 +1,6 @@
 # GBLB Store 3D Procedural World Transformation — proje bağlamı
 
-Revision: 148 · Yetkili kaynak: .project/state.json
+Revision: 151 · Yetkili kaynak: .project/state.json
 
 Bu görünüm türetilmiştir. Güncel kanıt kontrolü için context komutunu çalıştır.
 
@@ -430,7 +430,7 @@ Türler ve bağlantı kuralları: `ontology` komutu / `ONTOLOJİ.md`.
   - Kontrol: stale evidence: src/style.css
   - Kontrol: stale evidence: src/presentation/WorldScene.js
   - Kontrol: stale evidence: src/main.js
-- T-DYNAMIC-WORLD-EVENTS [review] Dynamic positive events and recoverable crises (kayıt: review)
+- T-DYNAMIC-WORLD-EVENTS [needs_review] Dynamic positive events and recoverable crises (kayıt: review)
   - Ölçüt: Ten events integrate with real stock, production, checkout and rewards.
   - Ölçüt: Director protects early play, alternates crises, pauses and survives reload.
   - Ölçüt: Nonblocking alerts and procedural event visuals expose counterplay.
@@ -440,10 +440,20 @@ Türler ve bağlantı kuralları: `ontology` komutu / `ONTOLOJİ.md`.
   - Ürettiği nesneler: yok
   - Etkin önkoşullar: yok
   - Kabul güncelliği: henüz doğrulanmadı · tamamlanma sayısı: 0
+  - Kontrol: stale evidence: src/presentation/HumanoidFactory.js
+- T-STAFF-LOW-POLY [review] Staff match the customer low-poly character style (kayıt: review)
+  - Ölçüt: All staff professions and simulation aliases share the chunky customer silhouette and face style.
+  - Ölçüt: Uniforms, tools, cargo and animated joints remain functional.
+  - Ölçüt: Visual preview, targeted animation checks and production build pass.
+  - İlgili nesneler: asset-staff-roster, asset-staff-animations-redesign
+  - Girdiler: yok
+  - Ürettiği nesneler: yok
+  - Etkin önkoşullar: yok
+  - Kabul güncelliği: henüz doğrulanmadı · tamamlanma sayısı: 0
 
 ## Çalışılabilir görevler
 
-T-PLAYER-LOW-POLY-DESIGN, T-DYNAMIC-WORLD-EVENTS
+T-PLAYER-LOW-POLY-DESIGN, T-STAFF-LOW-POLY
 
 ## Uyarılar
 
@@ -523,6 +533,7 @@ T-PLAYER-LOW-POLY-DESIGN, T-DYNAMIC-WORLD-EVENTS
 - T-LIVING-WORLD-VISUAL-PACKAGES: stale evidence: src/style.css
 - T-LIVING-WORLD-VISUAL-PACKAGES: stale evidence: src/presentation/WorldScene.js
 - T-LIVING-WORLD-VISUAL-PACKAGES: stale evidence: src/main.js
+- T-DYNAMIC-WORLD-EVENTS: stale evidence: src/presentation/HumanoidFactory.js
 
 ## Onarım işlemleri
 

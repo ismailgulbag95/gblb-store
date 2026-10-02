@@ -1,6 +1,6 @@
 # GBLB Store 3D Procedural World Transformation — Ontoloji
 
-Revizyon: 148. Canlı görünüm için `ontology` komutunu çalıştır.
+Revizyon: 151. Canlı görünüm için `ontology` komutunu çalıştır.
 
 ## Türler ve özellikler
 
@@ -145,6 +145,7 @@ Oklar kayıtlı ilişki yönüdür; değişiklik etkisinin yönü üstte ayrıca
 - **T-AUTOMATIC-FIXTURE-PLACEMENT — Varsayılan yer, yakın boş yer ve görünür bekleme kuyruğuyla güvenli yapı yerleşimi**: girdiler [], çıktılar [], durum needs_review.
 - **T-CONSTRUCTION-REVEAL — Progressive construction fences and opening reveal**: girdiler [], çıktılar [], durum needs_review.
 - **T-LIVING-WORLD-VISUAL-PACKAGES — Staged visual foundation, retail, ecology and character feedback**: girdiler [], çıktılar [], durum needs_review.
-- **T-DYNAMIC-WORLD-EVENTS — Dynamic positive events and recoverable crises**: girdiler [], çıktılar [], durum review.
+- **T-DYNAMIC-WORLD-EVENTS — Dynamic positive events and recoverable crises**: girdiler [], çıktılar [], durum needs_review.
+- **T-STAFF-LOW-POLY — Staff match the customer low-poly character style**: girdiler [], çıktılar [], durum review.
 
 Etki yeniden inceleme ihtiyacıdır; nesnenin yanlış olduğu hükmü değildir.

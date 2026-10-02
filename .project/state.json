@@ -1,6 +1,6 @@
 {
   "schema_version": 3,
-  "revision": 148,
+  "revision": 151,
   "project": {
     "id": "gblb-store-3d",
     "name": "GBLB Store 3D Procedural World Transformation",
@@ -5833,6 +5833,112 @@
           "note": "Implemented and verified dynamic event package; 220 tests and production build passed. Browser observed repair completion and golden harvest; see dossier for limits.",
           "reviewer": "codex",
           "sha256": "bceb4896c00894b612363e4235db54370c838b5c6a3dfe088adeec4ae3ff1b95"
+        }
+      ],
+      "input_snapshot": {
+        "sha256": "15d0a670c72963b4b8557d9030cece57d060e980a2ba46d7a50a9596f1210125",
+        "manifest": {
+          "graph": {
+            "inputs": [],
+            "objects": [],
+            "object_types": [],
+            "relation_types": [],
+            "relations": [],
+            "files": []
+          },
+          "producer_generations": {},
+          "contract": {
+            "input_fields": {},
+            "acceptance_rules": [],
+            "support_groups": []
+          }
+        }
+      },
+      "generation": 0,
+      "review_reasons": [],
+      "run_snapshot": {
+        "sha256": "15d0a670c72963b4b8557d9030cece57d060e980a2ba46d7a50a9596f1210125",
+        "manifest": {
+          "graph": {
+            "inputs": [],
+            "objects": [],
+            "object_types": [],
+            "relation_types": [],
+            "relations": [],
+            "files": []
+          },
+          "producer_generations": {},
+          "contract": {
+            "input_fields": {},
+            "acceptance_rules": [],
+            "support_groups": []
+          }
+        }
+      },
+      "output_snapshot": {
+        "sha256": "5be4e3c99f05c10c081b279674e4a4da11ce339c86efcd152c698e0f08b68054",
+        "manifest": {
+          "inputs": [],
+          "objects": [],
+          "object_types": [],
+          "relation_types": [],
+          "relations": [],
+          "files": []
+        }
+      }
+    },
+    {
+      "id": "T-STAFF-LOW-POLY",
+      "title": "Staff match the customer low-poly character style",
+      "status": "review",
+      "object_ids": [
+        "asset-staff-roster",
+        "asset-staff-animations-redesign"
+      ],
+      "input_ids": [],
+      "output_ids": [],
+      "depends_on": [],
+      "decision_ids": [],
+      "acceptance": [
+        "All staff professions and simulation aliases share the chunky customer silhouette and face style.",
+        "Uniforms, tools, cargo and animated joints remain functional.",
+        "Visual preview, targeted animation checks and production build pass."
+      ],
+      "evidence": [
+        {
+          "path": "src/presentation/HumanoidFactory.js",
+          "criterion": 0,
+          "note": "Shared customer-style silhouette and preserved profession rig; 222 tests and build pass, browser catalogue and walking checked.",
+          "reviewer": "codex",
+          "sha256": "65cd21810759e666a3060b210a83bcaf36881e4d795b02216f679ffdfa73228c"
+        },
+        {
+          "path": "tests/staff-design.test.js",
+          "criterion": 1,
+          "note": "Shared customer-style silhouette and preserved profession rig; 222 tests and build pass, browser catalogue and walking checked.",
+          "reviewer": "codex",
+          "sha256": "5d7125809e0d1d7613b56cd3ce5d7d1646656e3f5113c6ee403e323eb125a80d"
+        },
+        {
+          "path": "tests/character-animation.test.js",
+          "criterion": 1,
+          "note": "Shared customer-style silhouette and preserved profession rig; 222 tests and build pass, browser catalogue and walking checked.",
+          "reviewer": "codex",
+          "sha256": "82c8ebc64581e033339ca23d11b3b9076822b76fbed766bba9d6adef0f501f27"
+        },
+        {
+          "path": "tests/fixtures/staff-design.html",
+          "criterion": 2,
+          "note": "Shared customer-style silhouette and preserved profession rig; 222 tests and build pass, browser catalogue and walking checked.",
+          "reviewer": "codex",
+          "sha256": "bb7df111dd8ef6606c34f713fdcc0022dd8ba6b42d5196bea3530686bfb5e60e"
+        },
+        {
+          "path": "docs/staff-low-poly-design.md",
+          "criterion": 2,
+          "note": "Shared customer-style silhouette and preserved profession rig; 222 tests and build pass, browser catalogue and walking checked.",
+          "reviewer": "codex",
+          "sha256": "16e3ecf75017dafec47a8a4f69e3ca1c28a5332237a251065cb3030561353549"
         }
       ],
       "input_snapshot": {
@@ -47299,6 +47405,311 @@
                   "note": "Implemented and verified dynamic event package; 220 tests and production build passed. Browser observed repair completion and golden harvest; see dossier for limits.",
                   "reviewer": "codex",
                   "sha256": "bceb4896c00894b612363e4235db54370c838b5c6a3dfe088adeec4ae3ff1b95"
+                }
+              ],
+              "input_snapshot": {
+                "sha256": "15d0a670c72963b4b8557d9030cece57d060e980a2ba46d7a50a9596f1210125",
+                "manifest": {
+                  "graph": {
+                    "inputs": [],
+                    "objects": [],
+                    "object_types": [],
+                    "relation_types": [],
+                    "relations": [],
+                    "files": []
+                  },
+                  "producer_generations": {},
+                  "contract": {
+                    "input_fields": {},
+                    "acceptance_rules": [],
+                    "support_groups": []
+                  }
+                }
+              },
+              "generation": 0,
+              "review_reasons": [],
+              "run_snapshot": {
+                "sha256": "15d0a670c72963b4b8557d9030cece57d060e980a2ba46d7a50a9596f1210125",
+                "manifest": {
+                  "graph": {
+                    "inputs": [],
+                    "objects": [],
+                    "object_types": [],
+                    "relation_types": [],
+                    "relations": [],
+                    "files": []
+                  },
+                  "producer_generations": {},
+                  "contract": {
+                    "input_fields": {},
+                    "acceptance_rules": [],
+                    "support_groups": []
+                  }
+                }
+              },
+              "output_snapshot": {
+                "sha256": "5be4e3c99f05c10c081b279674e4a4da11ce339c86efcd152c698e0f08b68054",
+                "manifest": {
+                  "inputs": [],
+                  "objects": [],
+                  "object_types": [],
+                  "relation_types": [],
+                  "relations": [],
+                  "files": []
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "revision": 149,
+      "action": "extend_model",
+      "actor": "codex",
+      "reason": "User requests low-poly staff matching existing customer style.",
+      "change": {
+        "objects": [],
+        "relations": [],
+        "tasks": [
+          {
+            "id": "T-STAFF-LOW-POLY",
+            "title": "Staff match the customer low-poly character style",
+            "status": "todo",
+            "object_ids": [
+              "asset-staff-roster",
+              "asset-staff-animations-redesign"
+            ],
+            "input_ids": [],
+            "output_ids": [],
+            "depends_on": [],
+            "decision_ids": [],
+            "acceptance": [
+              "All staff professions and simulation aliases share the chunky customer silhouette and face style.",
+              "Uniforms, tools, cargo and animated joints remain functional.",
+              "Visual preview, targeted animation checks and production build pass."
+            ],
+            "evidence": [],
+            "input_snapshot": null,
+            "generation": 0,
+            "review_reasons": []
+          }
+        ],
+        "impact": {
+          "changed_objects": [],
+          "changed_relations": [],
+          "affected_objects": [],
+          "paths": {},
+          "affected_tasks": []
+        },
+        "task_changes": [
+          {
+            "task_id": "T-STAFF-LOW-POLY",
+            "before": null,
+            "after": {
+              "id": "T-STAFF-LOW-POLY",
+              "title": "Staff match the customer low-poly character style",
+              "status": "todo",
+              "object_ids": [
+                "asset-staff-roster",
+                "asset-staff-animations-redesign"
+              ],
+              "input_ids": [],
+              "output_ids": [],
+              "depends_on": [],
+              "decision_ids": [],
+              "acceptance": [
+                "All staff professions and simulation aliases share the chunky customer silhouette and face style.",
+                "Uniforms, tools, cargo and animated joints remain functional.",
+                "Visual preview, targeted animation checks and production build pass."
+              ],
+              "evidence": [],
+              "input_snapshot": null,
+              "generation": 0,
+              "review_reasons": []
+            }
+          }
+        ]
+      }
+    },
+    {
+      "revision": 150,
+      "action": "start_task",
+      "actor": "codex",
+      "reason": "Update shared silhouette and profession hats; preserve existing rigs.",
+      "change": {
+        "task_changes": [
+          {
+            "task_id": "T-STAFF-LOW-POLY",
+            "before": {
+              "id": "T-STAFF-LOW-POLY",
+              "title": "Staff match the customer low-poly character style",
+              "status": "todo",
+              "object_ids": [
+                "asset-staff-roster",
+                "asset-staff-animations-redesign"
+              ],
+              "input_ids": [],
+              "output_ids": [],
+              "depends_on": [],
+              "decision_ids": [],
+              "acceptance": [
+                "All staff professions and simulation aliases share the chunky customer silhouette and face style.",
+                "Uniforms, tools, cargo and animated joints remain functional.",
+                "Visual preview, targeted animation checks and production build pass."
+              ],
+              "evidence": [],
+              "input_snapshot": null,
+              "generation": 0,
+              "review_reasons": []
+            },
+            "after": {
+              "id": "T-STAFF-LOW-POLY",
+              "title": "Staff match the customer low-poly character style",
+              "status": "doing",
+              "object_ids": [
+                "asset-staff-roster",
+                "asset-staff-animations-redesign"
+              ],
+              "input_ids": [],
+              "output_ids": [],
+              "depends_on": [],
+              "decision_ids": [],
+              "acceptance": [
+                "All staff professions and simulation aliases share the chunky customer silhouette and face style.",
+                "Uniforms, tools, cargo and animated joints remain functional.",
+                "Visual preview, targeted animation checks and production build pass."
+              ],
+              "evidence": [],
+              "input_snapshot": null,
+              "generation": 0,
+              "review_reasons": [],
+              "run_snapshot": {
+                "sha256": "15d0a670c72963b4b8557d9030cece57d060e980a2ba46d7a50a9596f1210125",
+                "manifest": {
+                  "graph": {
+                    "inputs": [],
+                    "objects": [],
+                    "object_types": [],
+                    "relation_types": [],
+                    "relations": [],
+                    "files": []
+                  },
+                  "producer_generations": {},
+                  "contract": {
+                    "input_fields": {},
+                    "acceptance_rules": [],
+                    "support_groups": []
+                  }
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "revision": 151,
+      "action": "submit_evidence",
+      "actor": "codex",
+      "reason": "Low-poly staff implemented and verified; user review pending.",
+      "change": {
+        "task_changes": [
+          {
+            "task_id": "T-STAFF-LOW-POLY",
+            "before": {
+              "id": "T-STAFF-LOW-POLY",
+              "title": "Staff match the customer low-poly character style",
+              "status": "doing",
+              "object_ids": [
+                "asset-staff-roster",
+                "asset-staff-animations-redesign"
+              ],
+              "input_ids": [],
+              "output_ids": [],
+              "depends_on": [],
+              "decision_ids": [],
+              "acceptance": [
+                "All staff professions and simulation aliases share the chunky customer silhouette and face style.",
+                "Uniforms, tools, cargo and animated joints remain functional.",
+                "Visual preview, targeted animation checks and production build pass."
+              ],
+              "evidence": [],
+              "input_snapshot": null,
+              "generation": 0,
+              "review_reasons": [],
+              "run_snapshot": {
+                "sha256": "15d0a670c72963b4b8557d9030cece57d060e980a2ba46d7a50a9596f1210125",
+                "manifest": {
+                  "graph": {
+                    "inputs": [],
+                    "objects": [],
+                    "object_types": [],
+                    "relation_types": [],
+                    "relations": [],
+                    "files": []
+                  },
+                  "producer_generations": {},
+                  "contract": {
+                    "input_fields": {},
+                    "acceptance_rules": [],
+                    "support_groups": []
+                  }
+                }
+              }
+            },
+            "after": {
+              "id": "T-STAFF-LOW-POLY",
+              "title": "Staff match the customer low-poly character style",
+              "status": "review",
+              "object_ids": [
+                "asset-staff-roster",
+                "asset-staff-animations-redesign"
+              ],
+              "input_ids": [],
+              "output_ids": [],
+              "depends_on": [],
+              "decision_ids": [],
+              "acceptance": [
+                "All staff professions and simulation aliases share the chunky customer silhouette and face style.",
+                "Uniforms, tools, cargo and animated joints remain functional.",
+                "Visual preview, targeted animation checks and production build pass."
+              ],
+              "evidence": [
+                {
+                  "path": "src/presentation/HumanoidFactory.js",
+                  "criterion": 0,
+                  "note": "Shared customer-style silhouette and preserved profession rig; 222 tests and build pass, browser catalogue and walking checked.",
+                  "reviewer": "codex",
+                  "sha256": "65cd21810759e666a3060b210a83bcaf36881e4d795b02216f679ffdfa73228c"
+                },
+                {
+                  "path": "tests/staff-design.test.js",
+                  "criterion": 1,
+                  "note": "Shared customer-style silhouette and preserved profession rig; 222 tests and build pass, browser catalogue and walking checked.",
+                  "reviewer": "codex",
+                  "sha256": "5d7125809e0d1d7613b56cd3ce5d7d1646656e3f5113c6ee403e323eb125a80d"
+                },
+                {
+                  "path": "tests/character-animation.test.js",
+                  "criterion": 1,
+                  "note": "Shared customer-style silhouette and preserved profession rig; 222 tests and build pass, browser catalogue and walking checked.",
+                  "reviewer": "codex",
+                  "sha256": "82c8ebc64581e033339ca23d11b3b9076822b76fbed766bba9d6adef0f501f27"
+                },
+                {
+                  "path": "tests/fixtures/staff-design.html",
+                  "criterion": 2,
+                  "note": "Shared customer-style silhouette and preserved profession rig; 222 tests and build pass, browser catalogue and walking checked.",
+                  "reviewer": "codex",
+                  "sha256": "bb7df111dd8ef6606c34f713fdcc0022dd8ba6b42d5196bea3530686bfb5e60e"
+                },
+                {
+                  "path": "docs/staff-low-poly-design.md",
+                  "criterion": 2,
+                  "note": "Shared customer-style silhouette and preserved profession rig; 222 tests and build pass, browser catalogue and walking checked.",
+                  "reviewer": "codex",
+                  "sha256": "16e3ecf75017dafec47a8a4f69e3ca1c28a5332237a251065cb3030561353549"
                 }
               ],
               "input_snapshot": {
