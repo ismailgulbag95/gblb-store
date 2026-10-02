@@ -8,7 +8,7 @@ export const ZONES = {
   farm: { minX: -25.5, maxX: -4.5, minZ: -8.5, maxZ: 8.5 },
   market: { minX: -3.5, maxX: 13.5, minZ: -8.5, maxZ: 8.5 },
   restaurant: { minX: -47.5, maxX: -26.5, minZ: -8.5, maxZ: 8.5 },
-  staff: { minX: -3.5, maxX: 13.5, minZ: -20, maxZ: -9 },
+  staff: { minX: -4.5, maxX: 17.5, minZ: -20.5, maxZ: -9 },
   logistics: { minX: 14.5, maxX: 26.5, minZ: -8, maxZ: 8 },
 };
 

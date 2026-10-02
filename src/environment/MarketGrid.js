@@ -208,6 +208,7 @@ export class MarketGrid {
     this.staffPlotTrees.push(this.props.createOakTree(-3.5, -15, 1.1));
     this.staffPlotTrees.push(this.props.createOakTree(2, -14, 1.2));
     this.staffPlotTrees.push(this.props.createOakTree(12, -14, 1.0));
+    this.staffPlotTrees.push(this.props.createOakTree(15.5, -15, 1.1));
     this.props.createPineTree(30, -5, 1.1);
     this.props.createPineTree(30, 4, 1.2);
     this.props.createPineTree(-37, -10, 1.2);
@@ -1074,18 +1075,140 @@ export class MarketGrid {
     if (cleared && !this.staffLand && (sceneBuildBudget?.take?.() ?? true)) {
       this.staffLand = new THREE.Group();
       this.staffLand.name = 'staff-north-land';
-      const floor = new THREE.Mesh(new THREE.PlaneGeometry(17, 11),
-        createGrassMaterial(GAME_CONFIG.COLORS.FLOOR_FARM, 2.125, 1.375));
+
+      // 1. Lush Green Lawn Base (expanded across x: -4.5 to 17.5, z: -20.5 to -9.5)
+      const floor = new THREE.Mesh(
+        new THREE.PlaneGeometry(22, 11),
+        createGrassMaterial(GAME_CONFIG.COLORS.FLOOR_FARM, 2.75, 1.375),
+      );
       floor.rotation.x = -Math.PI / 2;
-      floor.position.set(5, 0.01, -14.5);
+      floor.position.set(6.5, 0.01, -15.0);
       floor.receiveShadow = true;
       this.staffLand.add(floor);
-      const path = new THREE.Mesh(new THREE.PlaneGeometry(17, 1.7),
-        new THREE.MeshStandardMaterial({ color: 0xe0ddcc, roughness: 0.85 }));
-      path.rotation.x = -Math.PI / 2;
-      path.position.set(5, 0.025, -11);
-      path.receiveShadow = true;
-      this.staffLand.add(path);
+
+      // 2. Paved Promenade Walkway along the south edge connecting all facility front porches
+      const stoneMat = new THREE.MeshStandardMaterial({ color: 0xe0ddcc, roughness: 0.85 });
+      const mainPath = new THREE.Mesh(new THREE.PlaneGeometry(21.4, 1.8), stoneMat);
+      mainPath.rotation.x = -Math.PI / 2;
+      mainPath.position.set(6.5, 0.025, -11.2);
+      mainPath.receiveShadow = true;
+      this.staffLand.add(mainPath);
+
+      // Connecting stone pavers leading north from the promenade to each facility landing
+      for (const fx of [0, 5, 10, 14.5]) {
+        const branch = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 1.3), stoneMat);
+        branch.rotation.x = -Math.PI / 2;
+        branch.position.set(fx, 0.026, -12.4);
+        branch.receiveShadow = true;
+        this.staffLand.add(branch);
+      }
+
+      // Decorative stone pavers under the fountain plaza (west)
+      const plazaPad = new THREE.Mesh(
+        new THREE.CylinderGeometry(1.9, 1.9, 0.03, 16),
+        new THREE.MeshStandardMaterial({ color: 0xd2d7d9, roughness: 0.8 }),
+      );
+      plazaPad.position.set(-2.6, 0.028, -11.4);
+      plazaPad.receiveShadow = true;
+      this.staffLand.add(plazaPad);
+
+      // Wooden deck pad for the recreation / table tennis area (east)
+      const recPad = new THREE.Mesh(
+        new THREE.BoxGeometry(3.2, 0.04, 2.2),
+        new THREE.MeshStandardMaterial({ color: 0xa07855, roughness: 0.75 }),
+      );
+      recPad.position.set(12.5, 0.028, -11.4);
+      recPad.receiveShadow = true;
+      this.staffLand.add(recPad);
+
+      // 3. Perimeter Wooden Fencing along North, West, East, and South borders
+      const fenceMat = new THREE.MeshStandardMaterial({ color: 0x8d6e63, roughness: 0.8 });
+      const fencePostGeo = new THREE.BoxGeometry(0.12, 1.1, 0.12);
+      const addFenceSection = (startX, startZ, endX, endZ) => {
+        const dx = endX - startX;
+        const dz = endZ - startZ;
+        const len = Math.hypot(dx, dz);
+        const angle = Math.atan2(dx, dz);
+        const posts = Math.max(2, Math.round(len / 2.2) + 1);
+        for (let p = 0; p < posts; p++) {
+          const t = p / (posts - 1);
+          const post = new THREE.Mesh(fencePostGeo, fenceMat);
+          post.position.set(startX + dx * t, 0.55, startZ + dz * t);
+          post.castShadow = true;
+          this.staffLand.add(post);
+        }
+        for (const ry of [0.42, 0.82]) {
+          const rail = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.08, len), fenceMat);
+          rail.position.set((startX + endX) / 2, ry, (startZ + endZ) / 2);
+          rail.rotation.y = angle;
+          rail.castShadow = true;
+          this.staffLand.add(rail);
+        }
+      };
+
+      // North boundary fence
+      addFenceSection(-4.3, -20.4, 17.3, -20.4);
+      // West boundary fence
+      addFenceSection(-4.3, -20.4, -4.3, -9.6);
+      // East boundary fence
+      addFenceSection(17.3, -20.4, 17.3, -9.6);
+      // South boundary fence flanking the entrance gate
+      addFenceSection(-4.3, -9.6, 3.2, -9.6);
+      addFenceSection(6.8, -9.6, 17.3, -9.6);
+
+      // 4. Procedural Gate Arch, Water Fountain, and Table Tennis
+      if (this.props?.createStaffCampusGateModel) {
+        const gate = this.props.createStaffCampusGateModel();
+        gate.position.set(5.0, 0, -9.6);
+        this.staffLand.add(gate);
+      }
+      if (this.props?.createGardenFountainModel) {
+        const fountain = this.props.createGardenFountainModel();
+        fountain.position.set(-2.6, 0, -11.4);
+        this.staffLand.add(fountain);
+      }
+      if (this.props?.createPingPongTableModel) {
+        const table = this.props.createPingPongTableModel();
+        table.position.set(12.5, 0, -11.4);
+        this.staffLand.add(table);
+      }
+
+      // 5. Park Benches & Streetlamps along the Campus Promenade
+      if (this.props?.createParkBenchModel) {
+        const bench1 = this.props.createParkBenchModel();
+        bench1.position.set(2.5, 0, -11.2);
+        this.staffLand.add(bench1);
+
+        const bench2 = this.props.createParkBenchModel();
+        bench2.position.set(7.5, 0, -11.2);
+        this.staffLand.add(bench2);
+      }
+
+      if (this.props?.createModernStreetLampModel) {
+        const lamp1 = this.props.createModernStreetLampModel();
+        lamp1.position.set(-1.5, 0, -10.4);
+        this.staffLand.add(lamp1);
+
+        const lamp2 = this.props.createModernStreetLampModel();
+        lamp2.position.set(11.0, 0, -10.4);
+        this.staffLand.add(lamp2);
+      }
+
+      // 6. Flower Planters and Decorative Shrubs along the North Perimeter
+      const planterWoodMat = new THREE.MeshStandardMaterial({ color: 0x795548, roughness: 0.8 });
+      const bloomColors = [0xff4757, 0xffa502, 0x2ed573, 0x1e90ff, 0x9b59b6];
+      for (let i = 0; i < 5; i++) {
+        const px = -3.2 + i * 4.8;
+        const planter = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.28, 0.45), planterWoodMat);
+        planter.position.set(px, 0.14, -19.9);
+        const blooms = new THREE.Mesh(
+          new THREE.DodecahedronGeometry(0.24, 0),
+          new THREE.MeshStandardMaterial({ color: bloomColors[i % bloomColors.length], roughness: 0.6 }),
+        );
+        blooms.position.set(px, 0.38, -19.9);
+        this.staffLand.add(planter, blooms);
+      }
+
       this.scene.add(this.staffLand);
     } else if (!cleared && this.staffLand) {
       disposeStaffFacilityModel(this.staffLand);

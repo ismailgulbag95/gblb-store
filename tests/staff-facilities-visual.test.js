@@ -7,8 +7,8 @@ import { createWorkerMesh, updateWorkerEnergyBar } from '../src/presentation/Hum
 import { CharacterAnimator } from '../src/presentation/CharacterAnimator.js';
 import { Item3DFactory } from '../src/presentation/Item3DFactory.js';
 
-const definitions = ['wc', 'rest', 'kitchen'].map((id, index) => ({
-  id, x: index * 5, z: -15, width: 3.2, depth: 4,
+const definitions = ['wc', 'rest', 'kitchen', 'gazebo'].map((id, index) => ({
+  id, x: id === 'gazebo' ? 14.5 : index * 5, z: -15, width: 3.2, depth: 4,
 }));
 
 test('facilities use distinct procedural fixtures, north footprints and usable entrance rest spots', () => {

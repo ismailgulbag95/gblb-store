@@ -64,9 +64,9 @@ export function workerWorkSpeed(worker) {
 
 export function chooseStaffFacility(state, worker) {
   const critical = worker.energy <= (STAFF_ARCHETYPES[worker.archetypeId]?.breakAt ?? 20);
-  const desired = critical ? ['rest', 'kitchen', 'wc']
-    : worker.comfort < 25 ? ['wc'] : worker.hunger < 25 || worker.morale < 25 ? ['kitchen'] : [];
-  return desired.map(id => STAFF_FACILITIES[id]).find(facility => getStaffFacilityAccess(state, facility.id)
+  const desired = critical ? ['rest', 'gazebo', 'kitchen', 'wc']
+    : worker.comfort < 25 ? ['wc', 'gazebo'] : worker.hunger < 25 || worker.morale < 25 ? ['kitchen', 'gazebo'] : ['gazebo', 'rest'];
+  return desired.map(id => STAFF_FACILITIES[id]).filter(Boolean).find(facility => getStaffFacilityAccess(state, facility.id)
     && state.workers.filter(other => other.id !== worker.id && other.break?.facilityId === facility.id
       && other.break.phase !== 'returning').length < facility.capacity) ?? null;
 }
@@ -75,10 +75,12 @@ export function chooseStaffFacility(state, worker) {
 export function recoverWorker(worker, facilityId) {
   const rest = worker.break;
   rest.ticks = (rest.ticks ?? 0) + 1;
-  worker.energy = clampNeed(worker.energy + (facilityId === 'rest' ? 0.55 : 0.15));
-  worker.morale = clampNeed(worker.morale + (facilityId === 'kitchen' ? 0.7 : 0.15));
+  worker.energy = clampNeed(worker.energy + (facilityId === 'rest' ? 0.55 : facilityId === 'gazebo' ? 0.35 : 0.15));
+  worker.morale = clampNeed(worker.morale + (facilityId === 'kitchen' ? 0.7 : facilityId === 'gazebo' ? 0.85 : 0.15));
   if (facilityId === 'wc') worker.comfort = clampNeed(worker.comfort + 2);
   if (facilityId === 'kitchen') worker.hunger = clampNeed(worker.hunger + 1.2);
+  if (facilityId === 'gazebo') worker.comfort = clampNeed(worker.comfort + 0.9);
   return facilityId === 'rest' ? worker.energy >= 85
+    : facilityId === 'gazebo' ? (worker.energy >= 70 && worker.morale >= 85)
     : facilityId === 'wc' ? rest.ticks >= 45 : rest.ticks >= 75;
 }

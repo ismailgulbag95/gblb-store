@@ -187,6 +187,8 @@ export const STAFF_FACILITIES = Object.freeze({
     width: 3.2, depth: 4, capacity: 2, effect: 'Enerji yenileme', effectEn: 'Energy recovery' },
   kitchen: { id: 'kitchen', title: 'Personel mutfağı', titleEn: 'Staff kitchen', price: 350, x: 10, z: -15,
     width: 3.2, depth: 4, capacity: 2, effect: 'Açlık ve moral yenileme', effectEn: 'Hunger and morale recovery' },
+  gazebo: { id: 'gazebo', title: 'Personel Çardağı', titleEn: 'Staff Gazebo', price: 280, x: 14.5, z: -15,
+    width: 3.2, depth: 4, capacity: 2, effect: 'Moral ve konfor yenileme', effectEn: 'Morale and comfort recovery' },
 });
 
 export const FARM_AD_UPGRADE_IDS = Object.freeze(UPGRADES

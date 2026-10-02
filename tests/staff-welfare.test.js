@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createInitialState, hydrateState, SAVE_VERSION } from '../src/domain/state.js';
 import { STAFF_ARCHETYPES, STAFF_FACILITIES, staffDailySalaryAtoms, MONEY_ATOMS } from '../src/domain/catalog.js';
-import { generateStaffCandidates, normalizeWorkerWelfare, tickWorkerNeeds, workerWorkSpeed, chooseStaffFacility } from '../src/domain/staff.js';
+import { generateStaffCandidates, normalizeWorkerWelfare, tickWorkerNeeds, workerWorkSpeed, chooseStaffFacility, recoverWorker } from '../src/domain/staff.js';
 import { getStaffFacilityAccess, getStaffFacilityCollisionBoxes, ZONES } from '../src/domain/layout.js';
 import { advanceSimulation } from '../src/domain/simulation.js';
 import { GameApplication } from '../src/application/GameApplication.js';
@@ -228,3 +228,39 @@ test('chef and waiter selection applies a single hiring fee and individual wages
     assert.equal(employee.archetypeId, candidate.archetypeId);
   }
 });
+
+test('gazebo facility can be purchased, accessed within campus bounds, and restores morale and comfort during breaks', () => {
+  const state = createInitialState();
+  openFacilities(state, ['wc', 'rest', 'kitchen', 'gazebo']);
+
+  // All 4 facilities must be strictly inside ZONES.staff
+  const boxes = getStaffFacilityCollisionBoxes(state);
+  assert.equal(boxes.length, 4);
+  for (const box of boxes) {
+    assert.ok(box.minX >= ZONES.staff.minX && box.maxX <= ZONES.staff.maxX);
+    assert.ok(box.minZ >= ZONES.staff.minZ && box.maxZ <= ZONES.staff.maxZ);
+    const access = getStaffFacilityAccess(state, box.id.slice(6));
+    assert.ok(access.z > box.maxZ && access.z <= -9);
+    assert.equal(access.z, -12.4);
+  }
+
+  // Gazebo has capacity 2 with distinct slots
+  const slot0 = getStaffFacilityAccess(state, 'gazebo', 0);
+  const slot1 = getStaffFacilityAccess(state, 'gazebo', 1);
+  assert.equal(slot0.x, 14.5 - 0.65);
+  assert.equal(slot1.x, 14.5 + 0.65);
+
+  // Recovery test: gazebo restores comfort, morale, and moderate energy
+  const w = worker({ energy: 40, morale: 30, comfort: 20, break: { facilityId: 'gazebo', phase: 'resting', returnTo: { x: 0, z: 0 }, ticks: 0 } });
+  const doneBefore = recoverWorker(w, 'gazebo');
+  assert.equal(doneBefore, false);
+  assert.equal(w.energy, 40.35);
+  assert.equal(w.morale, 30.85);
+  assert.equal(w.comfort, 20.9);
+
+  // Gazebo rest finishes once energy >= 70 and morale >= 85
+  w.energy = 72;
+  w.morale = 86;
+  assert.equal(recoverWorker(w, 'gazebo'), true);
+});
+

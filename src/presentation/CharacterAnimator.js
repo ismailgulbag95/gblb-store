@@ -130,7 +130,7 @@ export class CharacterAnimator {
       && !this.action && !moving && this.path.length === 0;
     const sitting = (['waiting-meal', 'eating', 'ready-tip'].includes(this.entity.phase)
       && (!this.action || this.action.type === 'receive'))
-      || onBreak && this.entity.break.facilityId === 'rest';
+      || onBreak && (this.entity.break.facilityId === 'rest' || this.entity.break.facilityId === 'gazebo');
     const fatigue = this.kind === 'worker' && !onBreak
       ? clamp((20 - (this.entity.energy ?? 100)) / 20, 0, 1) : 0;
     let facing = moving ? this.travelFacing : this.entity.facing ?? 0;
@@ -173,7 +173,7 @@ export class CharacterAnimator {
     a.head.rotation.x = THREE.MathUtils.lerp(a.head.rotation.x, sitting ? 0.14 : 0.02 + fatigue * 0.09, blend);
     a.head.rotation.y = THREE.MathUtils.lerp(a.head.rotation.y, Math.sin(time * 0.7) * 0.055, blend);
     a.head.rotation.z = THREE.MathUtils.lerp(a.head.rotation.z, 0, blend);
-    if (onBreak && this.entity.break.facilityId === 'kitchen') {
+    if (onBreak && (this.entity.break.facilityId === 'kitchen' || this.entity.break.facilityId === 'gazebo')) {
       a.arms[1].rotation.x = THREE.MathUtils.lerp(a.arms[1].rotation.x, -0.74, blend);
       a.elbows[1].rotation.x = THREE.MathUtils.lerp(a.elbows[1].rotation.x, -1.25, blend);
     }
@@ -358,7 +358,8 @@ export class CharacterAnimator {
     const a = this.actor;
     if (a.propObjects.breakMug) {
       a.propObjects.breakMug.visible = this.kind === 'worker'
-        && this.entity.break?.phase === 'resting' && this.entity.break.facilityId === 'kitchen'
+        && this.entity.break?.phase === 'resting'
+        && (this.entity.break.facilityId === 'kitchen' || this.entity.break.facilityId === 'gazebo')
         && !this.action && this.path.length === 0;
     }
     if (a.propObjects.box) {

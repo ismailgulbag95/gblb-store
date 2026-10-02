@@ -850,10 +850,8 @@ export class EnvironmentProps {
     return group;
   }
 
-  createModernStreetLamp(x, z) {
+  createModernStreetLampModel() {
     const group = new THREE.Group();
-    group.position.set(x, 0, z);
-
     const darkMat = new THREE.MeshStandardMaterial({ color: 0x2f3542, metalness: 0.8, roughness: 0.3 });
     const ledMat = new THREE.MeshBasicMaterial({ color: 0xfffa65 });
 
@@ -885,6 +883,12 @@ export class EnvironmentProps {
       ledPane.position.set(side * 0.82, 4.2, 0);
       group.add(ledPane);
     }
+    return group;
+  }
+
+  createModernStreetLamp(x, z) {
+    const group = this.createModernStreetLampModel();
+    group.position.set(x, 0, z);
 
     // Warm downward PointLight
     const pointLight = new THREE.PointLight(0xfffa65, 0.85, 9.0);
@@ -902,11 +906,8 @@ export class EnvironmentProps {
     return group;
   }
 
-  createParkBench(x, z, rotationY = 0) {
+  createParkBenchModel() {
     const group = new THREE.Group();
-    group.position.set(x, 0, z);
-    group.rotation.y = rotationY;
-
     const ironMat = new THREE.MeshStandardMaterial({ color: 0x1e272e, roughness: 0.6, metalness: 0.7 });
     const woodMat = new THREE.MeshStandardMaterial({ color: 0xb87333, roughness: 0.7 });
 
@@ -935,7 +936,13 @@ export class EnvironmentProps {
       backSlat.castShadow = true;
       group.add(backSlat);
     }
+    return group;
+  }
 
+  createParkBench(x, z, rotationY = 0) {
+    const group = this.createParkBenchModel();
+    group.position.set(x, 0, z);
+    group.rotation.y = rotationY;
     this.scene.add(group);
     return group;
   }
@@ -4584,6 +4591,272 @@ export class EnvironmentProps {
 
     this.scene.add(group);
     return group;
+  }
+
+  // --- 24. STAFF WELFARE & LIVING GROUNDS PROPS ---
+  createGardenFountainModel(scale = 1.0) {
+    const group = new THREE.Group();
+    group.name = 'garden-fountain';
+    group.scale.set(scale, scale, scale);
+
+    const stoneMat = new THREE.MeshStandardMaterial({ color: 0xb0bec5, roughness: 0.85 });
+    const darkStone = new THREE.MeshStandardMaterial({ color: 0x78909c, roughness: 0.9 });
+    const waterMat = new THREE.MeshStandardMaterial({
+      color: 0x29b6f6,
+      roughness: 0.1,
+      metalness: 0.15,
+      transparent: true,
+      opacity: 0.88,
+    });
+    const sprayMat = new THREE.MeshStandardMaterial({
+      color: 0xe1f5fe,
+      roughness: 0.1,
+      metalness: 0.2,
+      transparent: true,
+      opacity: 0.92,
+    });
+
+    const baseGeo = new THREE.CylinderGeometry(1.4, 1.5, 0.22, 16);
+    const base = new THREE.Mesh(baseGeo, stoneMat);
+    base.position.y = 0.11;
+    base.receiveShadow = true;
+    group.add(base);
+
+    const basinGeo = new THREE.CylinderGeometry(1.22, 1.25, 0.18, 16);
+    const basin = new THREE.Mesh(basinGeo, darkStone);
+    basin.position.y = 0.29;
+    basin.receiveShadow = true;
+    group.add(basin);
+
+    const waterGeo = new THREE.CylinderGeometry(1.18, 1.18, 0.04, 16);
+    const water = new THREE.Mesh(waterGeo, waterMat);
+    water.position.y = 0.36;
+    group.add(water);
+
+    const colGeo = new THREE.CylinderGeometry(0.24, 0.36, 0.75, 12);
+    const col = new THREE.Mesh(colGeo, stoneMat);
+    col.position.y = 0.72;
+    col.castShadow = true;
+    group.add(col);
+
+    const midBowlGeo = new THREE.CylinderGeometry(0.68, 0.38, 0.2, 12);
+    const midBowl = new THREE.Mesh(midBowlGeo, stoneMat);
+    midBowl.position.y = 1.1;
+    midBowl.castShadow = true;
+    group.add(midBowl);
+
+    const midWaterGeo = new THREE.CylinderGeometry(0.64, 0.64, 0.04, 12);
+    const midWater = new THREE.Mesh(midWaterGeo, waterMat);
+    midWater.position.y = 1.19;
+    group.add(midWater);
+
+    const finialGeo = new THREE.CylinderGeometry(0.1, 0.18, 0.32, 8);
+    const finial = new THREE.Mesh(finialGeo, darkStone);
+    finial.position.y = 1.34;
+    group.add(finial);
+
+    const sprayGeo = new THREE.SphereGeometry(0.14, 8, 8);
+    const spray = new THREE.Mesh(sprayGeo, sprayMat);
+    spray.position.y = 1.54;
+    group.add(spray);
+
+    const potMat = new THREE.MeshStandardMaterial({ color: 0xd87d4a, roughness: 0.85 });
+    const flowerMat = new THREE.MeshStandardMaterial({ color: 0xff6b81, roughness: 0.7 });
+    for (let i = 0; i < 4; i++) {
+      const angle = (i * Math.PI) / 2 + Math.PI / 4;
+      const urnX = Math.cos(angle) * 1.6;
+      const urnZ = Math.sin(angle) * 1.6;
+      const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.11, 0.22, 8), potMat);
+      pot.position.set(urnX, 0.11, urnZ);
+      const fl = new THREE.Mesh(new THREE.DodecahedronGeometry(0.14, 0), flowerMat);
+      fl.position.set(urnX, 0.26, urnZ);
+      group.add(pot, fl);
+    }
+
+    return group;
+  }
+
+  createGardenFountain(x, z, scale = 1.0) {
+    const fountain = this.createGardenFountainModel(scale);
+    fountain.position.set(x, 0, z);
+    this.scene.add(fountain);
+    return fountain;
+  }
+
+  createPingPongTableModel() {
+    const group = new THREE.Group();
+    group.name = 'ping-pong-table';
+
+    const tableMat = new THREE.MeshStandardMaterial({ color: 0x1b5a90, roughness: 0.4 });
+    const whiteLineMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+    const netMat = new THREE.MeshStandardMaterial({ color: 0x37474f, roughness: 0.8 });
+    const metalMat = new THREE.MeshStandardMaterial({ color: 0x263238, roughness: 0.5, metalness: 0.7 });
+    const woodMat = new THREE.MeshStandardMaterial({ color: 0x8d6e63, roughness: 0.7 });
+    const redRubberMat = new THREE.MeshStandardMaterial({ color: 0xd32f2f, roughness: 0.6 });
+    const blackRubberMat = new THREE.MeshStandardMaterial({ color: 0x212121, roughness: 0.6 });
+
+    const topGeo = new THREE.BoxGeometry(2.1, 0.05, 1.15);
+    const top = new THREE.Mesh(topGeo, tableMat);
+    top.position.y = 0.72;
+    top.castShadow = true;
+    top.receiveShadow = true;
+    group.add(top);
+
+    const borderLongGeo = new THREE.BoxGeometry(2.1, 0.005, 0.03);
+    for (const sz of [-0.56, 0.56]) {
+      const line = new THREE.Mesh(borderLongGeo, whiteLineMat);
+      line.position.set(0, 0.748, sz);
+      group.add(line);
+    }
+    const borderShortGeo = new THREE.BoxGeometry(0.03, 0.005, 1.15);
+    for (const sx of [-1.035, 1.035]) {
+      const line = new THREE.Mesh(borderShortGeo, whiteLineMat);
+      line.position.set(sx, 0.748, 0);
+      group.add(line);
+    }
+    const centerLine = new THREE.Mesh(new THREE.BoxGeometry(2.1, 0.005, 0.02), whiteLineMat);
+    centerLine.position.set(0, 0.748, 0);
+    group.add(centerLine);
+
+    const netMesh = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.14, 1.25), netMat);
+    netMesh.position.set(0, 0.81, 0);
+    netMesh.castShadow = true;
+    group.add(netMesh);
+
+    const netTop = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.02, 1.25), whiteLineMat);
+    netTop.position.set(0, 0.88, 0);
+    group.add(netTop);
+
+    for (const sx of [-0.85, 0.85]) {
+      for (const sz of [-0.48, 0.48]) {
+        const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.69, 8), metalMat);
+        leg.position.set(sx, 0.345, sz);
+        leg.castShadow = true;
+        group.add(leg);
+      }
+      const crossBeam = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.04, 0.96), metalMat);
+      crossBeam.position.set(sx, 0.18, 0);
+      group.add(crossBeam);
+    }
+
+    const paddle1 = new THREE.Group();
+    paddle1.position.set(-0.6, 0.755, 0.25);
+    paddle1.rotation.y = 0.4;
+    const blade1 = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.015, 12), redRubberMat);
+    const handle1 = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.014, 0.09), woodMat);
+    handle1.position.z = 0.1;
+    paddle1.add(blade1, handle1);
+    group.add(paddle1);
+
+    const paddle2 = new THREE.Group();
+    paddle2.position.set(0.65, 0.755, -0.22);
+    paddle2.rotation.y = -0.35;
+    const blade2 = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.015, 12), blackRubberMat);
+    const handle2 = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.014, 0.09), woodMat);
+    handle2.position.z = 0.1;
+    paddle2.add(blade2, handle2);
+    group.add(paddle2);
+
+    const ball = new THREE.Mesh(new THREE.SphereGeometry(0.035, 8, 8), whiteLineMat);
+    ball.position.set(0.35, 0.78, 0.15);
+    group.add(ball);
+
+    return group;
+  }
+
+  createPingPongTable(x, z, rotationY = 0) {
+    const table = this.createPingPongTableModel();
+    table.position.set(x, 0, z);
+    table.rotation.y = rotationY;
+    this.scene.add(table);
+    return table;
+  }
+
+  createStaffCampusGateModel() {
+    const group = new THREE.Group();
+    group.name = 'staff-campus-gate';
+
+    const woodMat = new THREE.MeshStandardMaterial({ color: 0x6d4c41, roughness: 0.8 });
+    const stoneMat = new THREE.MeshStandardMaterial({ color: 0x90a4ae, roughness: 0.9 });
+    const darkWood = new THREE.MeshStandardMaterial({ color: 0x4e342e, roughness: 0.75 });
+    const lampGlow = new THREE.MeshBasicMaterial({ color: 0xffe082 });
+
+    for (const sx of [-1.55, 1.55]) {
+      const stoneBase = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.35, 0.46), stoneMat);
+      stoneBase.position.set(sx, 0.175, 0);
+      stoneBase.receiveShadow = true;
+      group.add(stoneBase);
+
+      const col = new THREE.Mesh(new THREE.BoxGeometry(0.3, 2.5, 0.3), woodMat);
+      col.position.set(sx, 1.425, 0);
+      col.castShadow = true;
+      group.add(col);
+
+      const planter = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.22, 0.4), woodMat);
+      planter.position.set(sx + (sx < 0 ? -0.45 : 0.45), 0.11, 0);
+      const flowers = new THREE.Mesh(
+        new THREE.DodecahedronGeometry(0.18, 0),
+        new THREE.MeshStandardMaterial({ color: sx < 0 ? 0xff4757 : 0xffa502, roughness: 0.6 }),
+      );
+      flowers.position.set(sx + (sx < 0 ? -0.45 : 0.45), 0.28, 0);
+      group.add(planter, flowers);
+
+      const arm = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.04, 0.35), darkWood);
+      arm.position.set(sx, 2.2, 0.25);
+      const lantern = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.2, 0.14), lampGlow);
+      lantern.position.set(sx, 2.05, 0.4);
+      group.add(arm, lantern);
+    }
+
+    const beam = new THREE.Mesh(new THREE.BoxGeometry(3.6, 0.24, 0.36), darkWood);
+    beam.position.set(0, 2.65, 0);
+    beam.castShadow = true;
+    group.add(beam);
+
+    for (let i = -3; i <= 3; i++) {
+      const rafter = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.12, 0.7), woodMat);
+      rafter.position.set(i * 0.52, 2.8, 0);
+      group.add(rafter);
+    }
+
+    const signCanvas = createSafeCanvas(512, 128);
+    let signTex = null;
+    if (signCanvas) {
+      const ctx = signCanvas.getContext('2d');
+      ctx.fillStyle = '#1b3b2b';
+      ctx.fillRect(0, 0, 512, 128);
+      ctx.strokeStyle = '#27ae60';
+      ctx.lineWidth = 6;
+      ctx.strokeRect(6, 6, 500, 116);
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 28px Fredoka, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('GBLB PERSONEL YAŞAM ALANI', 256, 44);
+
+      ctx.fillStyle = '#f1c40f';
+      ctx.font = 'bold 16px sans-serif';
+      ctx.fillText('• WELFARE & SOCIAL CAMPUS •', 256, 88);
+      signTex = new THREE.CanvasTexture(signCanvas);
+    }
+
+    const signMat = signTex
+      ? new THREE.MeshBasicMaterial({ map: signTex, toneMapped: false })
+      : new THREE.MeshBasicMaterial({ color: 0x1b3b2b });
+    const sign = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 0.65), signMat);
+    sign.position.set(0, 2.2, 0.02);
+    group.add(sign);
+
+    return group;
+  }
+
+  createStaffCampusGate(x, z, rotationY = 0) {
+    const gate = this.createStaffCampusGateModel();
+    gate.position.set(x, 0, z);
+    gate.rotation.y = rotationY;
+    this.scene.add(gate);
+    return gate;
   }
 
   update(delta, time) {
