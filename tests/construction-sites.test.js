@@ -4,27 +4,27 @@ import * as THREE from 'three';
 import { ConstructionSites, CONSTRUCTION_SITES, constructionStatus, constructionPlotOccupied } from '../src/environment/ConstructionSites.js';
 import { createInitialState, hydrateState } from '../src/domain/state.js';
 
-const bakery = CONSTRUCTION_SITES.find(site => site.id === 'bakery');
+const restaurant = CONSTRUCTION_SITES.find(site => site.id === 'restaurant');
 
 test('screens yield to manually moved fixtures and decorations', () => {
   const state = createInitialState();
-  assert.equal(constructionPlotOccupied(state, bakery), false);
-  state.layout.tomatoFarm = { x: bakery.x, z: bakery.z };
-  assert.equal(constructionPlotOccupied(state, bakery), true);
+  assert.equal(constructionPlotOccupied(state, restaurant), false);
+  state.layout.tomatoFarm = { x: restaurant.x, z: restaurant.z };
+  assert.equal(constructionPlotOccupied(state, restaurant), true);
   const sites = new ConstructionSites(new THREE.Scene()); sites.sync(state, 0.016);
-  assert.equal(sites.entries.find(entry => entry.site.id === 'bakery').group.visible, false);
+  assert.equal(sites.entries.find(entry => entry.site.id === 'restaurant').group.visible, false);
 });
 
 test('construction follows existing availability and waits for actual placement', () => {
   const state = createInitialState();
-  assert.equal(constructionStatus(state, bakery), 'locked');
-  state.availableUpgrades.push('bakery');
-  assert.equal(constructionStatus(state, bakery), 'ready');
-  state.completedUpgrades.push('bakery'); state.unlocked.bakery = true;
-  state.pendingStationIds.push('bakery'); delete state.layout.bakery;
-  assert.equal(constructionStatus(state, bakery), 'waiting');
-  state.layout.bakery = { x: -23, z: 0 };
-  assert.equal(constructionStatus(state, bakery), 'open');
+  assert.equal(constructionStatus(state, restaurant), 'locked');
+  state.availableUpgrades.push('restaurant');
+  assert.equal(constructionStatus(state, restaurant), 'ready');
+  state.completedUpgrades.push('restaurant'); state.unlocked.restaurant = true;
+  state.pendingStationIds.push('pizzaKitchen'); delete state.layout.pizzaKitchen;
+  assert.equal(constructionStatus(state, restaurant), 'waiting');
+  state.layout.pizzaKitchen = { x: -37, z: 0 }; state.layout.burgerKitchen = { x: -37, z: 4 };
+  assert.equal(constructionStatus(state, restaurant), 'open');
 });
 
 test('restored open sites do not celebrate again', () => {
@@ -49,4 +49,8 @@ test('opening effect is bounded and only runs on the closed-to-open transition',
   assert.equal(entry.particles, null); assert.equal(entry.group.visible, false);
   sites.sync(state, 0.016); assert.equal(entry.particles, null);
   assert.equal(scene.children.filter(group => group.name.startsWith('construction:')).length, CONSTRUCTION_SITES.length);
+});
+
+test('only pizza and warehouse destinations have discovery screens', () => {
+  assert.deepEqual(CONSTRUCTION_SITES.map(site => site.id), ['restaurant', 'logisticsOffice']);
 });

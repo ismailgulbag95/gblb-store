@@ -1,6 +1,6 @@
 {
   "schema_version": 3,
-  "revision": 151,
+  "revision": 154,
   "project": {
     "id": "gblb-store-3d",
     "name": "GBLB Store 3D Procedural World Transformation",
@@ -5432,44 +5432,23 @@
         {
           "path": "src/environment/ConstructionSites.js",
           "criterion": 0,
-          "note": "Procedural screens and progression states",
+          "note": "Pizza and warehouse discovery screen scope, verified with targeted tests and build",
           "reviewer": "codex",
-          "sha256": "a192a4100d57521253db504180c574309d4b362e302b90e7975330c94a150180"
-        },
-        {
-          "path": "src/environment/MarketGrid.js",
-          "criterion": 0,
-          "note": "Environment integration",
-          "reviewer": "codex",
-          "sha256": "9769bfddf4800b0386cf26c1ecef641324ecb36075e7bf124463f0690d6c7b16"
-        },
-        {
-          "path": "src/presentation/WorldScene.js",
-          "criterion": 1,
-          "note": "State-driven visual sync",
-          "reviewer": "codex",
-          "sha256": "5981f84e4e5eb5b349a84505ad31e854cca6ecc7305d093a2fe4dbb0c0d22090"
+          "sha256": "e40e61b6253d49013f3858c45396f232e0ab7021de84934cf2dd7ed175ea99ce"
         },
         {
           "path": "tests/construction-sites.test.js",
           "criterion": 1,
-          "note": "Save, queue, occupied plot and one-shot opening regressions",
+          "note": "Pizza and warehouse discovery screen scope, verified with targeted tests and build",
           "reviewer": "codex",
-          "sha256": "0f158e37669a85f74c4201ee76776e6e1fb6faee9a1495e7e69bfa6eed532809"
+          "sha256": "3d855870cdf88a72a9bdb6c83c5106f176f7f6fa6d64794641c94e2f67da4adb"
         },
         {
           "path": "docs/construction-reveal.md",
           "criterion": 2,
-          "note": "11 targeted tests and production build passed",
+          "note": "Pizza and warehouse discovery screen scope, verified with targeted tests and build",
           "reviewer": "codex",
-          "sha256": "391e73ec29fe78b2ce7f1e64e7f36bf7c421e2bed7f3c1aa61d771f8603155b0"
-        },
-        {
-          "path": "tests/fixtures/construction-design.html",
-          "criterion": 2,
-          "note": "Isolated visual preview",
-          "reviewer": "codex",
-          "sha256": "2d1b767490b12cd0b6a293c7765b52c914366b8e5867d9c6d50e78bb1cc4c24a"
+          "sha256": "3e77e452ec3eac0e3baf7976f72bb9cdc9d3b36d2829f5d3bd35afa326549c15"
         }
       ],
       "input_snapshot": {
@@ -5522,7 +5501,8 @@
           "relations": [],
           "files": []
         }
-      }
+      },
+      "support_snapshot": null
     },
     {
       "id": "T-LIVING-WORLD-VISUAL-PACKAGES",
@@ -47763,6 +47743,431 @@
                   "files": []
                 }
               }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "revision": 152,
+      "action": "reopen_task",
+      "actor": "codex",
+      "reason": "User requested discovery screens only for pizza and warehouse; targeted 5 tests and production build passed; visual acceptance pending.",
+      "change": {
+        "task_changes": [
+          {
+            "task_id": "T-CONSTRUCTION-REVEAL",
+            "before": {
+              "id": "T-CONSTRUCTION-REVEAL",
+              "title": "Progressive construction fences and opening reveal",
+              "status": "review",
+              "object_ids": [
+                "mod-farm-production",
+                "mod-logistics-backend"
+              ],
+              "input_ids": [],
+              "output_ids": [],
+              "depends_on": [],
+              "decision_ids": [],
+              "acceptance": [
+                "Locked facilities show construction screens with progression-aware labels.",
+                "Placed purchases open once; saved unlocks and queued placements are respected without changing paths.",
+                "Targeted regression tests and production build pass."
+              ],
+              "evidence": [
+                {
+                  "path": "src/environment/ConstructionSites.js",
+                  "criterion": 0,
+                  "note": "Procedural screens and progression states",
+                  "reviewer": "codex",
+                  "sha256": "a192a4100d57521253db504180c574309d4b362e302b90e7975330c94a150180"
+                },
+                {
+                  "path": "src/environment/MarketGrid.js",
+                  "criterion": 0,
+                  "note": "Environment integration",
+                  "reviewer": "codex",
+                  "sha256": "9769bfddf4800b0386cf26c1ecef641324ecb36075e7bf124463f0690d6c7b16"
+                },
+                {
+                  "path": "src/presentation/WorldScene.js",
+                  "criterion": 1,
+                  "note": "State-driven visual sync",
+                  "reviewer": "codex",
+                  "sha256": "5981f84e4e5eb5b349a84505ad31e854cca6ecc7305d093a2fe4dbb0c0d22090"
+                },
+                {
+                  "path": "tests/construction-sites.test.js",
+                  "criterion": 1,
+                  "note": "Save, queue, occupied plot and one-shot opening regressions",
+                  "reviewer": "codex",
+                  "sha256": "0f158e37669a85f74c4201ee76776e6e1fb6faee9a1495e7e69bfa6eed532809"
+                },
+                {
+                  "path": "docs/construction-reveal.md",
+                  "criterion": 2,
+                  "note": "11 targeted tests and production build passed",
+                  "reviewer": "codex",
+                  "sha256": "391e73ec29fe78b2ce7f1e64e7f36bf7c421e2bed7f3c1aa61d771f8603155b0"
+                },
+                {
+                  "path": "tests/fixtures/construction-design.html",
+                  "criterion": 2,
+                  "note": "Isolated visual preview",
+                  "reviewer": "codex",
+                  "sha256": "2d1b767490b12cd0b6a293c7765b52c914366b8e5867d9c6d50e78bb1cc4c24a"
+                }
+              ],
+              "input_snapshot": {
+                "sha256": "15d0a670c72963b4b8557d9030cece57d060e980a2ba46d7a50a9596f1210125",
+                "manifest": {
+                  "graph": {
+                    "inputs": [],
+                    "objects": [],
+                    "object_types": [],
+                    "relation_types": [],
+                    "relations": [],
+                    "files": []
+                  },
+                  "producer_generations": {},
+                  "contract": {
+                    "input_fields": {},
+                    "acceptance_rules": [],
+                    "support_groups": []
+                  }
+                }
+              },
+              "generation": 0,
+              "review_reasons": [],
+              "run_snapshot": {
+                "sha256": "15d0a670c72963b4b8557d9030cece57d060e980a2ba46d7a50a9596f1210125",
+                "manifest": {
+                  "graph": {
+                    "inputs": [],
+                    "objects": [],
+                    "object_types": [],
+                    "relation_types": [],
+                    "relations": [],
+                    "files": []
+                  },
+                  "producer_generations": {},
+                  "contract": {
+                    "input_fields": {},
+                    "acceptance_rules": [],
+                    "support_groups": []
+                  }
+                }
+              },
+              "output_snapshot": {
+                "sha256": "5be4e3c99f05c10c081b279674e4a4da11ce339c86efcd152c698e0f08b68054",
+                "manifest": {
+                  "inputs": [],
+                  "objects": [],
+                  "object_types": [],
+                  "relation_types": [],
+                  "relations": [],
+                  "files": []
+                }
+              }
+            },
+            "after": {
+              "id": "T-CONSTRUCTION-REVEAL",
+              "title": "Progressive construction fences and opening reveal",
+              "status": "todo",
+              "object_ids": [
+                "mod-farm-production",
+                "mod-logistics-backend"
+              ],
+              "input_ids": [],
+              "output_ids": [],
+              "depends_on": [],
+              "decision_ids": [],
+              "acceptance": [
+                "Locked facilities show construction screens with progression-aware labels.",
+                "Placed purchases open once; saved unlocks and queued placements are respected without changing paths.",
+                "Targeted regression tests and production build pass."
+              ],
+              "evidence": [],
+              "input_snapshot": null,
+              "generation": 0,
+              "review_reasons": [
+                "task reopened"
+              ],
+              "run_snapshot": {
+                "sha256": "15d0a670c72963b4b8557d9030cece57d060e980a2ba46d7a50a9596f1210125",
+                "manifest": {
+                  "graph": {
+                    "inputs": [],
+                    "objects": [],
+                    "object_types": [],
+                    "relation_types": [],
+                    "relations": [],
+                    "files": []
+                  },
+                  "producer_generations": {},
+                  "contract": {
+                    "input_fields": {},
+                    "acceptance_rules": [],
+                    "support_groups": []
+                  }
+                }
+              },
+              "output_snapshot": null,
+              "support_snapshot": null
+            }
+          }
+        ]
+      }
+    },
+    {
+      "revision": 153,
+      "action": "start_task",
+      "actor": "codex",
+      "reason": "User requested discovery screens only for pizza and warehouse; targeted 5 tests and production build passed; visual acceptance pending.",
+      "change": {
+        "task_changes": [
+          {
+            "task_id": "T-CONSTRUCTION-REVEAL",
+            "before": {
+              "id": "T-CONSTRUCTION-REVEAL",
+              "title": "Progressive construction fences and opening reveal",
+              "status": "todo",
+              "object_ids": [
+                "mod-farm-production",
+                "mod-logistics-backend"
+              ],
+              "input_ids": [],
+              "output_ids": [],
+              "depends_on": [],
+              "decision_ids": [],
+              "acceptance": [
+                "Locked facilities show construction screens with progression-aware labels.",
+                "Placed purchases open once; saved unlocks and queued placements are respected without changing paths.",
+                "Targeted regression tests and production build pass."
+              ],
+              "evidence": [],
+              "input_snapshot": null,
+              "generation": 0,
+              "review_reasons": [
+                "task reopened"
+              ],
+              "run_snapshot": {
+                "sha256": "15d0a670c72963b4b8557d9030cece57d060e980a2ba46d7a50a9596f1210125",
+                "manifest": {
+                  "graph": {
+                    "inputs": [],
+                    "objects": [],
+                    "object_types": [],
+                    "relation_types": [],
+                    "relations": [],
+                    "files": []
+                  },
+                  "producer_generations": {},
+                  "contract": {
+                    "input_fields": {},
+                    "acceptance_rules": [],
+                    "support_groups": []
+                  }
+                }
+              },
+              "output_snapshot": null,
+              "support_snapshot": null
+            },
+            "after": {
+              "id": "T-CONSTRUCTION-REVEAL",
+              "title": "Progressive construction fences and opening reveal",
+              "status": "doing",
+              "object_ids": [
+                "mod-farm-production",
+                "mod-logistics-backend"
+              ],
+              "input_ids": [],
+              "output_ids": [],
+              "depends_on": [],
+              "decision_ids": [],
+              "acceptance": [
+                "Locked facilities show construction screens with progression-aware labels.",
+                "Placed purchases open once; saved unlocks and queued placements are respected without changing paths.",
+                "Targeted regression tests and production build pass."
+              ],
+              "evidence": [],
+              "input_snapshot": null,
+              "generation": 0,
+              "review_reasons": [
+                "task reopened"
+              ],
+              "run_snapshot": {
+                "sha256": "15d0a670c72963b4b8557d9030cece57d060e980a2ba46d7a50a9596f1210125",
+                "manifest": {
+                  "graph": {
+                    "inputs": [],
+                    "objects": [],
+                    "object_types": [],
+                    "relation_types": [],
+                    "relations": [],
+                    "files": []
+                  },
+                  "producer_generations": {},
+                  "contract": {
+                    "input_fields": {},
+                    "acceptance_rules": [],
+                    "support_groups": []
+                  }
+                }
+              },
+              "output_snapshot": null,
+              "support_snapshot": null
+            }
+          }
+        ]
+      }
+    },
+    {
+      "revision": 154,
+      "action": "submit_evidence",
+      "actor": "codex",
+      "reason": "User requested discovery screens only for pizza and warehouse; targeted 5 tests and production build passed; visual acceptance pending.",
+      "change": {
+        "task_changes": [
+          {
+            "task_id": "T-CONSTRUCTION-REVEAL",
+            "before": {
+              "id": "T-CONSTRUCTION-REVEAL",
+              "title": "Progressive construction fences and opening reveal",
+              "status": "doing",
+              "object_ids": [
+                "mod-farm-production",
+                "mod-logistics-backend"
+              ],
+              "input_ids": [],
+              "output_ids": [],
+              "depends_on": [],
+              "decision_ids": [],
+              "acceptance": [
+                "Locked facilities show construction screens with progression-aware labels.",
+                "Placed purchases open once; saved unlocks and queued placements are respected without changing paths.",
+                "Targeted regression tests and production build pass."
+              ],
+              "evidence": [],
+              "input_snapshot": null,
+              "generation": 0,
+              "review_reasons": [
+                "task reopened"
+              ],
+              "run_snapshot": {
+                "sha256": "15d0a670c72963b4b8557d9030cece57d060e980a2ba46d7a50a9596f1210125",
+                "manifest": {
+                  "graph": {
+                    "inputs": [],
+                    "objects": [],
+                    "object_types": [],
+                    "relation_types": [],
+                    "relations": [],
+                    "files": []
+                  },
+                  "producer_generations": {},
+                  "contract": {
+                    "input_fields": {},
+                    "acceptance_rules": [],
+                    "support_groups": []
+                  }
+                }
+              },
+              "output_snapshot": null,
+              "support_snapshot": null
+            },
+            "after": {
+              "id": "T-CONSTRUCTION-REVEAL",
+              "title": "Progressive construction fences and opening reveal",
+              "status": "review",
+              "object_ids": [
+                "mod-farm-production",
+                "mod-logistics-backend"
+              ],
+              "input_ids": [],
+              "output_ids": [],
+              "depends_on": [],
+              "decision_ids": [],
+              "acceptance": [
+                "Locked facilities show construction screens with progression-aware labels.",
+                "Placed purchases open once; saved unlocks and queued placements are respected without changing paths.",
+                "Targeted regression tests and production build pass."
+              ],
+              "evidence": [
+                {
+                  "path": "src/environment/ConstructionSites.js",
+                  "criterion": 0,
+                  "note": "Pizza and warehouse discovery screen scope, verified with targeted tests and build",
+                  "reviewer": "codex",
+                  "sha256": "e40e61b6253d49013f3858c45396f232e0ab7021de84934cf2dd7ed175ea99ce"
+                },
+                {
+                  "path": "tests/construction-sites.test.js",
+                  "criterion": 1,
+                  "note": "Pizza and warehouse discovery screen scope, verified with targeted tests and build",
+                  "reviewer": "codex",
+                  "sha256": "3d855870cdf88a72a9bdb6c83c5106f176f7f6fa6d64794641c94e2f67da4adb"
+                },
+                {
+                  "path": "docs/construction-reveal.md",
+                  "criterion": 2,
+                  "note": "Pizza and warehouse discovery screen scope, verified with targeted tests and build",
+                  "reviewer": "codex",
+                  "sha256": "3e77e452ec3eac0e3baf7976f72bb9cdc9d3b36d2829f5d3bd35afa326549c15"
+                }
+              ],
+              "input_snapshot": {
+                "sha256": "15d0a670c72963b4b8557d9030cece57d060e980a2ba46d7a50a9596f1210125",
+                "manifest": {
+                  "graph": {
+                    "inputs": [],
+                    "objects": [],
+                    "object_types": [],
+                    "relation_types": [],
+                    "relations": [],
+                    "files": []
+                  },
+                  "producer_generations": {},
+                  "contract": {
+                    "input_fields": {},
+                    "acceptance_rules": [],
+                    "support_groups": []
+                  }
+                }
+              },
+              "generation": 0,
+              "review_reasons": [],
+              "run_snapshot": {
+                "sha256": "15d0a670c72963b4b8557d9030cece57d060e980a2ba46d7a50a9596f1210125",
+                "manifest": {
+                  "graph": {
+                    "inputs": [],
+                    "objects": [],
+                    "object_types": [],
+                    "relation_types": [],
+                    "relations": [],
+                    "files": []
+                  },
+                  "producer_generations": {},
+                  "contract": {
+                    "input_fields": {},
+                    "acceptance_rules": [],
+                    "support_groups": []
+                  }
+                }
+              },
+              "output_snapshot": {
+                "sha256": "5be4e3c99f05c10c081b279674e4a4da11ce339c86efcd152c698e0f08b68054",
+                "manifest": {
+                  "inputs": [],
+                  "objects": [],
+                  "object_types": [],
+                  "relation_types": [],
+                  "relations": [],
+                  "files": []
+                }
+              },
+              "support_snapshot": null
             }
           }
         ]

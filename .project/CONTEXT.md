@@ -1,6 +1,6 @@
 # GBLB Store 3D Procedural World Transformation — proje bağlamı
 
-Revision: 151 · Yetkili kaynak: .project/state.json
+Revision: 154 · Yetkili kaynak: .project/state.json
 
 Bu görünüm türetilmiştir. Güncel kanıt kontrolü için context komutunu çalıştır.
 
@@ -405,7 +405,7 @@ Türler ve bağlantı kuralları: `ontology` komutu / `ONTOLOJİ.md`.
   - Kontrol: stale evidence: src/domain/state.js
   - Kontrol: stale evidence: src/presentation/HUD.js
   - Kontrol: stale evidence: src/presentation/WorldScene.js
-- T-CONSTRUCTION-REVEAL [needs_review] Progressive construction fences and opening reveal (kayıt: review)
+- T-CONSTRUCTION-REVEAL [review] Progressive construction fences and opening reveal (kayıt: review)
   - Ölçüt: Locked facilities show construction screens with progression-aware labels.
   - Ölçüt: Placed purchases open once; saved unlocks and queued placements are respected without changing paths.
   - Ölçüt: Targeted regression tests and production build pass.
@@ -414,9 +414,6 @@ Türler ve bağlantı kuralları: `ontology` komutu / `ONTOLOJİ.md`.
   - Ürettiği nesneler: yok
   - Etkin önkoşullar: yok
   - Kabul güncelliği: henüz doğrulanmadı · tamamlanma sayısı: 0
-  - Kontrol: stale evidence: src/environment/ConstructionSites.js
-  - Kontrol: stale evidence: src/environment/MarketGrid.js
-  - Kontrol: stale evidence: src/presentation/WorldScene.js
 - T-LIVING-WORLD-VISUAL-PACKAGES [needs_review] Staged visual foundation, retail, ecology and character feedback (kayıt: review)
   - Ölçüt: Calibrated render, contact shadows and surface/UI polish integrated with day/night and reduced motion.
   - Ölçüt: Retail details and ambient wildlife enhance existing world without duplicating assets or changing gameplay.
@@ -453,7 +450,7 @@ Türler ve bağlantı kuralları: `ontology` komutu / `ONTOLOJİ.md`.
 
 ## Çalışılabilir görevler
 
-T-PLAYER-LOW-POLY-DESIGN, T-STAFF-LOW-POLY
+T-PLAYER-LOW-POLY-DESIGN, T-CONSTRUCTION-REVEAL, T-STAFF-LOW-POLY
 
 ## Uyarılar
 
@@ -527,9 +524,6 @@ T-PLAYER-LOW-POLY-DESIGN, T-STAFF-LOW-POLY
 - T-AUTOMATIC-FIXTURE-PLACEMENT: stale evidence: src/domain/state.js
 - T-AUTOMATIC-FIXTURE-PLACEMENT: stale evidence: src/presentation/HUD.js
 - T-AUTOMATIC-FIXTURE-PLACEMENT: stale evidence: src/presentation/WorldScene.js
-- T-CONSTRUCTION-REVEAL: stale evidence: src/environment/ConstructionSites.js
-- T-CONSTRUCTION-REVEAL: stale evidence: src/environment/MarketGrid.js
-- T-CONSTRUCTION-REVEAL: stale evidence: src/presentation/WorldScene.js
 - T-LIVING-WORLD-VISUAL-PACKAGES: stale evidence: src/style.css
 - T-LIVING-WORLD-VISUAL-PACKAGES: stale evidence: src/presentation/WorldScene.js
 - T-LIVING-WORLD-VISUAL-PACKAGES: stale evidence: src/main.js

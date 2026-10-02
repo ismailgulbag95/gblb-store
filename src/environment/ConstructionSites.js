@@ -3,12 +3,8 @@ import { UPGRADES } from '../domain/catalog.js';
 import { getAllStationIds, getStationDimensions, isStationUnlocked, stationPosition } from '../domain/layout.js';
 
 export const CONSTRUCTION_SITES = [
-  { id: 'restaurant', title: 'GURME RESTORAN', x: -37, z: 0, width: 20, depth: 16, stations: ['burgerKitchen', 'pizzaKitchen'], color: 0xe99a65 },
+  { id: 'restaurant', title: 'PİZZA ALANI', x: -37, z: 0, width: 20, depth: 16, stations: ['burgerKitchen', 'pizzaKitchen'], color: 0xe99a65 },
   { id: 'logisticsOffice', title: 'DEPO VE LOJİSTİK', x: 21, z: 0, width: 10, depth: 14, unlock: 'managerOffice', color: 0x69baca },
-  { id: 'bakery', title: 'TAŞ FIRIN', x: -23, z: 0, width: 3.2, depth: 2.8, stations: ['bakery'], color: 0xe9bb63 },
-  { id: 'orange', title: 'PORTAKAL BAHÇESİ', x: -10, z: -7, width: 3.2, depth: 2.7, stations: ['orangeFarm'], color: 0x83bfa3 },
-  { id: 'corn', title: 'MISIR TARLASI', x: -18, z: 5, width: 3.2, depth: 2.7, stations: ['cornFarm'], color: 0x83bfa3 },
-  { id: 'flourMill', title: 'UN DEĞİRMENİ', x: -23, z: -4, width: 3.2, depth: 2.8, stations: ['flourMill'], color: 0x99a9d8 },
 ];
 
 export function constructionStatus(state, site) {
@@ -54,8 +50,13 @@ export class ConstructionSites {
       for (let x = -site.width / 2 + 0.3; x < site.width / 2; x += 0.6) {
         addBox(0.25, 0.5, 0.14, x, 0.25, -site.depth / 2, wood);
       }
-      // A low folded cover makes the empty plot read as a future building site.
-      const cover = addBox(site.width * 0.9, 0.24, site.depth * 0.78, 0, 0.2, -0.15, tarp);
+      // Covered silhouettes hint at the future destination without exposing its contents.
+      const cover = addBox(site.width * 0.76, 1.8, site.depth * 0.65, 0, 0.95, -0.6, tarp);
+      const foldedTop = addBox(site.width * 0.79, 0.18, site.depth * 0.68, 0, 1.95, -0.6, tarp);
+      foldedTop.rotation.z = -0.035;
+      for (const side of [-1, 1]) {
+        addBox(site.width * 0.13, 0.85, site.depth * 0.18, side * site.width * 0.31, 0.46, site.depth * 0.26, tarp);
+      }
       cover.rotation.z = 0.025;
       const gold = new THREE.MeshStandardMaterial({ color: 0xffcf52, roughness: 0.4, metalness: 0.3 });
       const lock = addBox(0.36, 0.3, 0.13, 0, 1.48, site.depth / 2, gold);
@@ -75,12 +76,12 @@ export class ConstructionSites {
     const en = language === 'en';
     ctx.fillStyle = status === 'ready' ? '#27634b' : '#79563d'; ctx.fillRect(0, 0, 768, 192);
     ctx.fillStyle = '#fff5dc'; ctx.textAlign = 'center'; ctx.font = 'bold 40px sans-serif';
-    ctx.fillText(entry.site.title, 384, 65);
+    ctx.fillText(status === 'locked' ? '?' : entry.site.title, 384, 65);
     ctx.font = 'bold 30px sans-serif';
     const price = UPGRADES.find(upgrade => upgrade.id === entry.site.id)?.price;
     ctx.fillText(status === 'waiting' ? (en ? 'WAITING FOR PLACEMENT' : 'YERLEŞTİRME BEKLİYOR')
       : status === 'ready' ? `${en ? 'READY TO BUILD' : 'İNŞAATA HAZIR'} • $${price}`
-        : (en ? 'COMING SOON' : 'YAKINDA HİZMETİNİZDE'), 384, 135);
+        : (en ? 'WHAT WILL OPEN HERE?' : 'BURADA NE AÇILACAK?'), 384, 135);
     entry.sign.material.map?.dispose();
     entry.sign.material.map = new THREE.CanvasTexture(canvas);
     entry.sign.material.map.colorSpace = THREE.SRGBColorSpace;
