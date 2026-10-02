@@ -1,3 +1,4 @@
+import { wholesaleUnitCost } from './worldEvents.js';
 import { MONEY_ATOMS, PROCUREMENT_CATALOG } from './catalog.js';
 import { EconomyLedger } from './ledger.js';
 import { getShelfLocations } from './layout.js';
@@ -60,7 +61,7 @@ export function quoteWholesaleOrder(state, cart) {
   for (const [item, cases] of entries) {
     const product = PROCUREMENT_CATALOG[item];
     if (!product || !Number.isSafeInteger(cases) || cases < 1 || cases > 10) return { ok: false, reason: 'invalid-cart' };
-    lines.push({ item, cases, quantity: cases * product.caseSize, unitCostAtoms: product.unitCostAtoms });
+    lines.push({ item, cases, quantity: cases * product.caseSize, unitCostAtoms: wholesaleUnitCost(state, item) });
   }
   const quantity = lines.reduce((sum, line) => sum + line.quantity, 0);
   if (quantity > 120) return { ok: false, reason: 'order-too-large' };

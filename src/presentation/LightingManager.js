@@ -16,8 +16,8 @@ export class LightingManager {
     this.dirLight = new THREE.DirectionalLight(0xfff5ea, 2.3);
     this.dirLight.position.set(22, 34, 18);
     this.dirLight.castShadow = true;
-    this.dirLight.shadow.mapSize.width = 2048;
-    this.dirLight.shadow.mapSize.height = 2048;
+    this.dirLight.shadow.mapSize.width = 1024;
+    this.dirLight.shadow.mapSize.height = 1024;
     this.dirLight.shadow.camera.near = 1;
     this.dirLight.shadow.camera.far = 85;
     this.dirLight.shadow.camera.left = -34;
@@ -32,6 +32,11 @@ export class LightingManager {
     this.storeLight.position.set(-17, 7, 0);
     this.scene.add(this.storeLight);
 
+    this.rimLight = new THREE.DirectionalLight(0xc4e4ff, 0.55);
+    this.rimLight.position.set(-20, 25, -20);
+    this.rimLight.castShadow = false;
+    this.scene.add(this.rimLight);
+
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.45);
     this.scene.add(ambientLight);
   }
@@ -42,6 +47,7 @@ export class LightingManager {
     const hemiSky = new THREE.Color().lerpColors(new THREE.Color(0x35495e), new THREE.Color(0xfff7e6), daylight);
     const hemiGround = new THREE.Color().lerpColors(new THREE.Color(0x1a252f), new THREE.Color(0x4a6572), daylight);
     
+    this.rimLight.intensity = 0.16 + daylight * 0.39;
     this.dirLight.color.copy(sunColor);
     this.dirLight.intensity = 0.6 + daylight * 1.7;
     this.hemiLight.color.copy(hemiSky);

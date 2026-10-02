@@ -1,6 +1,6 @@
 # GBLB Store 3D Procedural World Transformation — Ontoloji
 
-Revizyon: 99. Canlı görünüm için `ontology` komutunu çalıştır.
+Revizyon: 148. Canlı görünüm için `ontology` komutunu çalıştır.
 
 ## Türler ve özellikler
 
@@ -41,9 +41,9 @@ Revizyon: 99. Canlı görünüm için `ontology` komutunu çalıştır.
 - **Endüstriyel Forklift** (`asset-forklift`, procedural_asset): {"category": "logistics", "file_ref": "src/environment/EnvironmentProps.js", "name": "Yellow Warehouse Forklift"}; durum: input; üretici: dış girdi
 - **Taze Domates** (`item-tomato`, product_item): {"category": "produce", "name": "Fresh Tomato"}; durum: input; üretici: dış girdi
 - **Paket Süt** (`item-milk`, product_item): {"category": "packaged", "name": "Carton Milk"}; durum: input; üretici: dış girdi
-- **Faz 1: Market İç Mekanı** (`ms-phase1`, milestone): {"phase_number": 1, "verdict": "completed"}; durum: needs_review; üretici: T-PHASE-1
-- **10 Personel Mesleği Kadrosu** (`asset-staff-roster`, procedural_asset): {"category": "character", "file_ref": "src/presentation/HumanoidFactory.js", "name": "10 Staff Professions Roster"}; durum: needs_review; üretici: T-PHASE-6
-- **20+ Zengin Müşteri Arketipi** (`asset-customer-archetypes`, procedural_asset): {"category": "character", "file_ref": "src/presentation/HumanoidFactory.js", "name": "20+ Diverse Customer Archetypes"}; durum: needs_review; üretici: T-PHASE-6
+- **Faz 1: Market İç Mekanı** (`ms-phase1`, milestone): {"phase_number": 1, "verdict": "completed"}; durum: current; üretici: T-PHASE-1
+- **10 Personel Mesleği Kadrosu** (`asset-staff-roster`, procedural_asset): {"category": "character", "file_ref": "src/presentation/HumanoidFactory.js", "name": "10 Staff Professions Roster"}; durum: current; üretici: T-PHASE-6
+- **20+ Zengin Müşteri Arketipi** (`asset-customer-archetypes`, procedural_asset): {"category": "character", "file_ref": "src/presentation/HumanoidFactory.js", "name": "20+ Diverse Customer Archetypes"}; durum: current; üretici: T-PHASE-6
 - **Neobrutalism UI Bileşen Sistemi** (`asset-neobrutalism-ui`, procedural_asset): {"category": "utility", "file_ref": "src/style.css", "name": "Neobrutalism Design System & Components"}; durum: needs_review; üretici: T-NEOBRUTALISM-UI
 - **9 Prosedürel Üretim İstasyonu** (`asset-production-stations`, procedural_asset): {"category": "farm", "file_ref": "src/presentation/ProductionBuildModel.js", "name": "9 Procedural Production Stations & Living Animations"}; durum: needs_review; üretici: T-PRODUCTION-STATIONS-REDESIGN
 - **Tarla Yatakları ve Sebze Parselleri** (`asset-farm-fields`, procedural_asset): {"category": "farm", "file_ref": "src/presentation/FarmBuildModel.js", "name": "Procedural Farm Fields & Vegetable Plots"}; durum: needs_review; üretici: T-FARM-ASSETS-ANIMATIONS-REDESIGN
@@ -119,12 +119,12 @@ Oklar kayıtlı ilişki yönüdür; değişiklik etkisinin yönü üstte ayrıca
 
 ## Görevlerin veri bağları
 
-- **T-PHASE-1 — Faz 1: Süpermarket İç Mekan ve Ekipman Mimarisinin Kurulması**: girdiler [mod-supermarket], çıktılar [ms-phase1], durum needs_review.
-- **T-PHASE-2 — Faz 2: 3D Ürün Varlıklarının Geliştirilmesi ve Reyon Yerleşimi**: girdiler [item-tomato], çıktılar [], durum needs_review.
-- **T-PHASE-3 — Faz 3: Dış Mekan, Otopark, Yollar ve Araç Filosu**: girdiler [mod-parking-road], çıktılar [], durum needs_review.
-- **T-PHASE-4 — Faz 4: Tarım ve Üretim Çiftliği Bölgesi**: girdiler [mod-farm-production], çıktılar [], durum needs_review.
-- **T-PHASE-5 — Faz 5: Arka Alan, Depo ve Lojistik Tesisleri**: girdiler [mod-logistics-backend], çıktılar [], durum needs_review.
-- **T-PHASE-6 — Faz 6: 10 Personel Mesleği ve 20+ Zengin Müşteri Tipi**: girdiler [mod-supermarket], çıktılar [asset-staff-roster, asset-customer-archetypes], durum needs_review.
+- **T-PHASE-1 — Faz 1: Süpermarket İç Mekan ve Ekipman Mimarisinin Kurulması**: girdiler [mod-supermarket], çıktılar [ms-phase1], durum done.
+- **T-PHASE-2 — Faz 2: 3D Ürün Varlıklarının Geliştirilmesi ve Reyon Yerleşimi**: girdiler [item-tomato], çıktılar [], durum done.
+- **T-PHASE-3 — Faz 3: Dış Mekan, Otopark, Yollar ve Araç Filosu**: girdiler [mod-parking-road], çıktılar [], durum done.
+- **T-PHASE-4 — Faz 4: Tarım ve Üretim Çiftliği Bölgesi**: girdiler [mod-farm-production], çıktılar [], durum done.
+- **T-PHASE-5 — Faz 5: Arka Alan, Depo ve Lojistik Tesisleri**: girdiler [mod-logistics-backend], çıktılar [], durum done.
+- **T-PHASE-6 — Faz 6: 10 Personel Mesleği ve 20+ Zengin Müşteri Tipi**: girdiler [mod-supermarket], çıktılar [asset-staff-roster, asset-customer-archetypes], durum done.
 - **T-NEOBRUTALISM-UI — Kullanıcı Arayüzünün Neobrutalism Bileşen Mimarisine Dönüştürülmesi**: girdiler [mod-supermarket], çıktılar [asset-neobrutalism-ui], durum needs_review.
 - **T-NEOBRUTALISM-ICONS-LOGOS — İkon, Logo ve Simgelerin Neobrutalist SVG Sistemine Dönüştürülmesi ve Emojilerin Temizlenmesi**: girdiler [mod-supermarket], çıktılar [], durum needs_review.
 - **T-NEOBRUTALISM-STATION-BADGES — İstasyon ve Üretim Etiketlerinin Neobrutalist Kompakt İkonlu Göstergelere Dönüştürülmesi**: girdiler [mod-supermarket], çıktılar [], durum needs_review.
@@ -134,6 +134,17 @@ Oklar kayıtlı ilişki yönüdür; değişiklik etkisinin yönü üstte ayrıca
 - **T-CHARACTERS-ANIMATIONS-LIVING-WORLD — Personel ve Müşteri Varlıklarının Referans Görsele Göre Geliştirilmesi, Özgün Poz ve Sinematik Hareket Animasyonlarının Uygulanması**: girdiler [mod-supermarket], çıktılar [asset-staff-animations-redesign, asset-customer-animations-redesign], durum needs_review.
 - **T-STAFF-WELFARE-FACILITIES — Personel adayları, yorulma ve kuzey sosyal tesisleri**: girdiler [mod-supermarket], çıktılar [], durum needs_review.
 - **T-EAST-LOGISTICS-PROCUREMENT — Doğu lojistik ofisi, CRT toptan terminal ve kamyon teslimatı**: girdiler [mod-logistics-backend, mod-supermarket], çıktılar [], durum needs_review.
-- **T-CHECKOUT-CASH-LOOP — Ürün sayısına bağlı kasa süresi ve toplanan nakit akışı**: girdiler [mod-supermarket], çıktılar [asset-checkout-cash-pile], durum review.
+- **T-CHECKOUT-CASH-LOOP — Ürün sayısına bağlı kasa süresi ve toplanan nakit akışı**: girdiler [mod-supermarket], çıktılar [asset-checkout-cash-pile], durum needs_review.
+- **T-RETENTION-BEHAVIORAL-LOOP — Oyuncu tutunması, Ludic Loop, değişken oranlı ödüller ve PRP önleme mimarisi**: girdiler [mod-supermarket], çıktılar [], durum needs_review.
+- **T-REWARDED-ADS-MONETIZATION — Ödüllü reklam manipülasyon kancaları, near-miss hibesi ve sürtünme arbitrajı**: girdiler [mod-supermarket, mod-logistics-backend], çıktılar [], durum needs_review.
+- **T-SECURITY-PERF-HARDENING — Bellek optimizasyonu, güvenlik sertleştirme, hile engelleme ve uç durum onarımları**: girdiler [mod-supermarket, mod-logistics-backend], çıktılar [], durum blocked.
+- **T-CUSTOMER-REFERENCE-DESIGN — Müşteri modellerini bloklu karakter referansına uyarlama**: girdiler [], çıktılar [], durum needs_review.
+- **T-PLAYER-LOW-POLY-DESIGN — Oyuncu tiplerini müşteri stiliyle uyumlu low-poly modellere dönüştürme**: girdiler [], çıktılar [], durum review.
+- **T-PRODUCE-SHELF-STOCK-FIX — Manav raflarındaki sabit dekor ürünlerini kaldırıp stok görünümünü düzeltme**: girdiler [], çıktılar [], durum needs_review.
+- **T-REMOVE-HANGING-CATEGORY-SIGNS — Tavandan asılı kategori tabelalarını ve askılarını kaldırma**: girdiler [], çıktılar [], durum needs_review.
+- **T-AUTOMATIC-FIXTURE-PLACEMENT — Varsayılan yer, yakın boş yer ve görünür bekleme kuyruğuyla güvenli yapı yerleşimi**: girdiler [], çıktılar [], durum needs_review.
+- **T-CONSTRUCTION-REVEAL — Progressive construction fences and opening reveal**: girdiler [], çıktılar [], durum needs_review.
+- **T-LIVING-WORLD-VISUAL-PACKAGES — Staged visual foundation, retail, ecology and character feedback**: girdiler [], çıktılar [], durum needs_review.
+- **T-DYNAMIC-WORLD-EVENTS — Dynamic positive events and recoverable crises**: girdiler [], çıktılar [], durum review.
 
 Etki yeniden inceleme ihtiyacıdır; nesnenin yanlış olduğu hükmü değildir.

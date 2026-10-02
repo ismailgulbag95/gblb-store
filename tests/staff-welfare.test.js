@@ -92,7 +92,8 @@ test('a worker finishes a carried reservation before resting and returns to work
   assert.equal(reserveStock(state, task).ok, true);
   makeLocation(state.stock, task.carrier, 2);
   assert.equal(pickUpReservedStock(state, task.reservationId, task.carrier).ok, true);
-  state.workers = [worker({ x: 1, z: 2, energy: 5, task })];
+  // Start outside the produce stand's side barrel and widened visual footprint.
+  state.workers = [worker({ x: 0.75, z: 2, energy: 5, task })];
   let delivered = false, rested = false, returned = false;
   for (let i = 0; i < 550; i++) {
     advanceSimulation(state);

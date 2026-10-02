@@ -36,6 +36,9 @@ export class Engine {
 
     // Renderer
     this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 1.05;
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.qualityScale = 1;
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
@@ -51,41 +54,11 @@ export class Engine {
   }
 
   setupLights() {
-    // Soft vibrant ambient light
-    this.ambientLight = new THREE.AmbientLight(0xffffff, 0.75);
-    this.scene.add(this.ambientLight);
-
-    // Sky & Ground Hemisphere light for colorful fill and vibrant tones
-    this.hemiLight = new THREE.HemisphereLight(0x70d6ff, 0x2ed573, 0.45);
-    this.hemiLight.position.set(0, 40, 0);
-    this.scene.add(this.hemiLight);
-
-    // Main Sunlight with crisp warm illumination
-    const sunLight = new THREE.DirectionalLight(0xfffae8, 1.15);
-    sunLight.position.set(22, 32, 16);
-    sunLight.castShadow = true;
-    sunLight.shadow.mapSize.width = 1024;
-    sunLight.shadow.mapSize.height = 1024;
-    sunLight.shadow.camera.near = 0.5;
-    sunLight.shadow.camera.far = 85;
-    const d = 26;
-    sunLight.shadow.camera.left = -d;
-    sunLight.shadow.camera.right = d;
-    sunLight.shadow.camera.top = d;
-    sunLight.shadow.camera.bottom = -d;
-    sunLight.shadow.bias = -0.0005;
-    this.scene.add(sunLight);
-    this.sunLight = sunLight;
+    // Scene lighting is managed authoritatively by LightingManager in WorldScene.
   }
 
   setDaylight(amount) {
     const daylight = THREE.MathUtils.clamp(amount, 0, 1);
-    this.ambientLight.intensity = THREE.MathUtils.lerp(0.2, 0.75, daylight);
-    this.hemiLight.intensity = THREE.MathUtils.lerp(0.12, 0.45, daylight);
-    this.hemiLight.color.lerpColors(this.nightSky, this.daySky, daylight);
-    this.hemiLight.groundColor.lerpColors(this.nightGround, this.dayGround, daylight);
-    this.sunLight.intensity = THREE.MathUtils.lerp(0.08, 1.15, daylight);
-    this.sunLight.color.lerpColors(this.nightSun, this.daySun, daylight);
     this.scene.background.lerpColors(this.nightSky, this.daySky, daylight);
     this.scene.fog.color.lerpColors(this.nightSky, this.daySky, daylight);
   }
@@ -118,30 +91,11 @@ export class Engine {
     this.camera.bottom = -viewHeight / 2;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(window.innerWidth, window.innerHeight);
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5) * this.qualityScale);
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
   }
 
   render() {
-    const now = performance.now();
-    const elapsed = now - this.lastFrameAt;
-    this.lastFrameAt = now;
-    if (!document.hidden && elapsed < 2000) {
-      this.frameTimeSum += elapsed;
-      this.frameCount += 1;
-    }
-    if (this.frameTimeSum >= 2500 && this.frameCount > 0) {
-      const fps = this.frameCount * 1000 / this.frameTimeSum;
-      const nextScale = fps < 22 ? 0.7 : fps < 34 ? Math.min(this.qualityScale, 0.85)
-        : fps > 52 ? Math.min(1, this.qualityScale + 0.15) : this.qualityScale;
-      if (Math.abs(nextScale - this.qualityScale) > 0.01) {
-        this.qualityScale = nextScale;
-        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5) * this.qualityScale);
-      }
-      if (fps < 22 && this.renderer.shadowMap.enabled) this.renderer.shadowMap.enabled = false;
-      if (fps > 48 && !this.renderer.shadowMap.enabled) this.renderer.shadowMap.enabled = true;
-      this.frameTimeSum = 0;
-      this.frameCount = 0;
-    }
     this.renderer.render(this.scene, this.camera);
   }
 }
+

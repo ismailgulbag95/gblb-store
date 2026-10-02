@@ -51,7 +51,7 @@ export function transferStock(state, { transactionId, from, to, item, quantity, 
   target.items[item] = (target.items[item] ?? 0) + quantity;
   if (ownReservation) cancelReservation(state, reservationId);
   state.stockTransactions.push({ id: transactionId, from, to, item, quantity });
-  if (state.stockTransactions.length > 4_000) state.stockTransactions.splice(0, 1);
+  if (state.stockTransactions.length > 1_000) state.stockTransactions.splice(0, state.stockTransactions.length - 1_000);
   return { ok: true, duplicate: false, quantity };
 }
 
@@ -110,9 +110,13 @@ export function cancelReservation(state, reservationId) {
   if (!reservation) return false;
   const source = state.stock[reservation.from];
   const target = state.stock[reservation.to];
-  source.reserved[reservation.item] -= reservation.quantity;
-  if (source.reserved[reservation.item] <= 0) delete source.reserved[reservation.item];
-  target.reservedCapacity = Math.max(0, (target.reservedCapacity ?? 0) - reservation.quantity);
+  if (source?.reserved && reservation.item in source.reserved) {
+    source.reserved[reservation.item] -= reservation.quantity;
+    if (source.reserved[reservation.item] <= 0) delete source.reserved[reservation.item];
+  }
+  if (target) {
+    target.reservedCapacity = Math.max(0, (target.reservedCapacity ?? 0) - reservation.quantity);
+  }
   delete state.reservations[reservationId];
   return true;
 }

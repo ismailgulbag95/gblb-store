@@ -76,9 +76,9 @@ export const SHELF_STAGING_AREA = Object.freeze({
  */
 export const STATION_FOOTPRINTS = Object.freeze({
   // Manav Tezgâhları (Produce)
-  tomatoShelf: { width: 2.35, depth: 1.35 },
-  orangeShelf: { width: 2.35, depth: 1.35 },
-  cornShelf: { width: 2.35, depth: 1.35 },
+  tomatoShelf: { width: 3.5, depth: 1.9 },
+  orangeShelf: { width: 3.5, depth: 1.9 },
+  cornShelf: { width: 3.5, depth: 1.9 },
 
   // Gondol Reyonlar (Gondola)
   pasteShelf: { width: 1.86, depth: 0.98 },
@@ -201,6 +201,7 @@ export function stationZone(id) {
 }
 
 export function stationPosition(state, id) {
+  if (state.pendingStationIds?.includes(id) && !state.layout?.[id]) return null;
   if (id.startsWith('staff-')) return state.layout?.[id] ?? STAFF_FACILITIES[id.slice(6)];
   if (state.pendingShelfIds?.includes(id) && !state.layout?.[id]) return null;
   return state.layout?.[id] ?? state.checkoutRegisters?.[id] ?? state.customStations?.[id] ?? STATIONS[id];
@@ -421,6 +422,87 @@ export function canPlaceDecoration(state, decorationId, x, z, rotation = undefin
 
 export function nextShelfStagingPosition(state, stationId) {
   return SHELF_STAGING_AREA.slots.find(({ x, z }) => canPlaceStation(state, stationId, x, z)) ?? null;
+}
+
+export function pendingPlacementIds(state) {
+  return [...new Set([...(state.pendingShelfIds ?? []), ...(state.pendingStationIds ?? [])])];
+}
+
+// New fixtures must leave at least one grid cell between obstacles, and their
+// front access point must be reachable from the area's entrance.
+export function canPlaceAccessibleStation(state, id, x, z) {
+  if (!canPlaceStation(state, id, x, z)) return false;
+  const zone = ZONES[stationZone(id)];
+  const dims = getStationDimensions(id, state.layout?.[id]?.rotation ?? 0);
+  const obstacles = getAllStationIds(state).filter(other => other !== id && isStationUnlocked(state, other))
+    .map(other => {
+      const point = stationPosition(state, other);
+      return point && { ...point, ...getStationDimensions(other, point.rotation ?? 0) };
+    }).filter(Boolean);
+  for (const entry of state.decorations ?? []) obstacles.push({ ...entry, ...getDecorationDimensions(entry.type, entry.rotation ?? 0) });
+  if (obstacles.some(other => Math.abs(x - other.x) < (dims.width + other.width) / 2 + GRID_SIZE
+    && Math.abs(z - other.z) < (dims.depth + other.depth) / 2 + GRID_SIZE)) return false;
+  const rotation = state.layout?.[id]?.rotation ?? 0;
+  const target = { x: x + Math.sin(rotation) * (dims.width / 2 + GRID_SIZE),
+    z: z + Math.cos(rotation) * (dims.depth / 2 + GRID_SIZE) };
+  const snap = value => Math.round(value / GRID_SIZE) * GRID_SIZE;
+  const entrance = stationZone(id) === 'market' ? { x: 5, z: 8 }
+    : { x: snap(zone.maxX - 1), z: 0 };
+  const flood = boxes => {
+    const free = (px, pz) => px >= zone.minX + 0.2 && px <= zone.maxX - 0.2
+      && pz >= zone.minZ + 0.2 && pz <= zone.maxZ - 0.2
+      && !boxes.some(o => Math.abs(px - o.x) < o.width / 2 + 0.2 && Math.abs(pz - o.z) < o.depth / 2 + 0.2);
+    if (!free(entrance.x, entrance.z)) return new Set();
+    const queue = [entrance], seen = new Set([`${entrance.x},${entrance.z}`]);
+    for (let index = 0; index < queue.length; index++) {
+      const p = queue[index];
+      for (const [dx, dz] of [[GRID_SIZE, 0], [-GRID_SIZE, 0], [0, GRID_SIZE], [0, -GRID_SIZE]]) {
+        const px = p.x + dx, pz = p.z + dz, key = `${px},${pz}`;
+        if (!seen.has(key) && free(px, pz)) { seen.add(key); queue.push({ x: px, z: pz }); }
+      }
+    }
+    return seen;
+  };
+  const reachable = flood([...obstacles, { x, z, ...dims }]);
+  const keyAt = p => `${snap(p.x)},${snap(p.z)}`;
+  if (!reachable.has(keyAt(target))) return false;
+  const previouslyReachable = flood(obstacles);
+  // Do not close access to another fixture that was reachable before placement.
+  return obstacles.every(o => {
+    const rot = o.rotation ?? 0;
+    const access = { x: o.x + Math.sin(rot) * (o.width / 2 + GRID_SIZE),
+      z: o.z + Math.cos(rot) * (o.depth / 2 + GRID_SIZE) };
+    const key = keyAt(access);
+    return !previouslyReachable.has(key) || reachable.has(key);
+  });
+}
+
+export function nextStationPlacement(state, id) {
+  const preferred = DEFAULT_POSITIONS[id] ?? state.customStations?.[id];
+  if (!preferred) return null;
+  if (canPlaceAccessibleStation(state, id, preferred.x, preferred.z)) return { x: preferred.x, z: preferred.z };
+  const zone = ZONES[stationZone(id)], candidates = [];
+  for (let x = Math.ceil(zone.minX / GRID_SIZE) * GRID_SIZE; x <= zone.maxX; x += GRID_SIZE) {
+    for (let z = Math.ceil(zone.minZ / GRID_SIZE) * GRID_SIZE; z <= zone.maxZ; z += GRID_SIZE) {
+      candidates.push({ x, z });
+    }
+  }
+  candidates.sort((a, b) => Math.hypot(a.x - preferred.x, a.z - preferred.z)
+    - Math.hypot(b.x - preferred.x, b.z - preferred.z) || a.x - b.x || a.z - b.z);
+  return candidates.find(p => canPlaceAccessibleStation(state, id, p.x, p.z)) ?? null;
+}
+
+export function placeNewStation(state, id) {
+  if (state.layout?.[id]) return true;
+  state.pendingStationIds ??= [];
+  if (!state.pendingStationIds.includes(id)) state.pendingStationIds.push(id);
+  const position = nextStationPlacement(state, id);
+  if (!position) return false;
+  state.layout ??= {};
+  state.layout[id] = position;
+  state.pendingStationIds = state.pendingStationIds.filter(other => other !== id);
+  state.pendingShelfIds = (state.pendingShelfIds ?? []).filter(other => other !== id);
+  return true;
 }
 
 export function getMarketCollisionBoxes(state) {

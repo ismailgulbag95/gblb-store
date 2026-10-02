@@ -1,25 +1,27 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { GameApplication } from '../src/application/GameApplication.js';
-import { advanceSimulation, findCustomerMarketRoute, routeCustomerToShelf } from '../src/domain/simulation.js';
+import { advanceSimulation, findCustomerMarketRoute, getAvailableRegisters, routeCustomerToShelf } from '../src/domain/simulation.js';
 import { createInitialState, hydrateState, SAVE_VERSION } from '../src/domain/state.js';
 import { createFarmState } from '../src/domain/farm.js';
 import {
   canTransfer,
+  cancelReservation,
   makeLocation,
   pickUpReservedStock,
   quantityAt,
   reserveStock,
   transferStock,
 } from '../src/domain/inventory.js';
+import { createCashPileModel, disposeCashPileModel } from '../src/presentation/CashPileModel.js';
 import { EconomyLedger, InsufficientBalanceError } from '../src/domain/ledger.js';
 import { SaveRecoveryError, SaveService } from '../src/infrastructure/SaveService.js';
 import { getStaffCount, SHELVES, STATIONS } from '../src/domain/catalog.js';
-import { canPlaceStation, getDecorationDimensions, getMarketCollisionBoxes, getShelfLocations, getStationDimensions } from '../src/domain/layout.js';
+import { canPlaceStation, getDecorationDimensions, getMarketCollisionBoxes, getShelfLocations, getStationDimensions, registerCashPosition } from '../src/domain/layout.js';
 import { CharacterFactory } from '../src/presentation/CharacterFactory.js';
-import { customerMood, saleMoodMultiplier, tipForMood } from '../src/domain/customerExperience.js';
+import { customerMood, missedOpportunityAmount, saleMoodMultiplier, tipForMood } from '../src/domain/customerExperience.js';
 import { decorationPrice, nextOrder, orderProgress } from '../src/domain/orders.js';
-import { machineProductionSeconds, machineSpeedMultiplier, machineUpgradeCost, staffSpeedMultiplier, staffUpgradeCost } from '../src/domain/progression.js';
+import { endowedGoalProgress, goalProximityPercent, isNearMissGoal, machineProductionSeconds, machineSpeedMultiplier, machineUpgradeCost, staffSpeedMultiplier, staffUpgradeCost } from '../src/domain/progression.js';
 import { AdMobRewardedProvider, DevelopmentRewardedProvider, RewardedAdService } from '../src/infrastructure/RewardedAdProvider.js';
 
 class MemoryStorage {
@@ -291,12 +293,21 @@ test('a shopper purchase consumes one shelf item and credits the ledger once', (
   new SaveService(storage).commit(initial, 'fixture:sale');
 
   const app = new GameApplication(new SaveService(storage));
-  for (let index = 0; index < 40; index += 1) app.tick();
+  for (let index = 0; index < 100; index += 1) app.tick();
 
-  assert.equal(app.getBalance(), 103);
   assert.equal(app.getState().stats.tomatoSold, 1);
   assert.equal(quantityAt(app.getState().stock, 'shelf:TOMATO', 'TOMATO'), 0);
-  assert.equal(app.getState().economy.entries.filter((entry) => entry.reason === 'sale:TOMATO').length, 1);
+  assert.equal(app.getState().cashAtRegisters.register, 30_000);
+  assert.equal(app.getBalance(), 100);
+
+  const pickup = registerCashPosition(getAvailableRegisters(app.getState())[0]);
+  app.getState().player.x = pickup.x;
+  app.getState().player.z = pickup.z;
+  app.tick();
+
+  assert.equal(app.getBalance(), 103);
+  assert.equal(app.getState().cashAtRegisters.register, 0);
+  assert.equal(app.getState().economy.entries.filter((entry) => entry.reason === 'register-cash:register').length, 1);
 });
 
 test('legacy multi-product baskets collect each item and credit the total once', () => {
@@ -317,11 +328,19 @@ test('legacy multi-product baskets collect each item and credit the total once',
   const app = new GameApplication(new SaveService(storage));
   for (let index = 0; index < 100; index += 1) app.tick();
 
-  const sold = app.getState().economy.entries.filter((entry) => entry.reason.startsWith('sale:'));
-  assert.equal(app.getBalance(), 107);
-  assert.equal(sold.length, 2);
-  assert.deepEqual(sold.map((entry) => entry.reason), ['sale:TOMATO', 'sale:ORANGE']);
   assert.equal(app.getState().stats.tomatoSold, 1);
+  assert.equal(app.getState().cashAtRegisters.register, 70_000);
+  assert.equal(app.getBalance(), 100);
+
+  const pickup = registerCashPosition(getAvailableRegisters(app.getState())[0]);
+  app.getState().player.x = pickup.x;
+  app.getState().player.z = pickup.z;
+  app.tick();
+
+  const collected = app.getState().economy.entries.filter((entry) => entry.reason === 'register-cash:register');
+  assert.equal(app.getBalance(), 107);
+  assert.equal(collected.length, 1);
+  assert.equal(app.getState().cashAtRegisters.register, 0);
 });
 
 test('customers wait at checkout until a cashier or the player is at the register', () => {
@@ -365,7 +384,7 @@ test('all five original player models build and animate as complete character ri
 test('staff hiring is ad-only and rewarded hire adds a working employee without spending cash', async () => {
   const storage = new MemoryStorage();
   const saved = createInitialState(19);
-  saved.stats.tomatoSold = 1;
+  saved.stats.pasteSold = 1;
   saved.availableUpgrades = ['tomatoFarm2'];
   new SaveService(storage).commit(saved, 'fixture:staff-unlock');
 
@@ -646,27 +665,27 @@ test('stations and items adhere to exact visual footprints and boundaries during
 
   // Test dimension getters
   const defaultTomatoDims = getStationDimensions('tomatoShelf', 0);
-  assert.equal(defaultTomatoDims.width, 2.35);
-  assert.equal(defaultTomatoDims.depth, 1.35);
+  assert.equal(defaultTomatoDims.width, 3.5);
+  assert.equal(defaultTomatoDims.depth, 1.9);
 
   // When rotated 90 degrees, width and depth swap to match visual volume
   const rotatedTomatoDims = getStationDimensions('tomatoShelf', Math.PI / 2);
-  assert.equal(rotatedTomatoDims.width, 1.35);
-  assert.equal(rotatedTomatoDims.depth, 2.35);
+  assert.equal(rotatedTomatoDims.width, 1.9);
+  assert.equal(rotatedTomatoDims.depth, 3.5);
 
   // Boundary checks: An item cannot be placed where its visual bounds extend outside zone walls
-  // Market zone max X is 13.5. tomatoShelf (width 2.35, halfW = 1.175) placed at x = 13.0 would reach 14.175 (outside)
+  // Market zone max X is 13.5. tomatoShelf (width 3.5, halfW = 1.175) placed at x = 13.0 would reach 14.175 (outside)
   assert.equal(canPlaceStation(state, 'tomatoShelf', 13.0, 0, 0), false, 'cannot extend beyond market right wall');
   // Safe position within zone bounds
-  assert.equal(canPlaceStation(state, 'tomatoShelf', 12.0, 0, 0), true, 'can place within safe bounds');
+  assert.equal(canPlaceStation(state, 'tomatoShelf', 11.5, 0, 0), true, 'can place within safe bounds');
 
   // Moving a station via GameApplication honors these boundaries
   const moveOutside = app.moveStation('tomatoShelf', 13.0, 0);
   assert.equal(moveOutside.ok, false);
 
-  const moveSafe = app.moveStation('tomatoShelf', 12.0, 0);
+  const moveSafe = app.moveStation('tomatoShelf', 11.5, 0);
   assert.equal(moveSafe.ok, true);
-  assert.equal(app.getState().layout.tomatoShelf.x, 12.0);
+  assert.equal(app.getState().layout.tomatoShelf.x, 11.5);
   assert.equal(app.getState().layout.tomatoShelf.z, 0);
   app.moveStation('tomatoShelf', 3, 2);
 });
@@ -776,20 +795,20 @@ test('adjacent shelves block gaps when less than 1 grid apart and allow passage 
   state.unlockedProducts = ['TOMATO', 'ORANGE'];
 
   // Case 1: Adjacent shelves placed with < 1 grid gap (e.g. 0.15m apart)
-  // tomatoShelf at x=2.0 (width 2.35, right edge = 3.175)
-  // orangeShelf at x=4.5 (width 2.35, left edge = 3.325) -> gap = 0.15m < 0.5
+  // tomatoShelf at x=2.0 (width 3.5, right edge = 3.75)
+  // orangeShelf at x=5.65 (width 3.5, left edge = 3.9) -> gap = 0.15m < 0.5
   state.layout = {
     tomatoShelf: { x: 2.0, z: 0 },
-    orangeShelf: { x: 4.5, z: 0 },
+    orangeShelf: { x: 5.65, z: 0 },
   };
   let boxes = getMarketCollisionBoxes(state);
   const gapBlocker = boxes.find((b) => b.id?.startsWith('gap:x:'));
   assert.ok(gapBlocker, 'Gap blocker should be created between adjacent shelves');
-  assert.ok(gapBlocker.minX <= 3.25 && gapBlocker.maxX >= 3.25, 'Gap between shelves is blocked');
+  assert.ok(gapBlocker.minX <= 3.825 && gapBlocker.maxX >= 3.825, 'Gap between shelves is blocked');
 
   // Case 2: Shelves placed with >= 1 grid gap (e.g. 0.65m apart)
-  // orangeShelf at x=5.0 (left edge = 3.825) -> gap = 3.825 - 3.175 = 0.65m >= 0.5
-  state.layout.orangeShelf = { x: 5.0, z: 0 };
+  // orangeShelf at x=6.15 (left edge = 4.4) -> gap = 4.4 - 3.75 = 0.65m >= 0.5
+  state.layout.orangeShelf = { x: 6.15, z: 0 };
   boxes = getMarketCollisionBoxes(state);
   const gapBlocker2 = boxes.find((b) => b.id?.startsWith('gap:x:'));
   assert.equal(gapBlocker2, undefined, 'No gap blocker when shelves are at least 1 grid apart');
@@ -800,15 +819,15 @@ test('shelves placed adjacent to walls block gap, while 1 grid away allows passa
   state.unlockedProducts = ['TOMATO'];
 
   // Right wall is at x = 13.5
-  // Case 1: Shelf adjacent to wall (< 1 grid gap, e.g. x = 12.0 -> maxX = 13.175 -> gap = 0.325m < 0.5)
-  state.layout = { tomatoShelf: { x: 12.0, z: 0 } };
+  // Case 1: Shelf adjacent to wall (< 1 grid gap, e.g. x = 11.5 -> maxX = 13.75 -> gap = 0.25m < 0.5)
+  state.layout = { tomatoShelf: { x: 11.5, z: 0 } };
   let boxes = getMarketCollisionBoxes(state);
   const shelfBox = boxes.find((b) => b.id === 'tomatoShelf');
   assert.ok(shelfBox, 'Tomato shelf box exists');
   assert.equal(shelfBox.maxX, 13.5, 'Shelf box extends to wall to block passage when adjacent');
 
-  // Case 2: Shelf placed 1 grid further away (gap >= 0.5, e.g. x = 11.5 -> maxX = 12.675 -> gap = 0.825m >= 0.5)
-  state.layout = { tomatoShelf: { x: 11.5, z: 0 } };
+  // Case 2: Shelf placed 1 grid further away (gap >= 0.5, e.g. x = 11 -> maxX = 12.75 -> gap = 0.75m >= 0.5)
+  state.layout = { tomatoShelf: { x: 11, z: 0 } };
   boxes = getMarketCollisionBoxes(state);
   const shelfBox2 = boxes.find((b) => b.id === 'tomatoShelf');
   assert.ok(shelfBox2.maxX < 13.0, 'Shelf box does not extend to wall when >= 1 grid gap exists');
@@ -824,6 +843,7 @@ class FakeRewardedProvider {
   }
 
   isReady() { return this.ready; }
+  isSimulated() { return true; }
 
   async show(_placement, callbacks, context) {
     this.showCount += 1;
@@ -1328,3 +1348,191 @@ test('machine upgrades reject insufficient balance and can be bought repeatedly 
   assert.equal(app.upgradeMachine('paste').reason, 'insufficient-funds');
   assert.equal(app.getState().machines.paste.upgradeLevel, 0);
 });
+
+test('retention behavioral loop: variable tipping, opportunity cost calculation, and near-miss progress', () => {
+  const happyCustomer = { missedItems: 0, checkoutWaitTicks: 0, mealWaitTicks: 0 };
+  const unhappyCustomer = { missedItems: 2, checkoutWaitTicks: 100, mealWaitTicks: 0 };
+
+  // 1. Variable tipping with Pareto distribution (Skinnerian VR reinforcement)
+  assert.equal(tipForMood(happyCustomer, null), 12);
+  assert.equal(tipForMood(happyCustomer, 0.05), 30); // 10% Jackpot!
+  assert.equal(tipForMood(happyCustomer, 0.15), 18); // 15% Generous!
+  assert.equal(tipForMood(happyCustomer, 0.50), 12); // Standard happy tip
+  assert.equal(tipForMood(unhappyCustomer, 0.05), 10); // Unhappy stays bounded
+
+  // 2. Missed opportunity cost calculation (loss framing)
+  const emptyHandedShopper = { shoppingList: ['TOMATO', 'ORANGE'], shoppingIndex: 0 };
+  const partialShopper = { shoppingList: ['TOMATO', 'ORANGE'], shoppingIndex: 1 };
+  assert.equal(missedOpportunityAmount(emptyHandedShopper), 7); // TOMATO (3) + ORANGE (4)
+  assert.equal(missedOpportunityAmount(partialShopper), 4); // ORANGE (4)
+
+  // 3. Goal gradient and near-miss detection
+  assert.equal(goalProximityPercent(900, 1000), 90);
+  assert.equal(isNearMissGoal(900, 1000), true);
+  assert.equal(isNearMissGoal(800, 1000), false);
+  assert.equal(isNearMissGoal(1000, 1000), false); // Complete is not a near-miss
+
+  // 4. Endowed progress effect (PRP elimination)
+  assert.equal(endowedGoalProgress(0, 1000, 20), 20); // 20% free artificial head-start
+  assert.equal(endowedGoalProgress(500, 1000, 20), 50);
+
+  // 5. Customer empty-handed event with loss framing
+  const simState = createInitialState(404);
+  simState.stock['shelf:TOMATO'].items.TOMATO = 0;
+  const shopper = {
+    id: 'test-shopper-1',
+    kind: 'shopper',
+    x: 3,
+    z: 2,
+    phase: 'waiting-stock',
+    demand: 'TOMATO',
+    shoppingList: ['TOMATO'],
+    basket: [],
+    shoppingIndex: 0,
+    targetShelfId: 'tomatoShelf',
+    waitTicks: 181,
+    checkoutOrder: 1,
+  };
+  simState.customers = [shopper];
+  const { events } = advanceSimulation(simState);
+  const lostEvent = events.find((e) => e.type === 'customer-lost');
+  assert.ok(lostEvent, 'customer-lost event must be emitted when shopper leaves empty-handed');
+  assert.equal(lostEvent.lostAmount, 3);
+  assert.equal(shopper.reaction, 'unhappy');
+});
+
+test('rewarded ads monetization: near-miss bailout, express truck unload, variable multiplier, and 30-tick supplier drop', async () => {
+  const { app } = makeAdApp();
+  const state = app.getState();
+
+  // 1. Near-miss bailout on expansion upgrade (paste costs $45 = 450k atoms)
+  state.availableUpgrades.push('paste');
+  state.economy.balanceAtoms = 300_000; // 66.7% -> Below min near-miss (80%)
+  assert.equal(app.canOfferRewardedAd('near-miss-bailout', { upgradeType: 'expansion', upgradeId: 'paste' }), false);
+
+  state.economy.balanceAtoms = 400_000; // 88.9% -> Near-miss (80% - 99%)
+  assert.equal(app.canOfferRewardedAd('near-miss-bailout', { upgradeType: 'expansion', upgradeId: 'paste' }), true);
+
+  state.economy.balanceAtoms = 450_000; // 100% -> Affordable without ad bailout
+  assert.equal(app.canOfferRewardedAd('near-miss-bailout', { upgradeType: 'expansion', upgradeId: 'paste' }), false);
+
+  // Watch ad for near-miss expansion upgrade
+  app.getState().economy.balanceAtoms = 400_000; // missing $5 = 50k atoms
+  const bailoutResult = await app.watchRewardedAd('near-miss-bailout', { upgradeType: 'expansion', upgradeId: 'paste' });
+  assert.equal(bailoutResult.ok, true);
+  assert.equal(app.getState().completedUpgrades.includes('paste'), true);
+  assert.equal(app.getState().unlocked.paste, true);
+  assert.equal(app.getState().economy.balanceAtoms, 0); // 400k + 50k grant - 450k purchase = 0
+
+  // 2. Near-miss bailout on machine progression
+  const pasteUpgradeCost = machineUpgradeCost('paste', 0);
+  const pasteCostAtoms = pasteUpgradeCost * 10_000;
+  app.getState().economy.balanceAtoms = Math.round(pasteCostAtoms * 0.90); // 90%
+  assert.equal(app.canOfferRewardedAd('near-miss-bailout', { upgradeType: 'machine', machineId: 'paste' }), true);
+
+  const machineBailout = await app.watchRewardedAd('near-miss-bailout', { upgradeType: 'machine', machineId: 'paste' });
+  assert.equal(machineBailout.ok, true);
+  assert.equal(app.getState().machines.paste.upgradeLevel, 1);
+
+  // 3. Variable ratio order multiplier (x2, x3, x5)
+  app.getState().lastOrderReward = { id: 'order-mult-5', reward: 20, item: 'TOMATO', quantity: 2, claimed: false };
+  const mult5 = await app.watchRewardedAd('order-double', { orderId: 'order-mult-5', roll: 0.02 });
+  assert.equal(mult5.ok, true);
+  assert.equal(mult5.details.multiplier, 5);
+  assert.equal(mult5.amount, 80); // 20 * (5 - 1) = 80 bonus
+
+  app.getState().lastOrderReward = { id: 'order-mult-3', reward: 15, item: 'TOMATO', quantity: 2, claimed: false };
+  const mult3 = await app.watchRewardedAd('order-double', { orderId: 'order-mult-3', roll: 0.20 });
+  assert.equal(mult3.ok, true);
+  assert.equal(mult3.details.multiplier, 3);
+  assert.equal(mult3.amount, 30); // 15 * (3 - 1) = 30 bonus
+
+  app.getState().lastOrderReward = { id: 'order-mult-2', reward: 10, item: 'TOMATO', quantity: 2, claimed: false };
+  const mult2 = await app.watchRewardedAd('order-double', { orderId: 'order-mult-2', roll: 0.50 });
+  assert.equal(mult2.ok, true);
+  assert.equal(mult2.details.multiplier, 2);
+  assert.equal(mult2.amount, 10); // 10 * (2 - 1) = 10 bonus
+
+  // 4. Express truck unload forklift
+  app.getState().unlocked.managerOffice = true;
+  app.getState().procurement = {
+    nextOrderId: 2,
+    orders: [{
+      id: 'procurement-1',
+      status: 'arriving',
+      totalAtoms: 50_000,
+      lines: [{ item: 'COLA', cases: 1, quantity: 6, unitCostAtoms: 5000 }],
+      createdTick: 10,
+    }],
+    delivery: { orderId: 'procurement-1', phase: 'arriving', phaseStartTick: app.getState().tick, cargoReleased: false },
+    automation: { enabled: false, threshold: 2, items: [] },
+  };
+  assert.equal(app.canOfferRewardedAd('express-truck-unload'), true);
+  const unloadResult = await app.watchRewardedAd('express-truck-unload');
+  assert.equal(unloadResult.ok, true);
+  assert.equal(app.getState().procurement.delivery.cargoReleased, true);
+  assert.equal(app.getState().procurement.delivery.phase, 'departing');
+  assert.equal(app.getState().procurement.orders.find((o) => o.id === 'procurement-1').status, 'delivered');
+  assert.equal(quantityAt(app.getState().stock, 'dock:incoming', 'COLA'), 6);
+
+  // 5. Emergency supplier drop lower threshold (30 ticks instead of 200)
+  app.getState().machines.paste.blocked = 'missing-input';
+  app.getState().machines.paste.blockedTicks = 32; // >= 30 ticks
+  assert.equal(app.canOfferRewardedAd('supplier-drop', { machineId: 'paste' }), true);
+});
+
+test('hardening: safe cancelReservation null checks, bounded dock capacity, simulated ad return receipt, and cash pile disposal', async () => {
+  // 1. cancelReservation null guards
+  const state = createInitialState(999);
+  state.reservations['res-missing-source'] = { from: 'non-existent-source', to: 'player', item: 'TOMATO', quantity: 2 };
+  assert.doesNotThrow(() => {
+    assert.equal(cancelReservation(state, 'res-missing-source'), true);
+  });
+  assert.equal(state.reservations['res-missing-source'], undefined);
+
+  state.reservations['res-missing-target'] = { from: 'player', to: 'non-existent-target', item: 'TOMATO', quantity: 1 };
+  assert.doesNotThrow(() => {
+    assert.equal(cancelReservation(state, 'res-missing-target'), true);
+  });
+  assert.equal(cancelReservation(state, 'non-existent-res'), false);
+
+  // 2. DevelopmentRewardedProvider returns truthy receipt
+  const devProvider = new DevelopmentRewardedProvider(null, true, 0);
+  const receipt = await devProvider.show('order-double', {}, { rewardId: 'test-dev-reward' });
+  assert.equal(typeof receipt, 'object');
+  assert.equal(receipt.rewarded, true);
+  assert.equal(receipt.rewardId, 'test-dev-reward');
+
+  // 3. Express truck unload does not inflate dock capacity
+  const adProvider = new DevelopmentRewardedProvider(new AdMobRewardedProvider(null), true, 0);
+  const app = new GameApplication(new SaveService(new MemoryStorage()), 1, new RewardedAdService(adProvider));
+  app.getState().unlocked.managerOffice = true;
+  app.getState().stock['dock:incoming'].capacity = 240;
+  app.getState().procurement = {
+    nextOrderId: 3,
+    orders: [{
+      id: 'procurement-dock-cap',
+      status: 'arriving',
+      totalAtoms: 60_000,
+      lines: [{ item: 'COLA', cases: 1, quantity: 20, unitCostAtoms: 3000 }],
+      createdTick: 20,
+    }],
+    delivery: { orderId: 'procurement-dock-cap', phase: 'arriving', phaseStartTick: app.getState().tick, cargoReleased: false },
+    automation: { enabled: false, threshold: 2, items: [] },
+  };
+  const unloadRes = await app.watchRewardedAd('express-truck-unload');
+  assert.equal(unloadRes.ok, true);
+  assert.equal(app.getState().stock['dock:incoming'].capacity, 240);
+
+  // 4. Order-double random roll generation when client omits roll
+  app.getState().lastOrderReward = { id: 'order-test-hardening', reward: 50, item: 'TOMATO', quantity: 2, claimed: false };
+  const doubleRes = await app.watchRewardedAd('order-double', { orderId: 'order-test-hardening' });
+  assert.equal(doubleRes.ok, true);
+  assert.ok([2, 3, 5].includes(doubleRes.details.multiplier));
+
+  // 5. Cash pile model resource disposal
+  const pile = createCashPileModel();
+  assert.doesNotThrow(() => disposeCashPileModel(pile));
+});
+
+

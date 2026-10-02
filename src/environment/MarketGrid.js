@@ -1,4 +1,7 @@
 import * as THREE from 'three';
+import { AmbientLife } from './AmbientLife.js';
+import { createRetailDetails } from './RetailDetails.js';
+import { ConstructionSites } from './ConstructionSites.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { GAME_CONFIG } from '../config/GameConfig.js';
 import { HANGING_SIGN_DEFAULT_POSITIONS, SHELF_STAGING_AREA } from '../domain/layout.js';
@@ -21,6 +24,9 @@ export class MarketGrid {
     this.hangingSigns = new Map();
     this.props = new EnvironmentProps(scene);
     this.buildEnvironment();
+    this.constructionSites = new ConstructionSites(scene);
+    this.ambientLife = new AmbientLife(scene);
+    this.retailDetails = createRetailDetails(scene);
   }
 
   buildEnvironment() {
@@ -51,8 +57,8 @@ export class MarketGrid {
     const storeMat = new THREE.MeshStandardMaterial({
       map: storeFloorTex,
       color: 0xffffff,
-      roughness: 0.98,
-      metalness: 0,
+      roughness: 0.32,
+      metalness: 0.04,
     });
     const storeFloor = new THREE.Mesh(storeGeo, storeMat);
     storeFloor.rotation.x = -Math.PI / 2;
@@ -143,7 +149,6 @@ export class MarketGrid {
     this.props.createSlidingGlassDoors(5, 9.0, 6.2, 2.7);
     this.createSupermarketShowcaseWindows();
     this.createEntranceWelcomeMat(5, 7.6);
-    this.createAisleCategorySigns();
 
     // B. Nested metal wire shopping carts parked outside entrance on sidewalk (x = 9.2, z = 10.2)
     this.props.createCartStack(9.2, 10.2, 4, -Math.PI / 2);
@@ -430,62 +435,6 @@ export class MarketGrid {
     this.scene.add(mesh);
   }
 
-  createAisleCategorySigns() {
-    const signs = [
-      { id: 'produce', text: 'MANAV • PRODUCE', color: '#5b9c66' },
-      { id: 'drinks', text: 'İÇECEK • COLD DRINKS', color: '#5d91bd' },
-      { id: 'bakery', text: 'FIRIN • BAKERY', color: '#c98754' },
-      { id: 'grocery', text: 'TEMEL GIDA • GROCERY', color: '#b9665e' },
-    ];
-
-    const cableMat = new THREE.MeshStandardMaterial({ color: 0xaab1aa, metalness: 0.25, roughness: 0.52 });
-    const mountMat = new THREE.MeshStandardMaterial({ color: 0x56635b, metalness: 0.2, roughness: 0.64 });
-    for (const s of signs) {
-      const group = new THREE.Group();
-      const position = HANGING_SIGN_DEFAULT_POSITIONS[s.id];
-      group.name = `hanging-sign-${s.id}`;
-      group.userData.hangingSignId = s.id;
-      group.position.set(position.x, 3.6, position.z);
-
-      const canvas = document.createElement('canvas');
-      canvas.width = 512;
-      canvas.height = 128;
-      const ctx = canvas.getContext('2d');
-      ctx.fillStyle = '#3e4d43';
-      ctx.fillRect(0, 0, 512, 128);
-      ctx.fillStyle = s.color;
-      ctx.fillRect(0, 0, 14, 128);
-      ctx.strokeStyle = '#d9d0c1';
-      ctx.lineWidth = 4;
-      ctx.strokeRect(6, 6, 500, 116);
-      ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 33px Fredoka, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(s.text, 256, 64);
-
-      const texture = new THREE.CanvasTexture(canvas);
-      texture.colorSpace = THREE.SRGBColorSpace;
-      const signMat = new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide });
-      const signMesh = new THREE.Mesh(new THREE.PlaneGeometry(1.8, 0.5), signMat);
-      signMesh.position.y = -0.85;
-      signMesh.userData.hangingSignId = s.id;
-      group.add(signMesh);
-
-      // Matching short hangers keep each sign level and visually connected to the ceiling.
-      for (const cx of [-0.66, 0.66]) {
-        const cable = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.62, 6), cableMat);
-        cable.position.set(cx, -0.31, 0);
-        const mount = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.06, 8), mountMat);
-        mount.position.set(cx, 0, 0);
-        group.add(cable, mount);
-      }
-
-      this.scene.add(group);
-      this.hangingSigns.set(s.id, group);
-    }
-  }
-
   syncHangingSigns(positions) {
     for (const [id, group] of this.hangingSigns) {
       const position = positions?.[id] ?? HANGING_SIGN_DEFAULT_POSITIONS[id];
@@ -565,6 +514,12 @@ export class MarketGrid {
 
   setDaylight(daylight) {
     const nightLighting = 1 - THREE.MathUtils.smoothstep(daylight, 0.25, 0.85);
+    for (const { pointLight, beam, pool } of this.props.streetLights) {
+      pointLight.intensity = 0.85 * nightLighting;
+      beam.material.opacity = 0.035 * nightLighting;
+      pool.material.opacity = 0.07 * nightLighting;
+      beam.visible = pool.visible = nightLighting > 0.01;
+    }
     for (const { light, glow } of this.interiorLights ?? []) {
       light.intensity = 2.6 * nightLighting;
       glow.material.opacity = 0.72 * nightLighting;
@@ -864,9 +819,8 @@ export class MarketGrid {
 
     // 5. Pedestrian Zebra Crossing connecting parking to supermarket entrance doors at x = 5
     for (let x = 3.2; x <= 6.8; x += 0.72) {
-      const zebra = new THREE.Mesh(new THREE.PlaneGeometry(0.44, 2.6), stripeMat);
-      zebra.rotation.x = -Math.PI / 2;
-      zebra.position.set(x, -0.03, 11.5);
+      const zebra = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.025, 2.6), stripeMat);
+      zebra.position.set(x, 0.012, 11.5);
       this.scene.add(zebra);
     }
   }

@@ -140,6 +140,7 @@ export const UPGRADES = Object.freeze([
   { id: 'chefWaiter', title: 'Şef ve garson işe al', price: 220, x: -34, z: 0, when: 'tipCollected', unlocks: ['chefWaiter'] },
   { id: 'logisticsOffice', title: 'Yönetici Ofisi ve Lojistik Hattı', price: 650, x: 22, z: 0, when: 'eggSold', unlocks: ['managerOffice', 'loadingDock', 'warehouse'] },
   { id: 'warehouseOperator', title: 'Depocu işe al', price: 160, x: 18, z: 5, when: 'logisticsOffice', unlocks: ['warehouseOperator'] },
+  { id: 'security', title: 'Güvenlik görevlisi işe al', price: 150, x: 5, z: 8.5, when: 'logisticsOffice', unlocks: ['security'] },
   { id: 'storeManager', title: 'Mağaza müdürü işe al', price: 200, x: 22, z: 0, when: 'logisticsOffice', unlocks: ['storeManager'] },
 ]);
 
@@ -151,6 +152,7 @@ export const STAFF = Object.freeze({
   chefWaiter: { title: 'Şef ve garson', icon: 'chef' },
   warehouseOperator: { title: 'Depocu', icon: 'courierAvatar' },
   storeManager: { title: 'Mağaza müdürü', icon: 'cashier' },
+  security: { title: 'Güvenlik görevlisi', icon: 'cashier' },
 });
 
 export const STAFF_HIRES = Object.freeze([
@@ -160,6 +162,7 @@ export const STAFF_HIRES = Object.freeze([
   { upgradeId: 'caretaker', staffTypes: ['caretaker'], effect: 'Yemi kümese, yumurtaları reyona taşır.', unlock: 'İlk yumurta satışından sonra açılır.' },
   { upgradeId: 'chefWaiter', staffTypes: ['chefWaiter', 'waiter'], effect: 'Restoran mutfağını ve masa servisini otomatikleştirir.', unlock: 'Restoran müşterisinden bahşiş alınca açılır.' },
   { upgradeId: 'warehouseOperator', staffTypes: ['warehouseOperator'], effect: 'Rampadan kolileri depoya ve reyonlara taşır.', unlock: 'Yönetici Ofisi ve Lojistik Hattı açılınca kullanılabilir.' },
+  { upgradeId: 'security', staffTypes: ['security'], effect: 'Kapıda hırsızları yakalar; molada veya maaş beklerken koruma durur.', unlock: 'Lojistik hattından sonra açılır.' },
   { upgradeId: 'storeManager', staffTypes: ['storeManager'], effect: 'Terminaldeki asgari stok eşiğine göre toptan sipariş verir.', unlock: 'Yönetici Ofisi ve Lojistik Hattı açılınca kullanılabilir.' },
 ]);
 

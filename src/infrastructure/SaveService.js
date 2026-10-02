@@ -15,8 +15,9 @@ function checksum(value) {
   return (hash >>> 0).toString(16).padStart(8, '0');
 }
 
-function wrap(payload, sequence, transactionId = 'checkpoint') {
-  const body = JSON.stringify({ payload, sequence, transactionId, saveVersion: SAVE_VERSION });
+function wrap(payload, sequence, transactionId = 'checkpoint', preStringifiedPayload = null) {
+  const payloadStr = preStringifiedPayload ?? JSON.stringify(payload);
+  const body = `{"payload":${payloadStr},"sequence":${sequence},"transactionId":${JSON.stringify(transactionId)},"saveVersion":${SAVE_VERSION}}`;
   return JSON.stringify({ body, checksum: checksum(body) });
 }
 
@@ -80,13 +81,14 @@ export class SaveService {
 
   commit(state, transactionId) {
     if (!transactionId) throw new TypeError('Kalıcı işlem için transactionId gerekir.');
-    const payloadHash = checksum(JSON.stringify(state));
+    const payloadJson = JSON.stringify(state);
+    const payloadHash = checksum(payloadJson);
     if (transactionId === this.lastTransactionId) {
       if (payloadHash === this.lastPayloadChecksum) return { duplicate: true, sequence: this.sequence };
       throw new SaveRecoveryError(`Transaction ID farklı içerikle tekrar kullanıldı: ${transactionId}`);
     }
     const nextSequence = this.sequence + 1;
-    const nextRecord = wrap(state, nextSequence, transactionId);
+    const nextRecord = wrap(state, nextSequence, transactionId, payloadJson);
     const current = this.storage.getItem(KEYS.current);
     if (current) {
       try { this.storage.setItem(KEYS.backup, current); } catch { /* current remains authoritative */ }

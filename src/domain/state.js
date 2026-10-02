@@ -1,3 +1,4 @@
+import { createWorldEvents, normalizeWorldEvents } from './worldEvents.js';
 import { ITEMS, MONEY_ATOMS, SHELVES, STATIONS, STAFF_FACILITIES, STAFF_HIRES } from './catalog.js';
 import { normalizeWorkerWelfare } from './staff.js';
 import { createFarmState, ensureFarmState, syncFarmHarvest } from './farm.js';
@@ -7,7 +8,7 @@ import { PLAYER_CHARACTER_IDS } from './characters.js';
 import { normalizeProcurement } from './procurement.js';
 import { DEFAULT_CUSTOMER_SATISFACTION, normalizeCustomerSatisfaction } from './customerExperience.js';
 
-export const SAVE_VERSION = 12;
+export const SAVE_VERSION = 13;
 
 function emptyStock(capacity) {
   return { capacity, items: {}, reserved: {}, reservedCapacity: 0 };
@@ -28,6 +29,7 @@ export function createInitialState(seed = 0x51f15e) {
   };
   const state = {
     saveVersion: SAVE_VERSION,
+    worldEvents: createWorldEvents(seed),
     revision: 0,
     tick: 0,
     customerSpawnTicks: 0,
@@ -70,6 +72,7 @@ export function createInitialState(seed = 0x51f15e) {
     layout: {},
     hangingSigns: normalizeHangingSignPositions(HANGING_SIGN_DEFAULT_POSITIONS),
     pendingShelfIds: [],
+    pendingStationIds: [],
     decorations: [
       { id: 'decoration-boxes', type: 'cardboardBoxes', x: -3.8, z: -7.5, rotation: 0 },
       { id: 'trash-bin', type: 'trashBin', x: 12.5, z: 7.5, rotation: 0 },
@@ -256,7 +259,7 @@ function removeLegacyFurniture(candidate) {
 
 export function hydrateState(candidate) {
   if (!candidate || typeof candidate !== 'object') throw new Error('Kayıt boş veya bozuk.');
-  if (![2, 3, 4, 5, 6, 7, 8, 9, 10, 11, SAVE_VERSION].includes(candidate.saveVersion)) throw new Error(`Bu kayıt sürümü desteklenmiyor (${candidate.saveVersion ?? 'bilinmiyor'}).`);
+  if (![2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, SAVE_VERSION].includes(candidate.saveVersion)) throw new Error(`Bu kayıt sürümü desteklenmiyor (${candidate.saveVersion ?? 'bilinmiyor'}).`);
   candidate = removeLegacyFurniture(candidate);
   const initial = createInitialState(candidate.rng);
   const hydrated = { ...initial, ...candidate };
@@ -368,6 +371,10 @@ export function hydrateState(candidate) {
   hydrated.pendingShelfIds = [...new Set((Array.isArray(candidate.pendingShelfIds) ? candidate.pendingShelfIds : [])
     .filter((id) => STATIONS[id]?.kind === 'shelf' && !hydrated.layout[id]
       && Array.isArray(hydrated.unlockedProducts) && hydrated.unlockedProducts.includes(STATIONS[id].item)))];
+  hydrated.pendingStationIds = [...new Set((Array.isArray(candidate.pendingStationIds) ? candidate.pendingStationIds : [])
+    .filter(id => STATIONS[id] && !hydrated.layout[id]
+      && (hydrated.machines[id] || hydrated.farms[id] || candidate.diningTables?.[id]
+        || hydrated.unlockedProducts.includes(STATIONS[id].item))))];
   hydrated.decorations = (Array.isArray(candidate.decorations) ? candidate.decorations : []).filter((entry) =>
     entry && typeof entry.id === 'string' && typeof entry.type === 'string'
       && Number.isFinite(entry.x) && Number.isFinite(entry.z) && entry.placed !== false);
@@ -555,5 +562,6 @@ export function hydrateState(candidate) {
     throw new Error('Kayıttaki stok işlem kimlikleri yineleniyor veya geçersiz.');
   }
   syncFarmHarvest(hydrated);
+  hydrated.worldEvents = normalizeWorldEvents(hydrated, candidate.worldEvents);
   return hydrated;
 }

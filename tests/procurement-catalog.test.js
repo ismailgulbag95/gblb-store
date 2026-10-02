@@ -80,8 +80,8 @@ test('version 10 saves migrate empty logistics without altering wallet, workers 
   delete old.stock['warehouse:main'];
   for (const item of imports) delete old.stock[`shelf:${item}`];
   const migrated = hydrateState(old);
-  assert.equal(SAVE_VERSION, 11);
-  assert.equal(migrated.saveVersion, 11);
+  assert.equal(SAVE_VERSION, 13);
+  assert.equal(migrated.saveVersion, SAVE_VERSION);
   assert.equal(migrated.economy.balanceAtoms, old.economy.balanceAtoms);
   assert.equal(migrated.stock.player.items.TOMATO, 2);
   assert.equal(migrated.workers[0].energy, 37);

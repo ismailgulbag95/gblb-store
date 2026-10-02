@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { addContactShadow } from './ContactShadow.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 
 export function createDiningChair(cushionColor = 0xd63031, woodColor = 0x6d4c41) {
@@ -56,6 +57,7 @@ export function createDiningChair(cushionColor = 0xd63031, woodColor = 0x6d4c41)
 
 export function createDiningTableModel(itemFactory, tableId = 'table1') {
   const group = new THREE.Group();
+  addContactShadow(group, 2.8, 2.1);
 
   // Fine Restaurant Materials
   const honeyOakMat = new THREE.MeshStandardMaterial({ color: 0xb3743a, roughness: 0.45 });

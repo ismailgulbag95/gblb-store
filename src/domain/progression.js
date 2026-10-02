@@ -63,3 +63,20 @@ export function percentGain(currentValue, nextValue) {
   if (!Number.isFinite(currentValue) || currentValue <= 0 || !Number.isFinite(nextValue) || nextValue <= 0) return 0;
   return Math.max(0, (nextValue / currentValue - 1) * 100);
 }
+
+// ponytail: hedefe yakınlık ve PRP önleme yardımcıları
+export function goalProximityPercent(currentAtoms, targetCostAtoms) {
+  if (!Number.isFinite(targetCostAtoms) || targetCostAtoms <= 0) return 100;
+  if (!Number.isFinite(currentAtoms) || currentAtoms <= 0) return 0;
+  return Math.min(100, Math.max(0, Math.round((currentAtoms / targetCostAtoms) * 100)));
+}
+
+export function isNearMissGoal(currentAtoms, targetCostAtoms, minPercent = 85, maxPercent = 99) {
+  const percent = goalProximityPercent(currentAtoms, targetCostAtoms);
+  return percent >= minPercent && percent <= maxPercent;
+}
+
+export function endowedGoalProgress(currentAtoms, targetCostAtoms, bonusPercent = 20) {
+  const actual = goalProximityPercent(currentAtoms, targetCostAtoms);
+  return Math.min(100, Math.max(actual, bonusPercent));
+}

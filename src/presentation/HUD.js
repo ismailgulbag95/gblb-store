@@ -1,7 +1,10 @@
+import { WorldEventAlert } from './WorldEventAlert.js';
+import { activeWorldEvent, wholesaleUnitCost } from '../domain/worldEvents.js';
 import { FARM_AD_UPGRADE_IDS, IMPORTED_SHELVES, ITEMS, MONEY_ATOMS, PROCUREMENT_CATALOG, RECIPES, SHELVES, STAFF, STAFF_ARCHETYPES, STAFF_FACILITIES, STAFF_HIRES, STAFF_LAND_PRICE, STATIONS, UPGRADES, staffDailySalaryAtoms } from '../domain/catalog.js';
 import { DECORATIONS, decorBonus, decorScore } from '../domain/decorCatalog.js';
+import { pendingPlacementIds } from '../domain/layout.js';
 import { decorationPrice, orderProgress } from '../domain/orders.js';
-import { machineProductionSeconds, machineSpeedMultiplier, machineUpgradeCost, percentGain, staffSpeedMultiplier, staffUpgradeCost } from '../domain/progression.js';
+import { endowedGoalProgress, isNearMissGoal, machineProductionSeconds, machineSpeedMultiplier, machineUpgradeCost, percentGain, staffSpeedMultiplier, staffUpgradeCost } from '../domain/progression.js';
 import { gameDayNumber } from '../domain/dayCycle.js';
 import { normalizeCustomerSatisfaction } from '../domain/customerExperience.js';
 import { PLAYER_CHARACTERS } from '../domain/characters.js';
@@ -30,12 +33,14 @@ const EN = {
     cashier: 'Handles customer payments at the register.', harvester: 'Stocks shelves first, then supplies production machines.',
     factoryFeeder: 'Refills retail stock before carrying production ingredients.', caretaker: 'Supplies the coop and stocks eggs on the shelf.',
     chefWaiter: 'Automates restaurant cooking and table service.',
+    security: 'Catches shoplifters at the entrance while on duty.',
     warehouseOperator: 'Carries incoming dock stock to retail shelves.', storeManager: 'Manages minimum stock orders from the office terminal.',
   },
   staffUnlock: {
     cashier: 'Unlocks after your first paste sale; hire from Staff Management.', harvester: 'Unlocks after your first paste sale.',
     factoryFeeder: 'Unlocks after your first orange juice sale.', caretaker: 'Unlocks after your first egg sale.',
     chefWaiter: 'Unlocks after collecting a restaurant tip.',
+    security: 'Unlocks with the office and logistics line.',
     warehouseOperator: 'Unlocks with the office and logistics line.', storeManager: 'Unlocks with the office and logistics line.',
   },
 };
@@ -51,7 +56,7 @@ const PROCUREMENT_CATEGORIES = [
 ];
 const PROCUREMENT_NAMES_EN = { COLA: 'Cola', SODA: 'Soda', CHIPS: 'Chips', BISCUIT: 'Biscuits', CHOCOLATE: 'Chocolate', CANNED_FISH: 'Canned fish', DETERGENT: 'Detergent', SHAMPOO: 'Shampoo', TOMATO: 'Tomato', TOMATO_PASTE: 'Tomato paste', ORANGE: 'Orange', ORANGE_JUICE: 'Orange juice', CORN: 'Corn', POPCORN: 'Popcorn', WHEAT: 'Wheat', FLOUR: 'Flour', BREAD: 'Bread', EGG: 'Egg', CHICKEN_FEED: 'Chicken feed', ORANGE_TART: 'Orange tart', BURGER: 'Gourmet burger', PIZZA: 'Pizza' };
 const procurementName = (item, english) => escapeMarkup(english ? PROCUREMENT_NAMES_EN[item] ?? ITEMS[item]?.name ?? item : ITEMS[item]?.name ?? item);
-const procurementTotal = (cart) => Object.entries(cart ?? {}).reduce((total, [item, cases]) => total + (PROCUREMENT_CATALOG[item] ? PROCUREMENT_CATALOG[item].unitCostAtoms * PROCUREMENT_CATALOG[item].caseSize * cases : 0), 0);
+const procurementTotal = (cart, state) => Object.entries(cart ?? {}).reduce((total, [item, cases]) => total + (PROCUREMENT_CATALOG[item] ? wholesaleUnitCost(state, item) * PROCUREMENT_CATALOG[item].caseSize * cases : 0), 0);
 
 function staffBreakText(worker, english) {
   const phase = worker.break?.phase;
@@ -65,6 +70,7 @@ function staffBreakText(worker, english) {
 export class HUD {
   constructor(app, input, onModalChange = () => {}) {
     this.app = app;
+    this.worldEventAlert = new WorldEventAlert(app);
     this.input = input;
     this.onModalChange = onModalChange;
     this.modals = ['expansion-modal', 'staff-candidates-modal', 'procurement-modal', 'settings-modal', 'inventory-modal', 'decor-modal', 'recovery-modal', 'bonus-offer-modal'];
@@ -77,6 +83,13 @@ export class HUD {
     this.toasts = new ToastManager(app);
     hydrateAssetIcons();
     this.#cacheElements();
+    this.pendingPlacements = document.getElementById('pending-placement-panel');
+    this.pendingPlacements.addEventListener('click', event => {
+      const button = event.target.closest('[data-pending-station]');
+      if (!button) return;
+      if (!this.input.layoutMode) document.getElementById('btn-layout')?.click();
+      this.input.selectPendingStation(button.dataset.pendingStation);
+    });
     this.characterPreviewSources = mountCharacterPreviews();
     this.#bind();
   }
@@ -243,6 +256,10 @@ export class HUD {
         if (event.target === modal && id !== 'recovery-modal') this.close(id);
       });
     });
+    if (import.meta.env?.PROD) {
+      document.querySelector('.settings-tab[data-tab="debug"]')?.remove();
+      document.querySelector('.settings-content[data-panel="debug"]')?.remove();
+    }
     document.querySelectorAll('.settings-tab').forEach((button) => button.addEventListener('click', () => this.#selectSettingsTab(button.dataset.tab)));
     document.querySelectorAll('[data-language]').forEach((button) => button.addEventListener('click', () => {
       this.app.setLanguage(button.dataset.language);
@@ -366,6 +383,8 @@ export class HUD {
       upgradeId: button.dataset.adUpgrade,
       role: button.dataset.adRole,
       machineId: button.dataset.adMachine,
+      upgradeType: button.dataset.adUpgradeType,
+      costAtoms: button.dataset.adCostAtoms ? Number(button.dataset.adCostAtoms) : undefined,
     };
   }
 
@@ -402,6 +421,7 @@ export class HUD {
   }
 
   #debug(action) {
+    if (import.meta.env?.PROD) return;
     if (action === 'credit') this.app.debugCredit(1_000);
     if (action === 'creditLarge') this.app.debugCredit(99_999);
     if (action === 'capacity') this.app.debugCapacity(this.app.getState().player.capacity + 50);
@@ -529,7 +549,7 @@ export class HUD {
     const manager = state.workers.some((worker) => worker.type === 'storeManager');
     const automation = this.procurementAutomationDraft ?? state.procurement?.automation ?? { enabled: false, threshold: 2, items: [] };
     const signature = JSON.stringify([state.settings.language, this.procurementCategory, cart, state.economy.balanceAtoms,
-      orders.map((order) => [order.id, order.status]), manager, automation, Object.keys(state.unlocked ?? {}).filter((id) => state.unlocked[id])]);
+      orders.map((order) => [order.id, order.status]), activeWorldEvent(state, 'flashCargo')?.items, manager, automation, Object.keys(state.unlocked ?? {}).filter((id) => state.unlocked[id])]);
     if (!force && signature === this.lastProcurementSignature) return;
     this.lastProcurementSignature = signature;
     const category = PROCUREMENT_CATEGORIES.find((entry) => entry.id === this.procurementCategory) ?? PROCUREMENT_CATEGORIES[0];
@@ -540,23 +560,30 @@ export class HUD {
       const shelfBuilt = shelf && Boolean(state.unlocked?.[shelf.stationId]);
       const shelfCost = shelf?.price * MONEY_ATOMS;
       const furniture = shelf ? `<button type="button" data-imported-shelf="${entry.item}" ${shelfBuilt || state.economy.balanceAtoms < shelfCost ? 'disabled' : ''}>${shelfBuilt ? (english ? 'Shelf available' : 'Reyon mevcut') : `${shelf.displayType === 'cooler' ? (english ? 'Place cooler' : 'Soğutucu yerleştir') : (english ? 'Place gondola' : 'Gondol yerleştir')} · $${staffMoney(shelfCost, english)}`}</button>` : '';
-      return `<article class="crt-product"><div><strong>${procurementName(entry.item, english)}</strong><small>${english ? 'Case' : 'Koli'} × ${entry.caseSize} · $${staffMoney(entry.unitCostAtoms * entry.caseSize, english)}</small></div><div class="crt-product-controls"><button type="button" data-procurement-add="${entry.item}" ${cart[entry.item] >= 10 || cartCases >= 20 ? 'disabled' : ''}>+ ${english ? 'Add case' : 'Koli ekle'}</button>${furniture}</div></article>`;
+      return `<article class="crt-product"><div><strong>${procurementName(entry.item, english)}${activeWorldEvent(state, 'flashCargo')?.items.includes(entry.item) ? ' · −50%' : ''}</strong><small>${english ? 'Case' : 'Koli'} × ${entry.caseSize} · $${staffMoney(wholesaleUnitCost(state, entry.item) * entry.caseSize, english)}</small></div><div class="crt-product-controls"><button type="button" data-procurement-add="${entry.item}" ${cart[entry.item] >= 10 || cartCases >= 20 ? 'disabled' : ''}>+ ${english ? 'Add case' : 'Koli ekle'}</button>${furniture}</div></article>`;
     }).join('');
     const lines = Object.entries(cart).filter(([item, cases]) => PROCUREMENT_CATALOG[item] && cases > 0).map(([item, cases]) => {
       const entry = PROCUREMENT_CATALOG[item];
-      return `<li><span>${procurementName(item, english)} × ${cases} ${english ? 'cases' : 'koli'} (${cases * entry.caseSize})</span><strong>$${staffMoney(entry.unitCostAtoms * entry.caseSize * cases, english)}</strong><button type="button" data-procurement-remove="${item}" aria-label="${english ? 'Remove a case of' : 'Bir koli çıkar:'} ${procurementName(item, english)}">−</button></li>`;
+      return `<li><span>${procurementName(item, english)} × ${cases} ${english ? 'cases' : 'koli'} (${cases * entry.caseSize})</span><strong>$${staffMoney(wholesaleUnitCost(state, entry.item) * entry.caseSize * cases, english)}</strong><button type="button" data-procurement-remove="${item}" aria-label="${english ? 'Remove a case of' : 'Bir koli çıkar:'} ${procurementName(item, english)}">−</button></li>`;
     }).join('');
-    const total = procurementTotal(cart);
+    const total = procurementTotal(cart, state);
     const statuses = english ? { queued: 'Queued', arriving: 'Arriving', unloading: 'Unloading', delivered: 'Unloaded at dock' }
       : { queued: 'Sırada', arriving: 'Yolda', unloading: 'İndiriliyor', delivered: 'Rampaya indirildi' };
     const queue = orders.slice(-5).reverse().map((order) => `<li><span>${escapeMarkup(order.id)} · ${(order.lines ?? []).map((line) => `${procurementName(line.item, english)} × ${line.quantity}`).join(', ')}</span><strong>${statuses[order.status] ?? escapeMarkup(order.status)}</strong></li>`).join('');
     const autoItems = Object.values(PROCUREMENT_CATALOG).map((entry) => `<label><input type="checkbox" data-procurement-auto-item="${entry.item}" ${automation.items?.includes(entry.item) ? 'checked' : ''} ${manager ? '' : 'disabled'} />${procurementName(entry.item, english)}</label>`).join('');
+    const delivery = state.procurement?.delivery;
+    const canExpressUnload = delivery && (delivery.phase === 'arriving' || delivery.phase === 'unloading') && !delivery.cargoReleased
+      && this.app.canOfferRewardedAd('express-truck-unload');
+    if (canExpressUnload) this.app.markRewardedOfferShown('express-truck-unload');
+    const expressUnloadBanner = canExpressUnload
+      ? `<div class="crt-express-unload"><span class="crt-express-text">${english ? 'Truck at dock: Skip unloading wait' : 'Kamyon rampada: Boşaltma sırasını bekleme'}</span><button type="button" class="ad-reward-button" data-ad-accept="express-truck-unload">${english ? 'Express Forklift (Watch Ad)' : 'Ekspres Forklift (Reklam İzle)'}</button></div>`
+      : '';
     content.innerHTML = `<div class="crt-system-line"><span>C:\\WHOLESALE&gt; CATALOG.EXE</span><span>${english ? 'BALANCE' : 'BAKİYE'} $${staffMoney(state.economy.balanceAtoms, english)}</span></div>
       <div class="crt-tabs" role="tablist" aria-label="${english ? 'Wholesale categories' : 'Toptan ürün kategorileri'}">${tabs}</div>
       <div class="crt-main"><section id="procurement-products" role="tabpanel" aria-labelledby="procurement-tab-${category.id}" tabindex="0"><h2>${english ? category.en : category.tr}</h2><p class="crt-note">${english ? 'Wholesale stock arrives at the loading dock. Place an imported shelf before retail sales; farm production retains a higher margin.' : 'Toptan stok yükleme rampasına gelir. İthal ürün satışı için önce reyon yerleştir; çiftlik üretimi daha yüksek kâr getirir.'}</p><div class="crt-products">${cards}</div></section>
       <aside class="crt-cart"><h2>${english ? 'ORDER CART' : 'SİPARİŞ SEPETİ'} [${cartCases}/20]</h2><ul>${lines || `<li>${english ? 'No cases selected.' : 'Henüz koli seçilmedi.'}</li>`}</ul><div class="crt-total"><span>${english ? 'TOTAL' : 'TOPLAM'}</span><strong>$${staffMoney(total, english)}</strong></div><button type="button" id="procurement-confirm" ${!total || total > state.economy.balanceAtoms ? 'disabled' : ''}>${english ? 'Confirm Order' : 'Siparişi Onayla'}</button><p class="crt-note">${english ? 'Paid immediately. Up to 10 cases per product and 20 per delivery. Close this terminal to let deliveries continue.' : 'Ödeme onayda alınır. Ürün başına 10, teslimat başına 20 koli. Teslimatın ilerlemesi için terminali kapat.'}</p></aside></div>
       <section class="crt-automation"><h2>${english ? 'MINIMUM STOCK POLICY' : 'OTOMATİK ASGARİ STOK EŞİĞİ'}</h2><p class="crt-note">${manager ? (english ? 'The on-duty manager orders one case when selected shelves fall below the threshold. Incoming stock prevents duplicate orders.' : 'Görevdeki müdür seçili reyon eşiğin altına inince bir koli sipariş eder. Gelen stok tekrar siparişini önler.') : (english ? 'Hire a Store Manager to enable automatic orders.' : 'Otomatik sipariş için Mağaza Müdürü işe al.')}</p><div class="crt-policy-controls"><label><input type="checkbox" id="procurement-auto-enabled" ${automation.enabled ? 'checked' : ''} ${manager ? '' : 'disabled'} />${english ? 'Automatic ordering' : 'Otomatik sipariş'}</label><label for="procurement-auto-threshold">${english ? 'Order below' : 'Bu stoktan azsa sipariş'} <input type="number" id="procurement-auto-threshold" min="1" max="12" step="1" value="${Number.isInteger(automation.threshold) ? automation.threshold : 2}" ${manager ? '' : 'disabled'} /></label><button type="button" id="procurement-auto-save" ${manager ? '' : 'disabled'}>${english ? 'Save policy' : 'Eşiği kaydet'}</button></div><div class="crt-auto-items">${autoItems}</div></section>
-      <section class="crt-deliveries" aria-live="polite"><h2>${english ? 'DELIVERY LOG' : 'TESLİMAT KAYDI'} [${orders.length}]</h2><ul>${queue || `<li>${english ? 'No deliveries yet.' : 'Henüz teslimat yok.'}</li>`}</ul></section>`;
+      <section class="crt-deliveries" aria-live="polite"><h2>${english ? 'DELIVERY LOG' : 'TESLİMAT KAYDI'} [${orders.length}]</h2>${expressUnloadBanner}<ul>${queue || `<li>${english ? 'No deliveries yet.' : 'Henüz teslimat yok.'}</li>`}</ul></section>`;
   }
 
   openBonusOffer(offer) {
@@ -626,6 +653,7 @@ export class HUD {
   }
 
   #selectSettingsTab(tab) {
+    if (tab === 'debug' && import.meta.env?.PROD) return;
     document.querySelectorAll('.settings-tab').forEach((button) => button.classList.toggle('active', button.dataset.tab === tab));
     document.querySelectorAll('.settings-content').forEach((panel) => panel.classList.toggle('hidden', panel.dataset.panel !== tab));
   }
@@ -664,13 +692,31 @@ export class HUD {
   }
 
   render(state, action, force = false) {
+    this.worldEventAlert.render(state);
     const language = state.settings.language;
+    const pending = pendingPlacementIds(state);
+    const pendingSignature = `${language}:${pending.join(',')}`;
+    this.pendingPlacements.classList.toggle('hidden', pending.length === 0);
+    if (this.pendingPlacementSignature !== pendingSignature) {
+      this.pendingPlacementSignature = pendingSignature;
+      this.pendingPlacements.innerHTML = `<strong>${language === 'en' ? 'Awaiting placement' : 'Yerleştirmeyi bekleyenler'} (${pending.length})</strong><p>${language === 'en' ? 'Free up space or choose a location.' : 'Alan aç veya yerleştirmek için bir yapı seç.'}</p>`
+        + pending.map(id => `<button type="button" data-pending-station="${escapeMarkup(id)}">${escapeMarkup(STATIONS[id]?.title ?? id)} · ${language === 'en' ? 'Place' : 'Yerleştir'}</button>`).join('');
+    }
     this.#applyLanguage(language);
     const ledgerBalance = state.economy.balanceAtoms / 10_000;
     const balance = Math.max(0, state.economy.balanceAtoms / 10_000
       - (action?.kind === 'upgrade' ? (action.paymentAmount ?? 0) : 0));
     const moneyLabel = `$${balance.toLocaleString(language === 'tr' ? 'tr-TR' : 'en-US', { maximumFractionDigits: 2 })}`;
-    if (this.elements['money-display']) this.elements['money-display'].textContent = moneyLabel;
+    const moneyDisplay = this.elements['money-display'];
+    if (moneyDisplay && moneyDisplay.textContent !== moneyLabel) {
+      moneyDisplay.textContent = moneyLabel;
+      if (this.lastMoneyAnimationAt === undefined || performance.now() - this.lastMoneyAnimationAt > 350) {
+        moneyDisplay.classList.remove('money-updated');
+        void moneyDisplay.offsetWidth;
+        moneyDisplay.classList.add('money-updated');
+        this.lastMoneyAnimationAt = performance.now();
+      }
+    }
     if (this.elements.moneyPill) this.elements.moneyPill.classList.toggle('compact', moneyLabel.length >= 8);
     if (this.elements.moneyPill) this.elements.moneyPill.classList.toggle('charging', action?.kind === 'upgrade' && action.paymentProgress > 0);
     if (this.elements['day-display']) {
@@ -758,15 +804,15 @@ export class HUD {
       this.app.markRewardedOfferShown('order-double', { orderId: orderReward.id });
       if (this.elements['order-ad-copy']) {
         this.elements['order-ad-copy'].textContent = english
-          ? `Watch a rewarded ad to double this order bonus (+$${orderReward.reward}).`
-          : `Ödüllü reklamı izle, bu sipariş kazancını ikiye katla (+$${orderReward.reward}).`;
+          ? `Watch a rewarded ad to multiply this order bonus (+$${orderReward.reward} or x3/x5 chance!).`
+          : `Ödüllü reklamı izle, sipariş kazancını katla (+$${orderReward.reward} veya x3/x5 şansı!).`;
       }
       if (this.elements['btn-order-ad']) {
         this.elements['btn-order-ad'].dataset.adOrder = orderReward.id;
         const adLabel = this.app.isRewardedAdSimulated()
           ? (english ? 'Wait 3 sec · ' : '3 sn bekle · ')
           : (english ? 'Watch · ' : 'İzle · ');
-        this.elements['btn-order-ad'].textContent = `${adLabel}+$${orderReward.reward}`;
+        this.elements['btn-order-ad'].textContent = `${adLabel}+$${orderReward.reward} (2x-5x)`;
       }
     }
 
@@ -862,11 +908,16 @@ export class HUD {
     document.querySelector('.settings-tabs [data-tab="general"]').textContent = english ? EN.general : 'Genel';
     document.querySelector('.settings-tabs [data-tab="character"]').textContent = english ? EN.character : 'Karakter';
     document.querySelector('.settings-tabs [data-tab="language"]').textContent = english ? 'Language' : 'Dil';
-    document.querySelector('.settings-tabs [data-tab="debug"]').textContent = english ? EN.developer : 'Geliştirici';
-    document.querySelector('[data-debug-label="allUpgrades"]').textContent = english ? 'Unlock and build everything' : 'Tüm geliştirmeleri aç';
-    document.getElementById('debug-all-note').textContent = english
-      ? 'All production buildings, imported shelves, and staff facilities are built for free.'
-      : 'Tüm üretim yapıları, ithal reyonlar ve personel tesisleri ücretsiz kurulur.';
+    const debugTab = document.querySelector('.settings-tabs [data-tab="debug"]');
+    if (debugTab) debugTab.textContent = english ? EN.developer : 'Geliştirici';
+    const debugLabel = document.querySelector('[data-debug-label="allUpgrades"]');
+    if (debugLabel) debugLabel.textContent = english ? 'Unlock and build everything' : 'Tüm geliştirmeleri aç';
+    const debugNote = document.getElementById('debug-all-note');
+    if (debugNote) {
+      debugNote.textContent = english
+        ? 'All production buildings, imported shelves, and staff facilities are built for free.'
+        : 'Tüm üretim yapıları, ithal reyonlar ve personel tesisleri ücretsiz kurulur.';
+    }
     const generalLabels = english
       ? [EN.sound, EN.haptics, EN.autoPickup]
       : ['Ses efektleri', 'Dokunsal geri bildirim', 'Otomatik üstüne alma'];
@@ -921,9 +972,24 @@ export class HUD {
     const list = this.elements['upgrade-list'];
     const english = state.settings.language === 'en';
     const expansionCards = upgrades.map((upgrade) => {
-      const affordable = state.economy.balanceAtoms >= upgrade.price * 10_000;
+      const costAtoms = upgrade.price * 10_000;
+      const affordable = state.economy.balanceAtoms >= costAtoms;
+      const nearMiss = isNearMissGoal(state.economy.balanceAtoms, costAtoms, 80, 99);
+      const proximity = endowedGoalProgress(state.economy.balanceAtoms, costAtoms, 20);
       const title = english ? this.#upgradeNameEnglish(upgrade.id, upgrade.title) : upgrade.title;
-      return `<article class="upgrade-card"><div class="upgrade-icon">${assetIconMarkup(UPGRADE_ICONS[upgrade.id] ?? 'decorScore', 38)}</div><div class="upgrade-copy"><strong>${title}</strong><small>${english ? 'Unlock a new production step' : 'Yeni bir üretim aşaması aç'}</small></div><button class="buy-button" data-buy-upgrade="${upgrade.id}" ${affordable ? '' : 'disabled'}>$${upgrade.price}</button></article>`;
+      const nearMissBadge = nearMiss ? `<span class="near-miss-pill">${english ? `Near Goal: ${proximity}%` : `Hedefe Yakın: %${proximity}`}</span>` : '';
+      const nearMissPayload = { upgradeType: 'expansion', upgradeId: upgrade.id, costAtoms };
+      const canBailout = nearMiss && this.app.canOfferRewardedAd('near-miss-bailout', nearMissPayload);
+      if (canBailout) this.app.markRewardedOfferShown('near-miss-bailout', nearMissPayload);
+      const missingDollars = ((costAtoms - state.economy.balanceAtoms) / 10_000).toFixed(2);
+      const bailoutBtn = canBailout
+        ? `<button class="buy-button ad-reward-button near-miss-ad-btn" data-ad-accept="near-miss-bailout" data-ad-upgrade-type="expansion" data-ad-upgrade="${upgrade.id}" data-ad-cost-atoms="${costAtoms}">${english ? `Sponsor Grant (+$${missingDollars})` : `Sponsor Hibesi (+$${missingDollars})`}</button>`
+        : '';
+      return `<article class="upgrade-card${nearMiss ? ' near-miss' : ''}">
+        <div class="upgrade-icon">${assetIconMarkup(UPGRADE_ICONS[upgrade.id] ?? 'decorScore', 38)}</div>
+        <div class="upgrade-copy"><strong>${title}</strong><small>${english ? 'Unlock a new production step' : 'Yeni bir üretim aşaması aç'}</small>${nearMissBadge}</div>
+        <div class="upgrade-actions"><button class="buy-button" data-buy-upgrade="${upgrade.id}" ${affordable ? '' : 'disabled'}>$${upgrade.price}</button>${bailoutBtn}</div>
+      </article>`;
     }).join('');
     const farmCards = this.#farmUnlockCards(state);
     const machineCards = Object.entries(state.machines).filter(([id]) => STATIONS[id]?.kind === 'machine').map(([id, machine]) => {
@@ -932,14 +998,27 @@ export class HUD {
       const nextSeconds = machineProductionSeconds(id, level + 1);
       const speedGain = percentGain(machineSpeedMultiplier(level), machineSpeedMultiplier(level + 1));
       const cost = machineUpgradeCost(id, level);
-      const affordable = state.economy.balanceAtoms >= cost * 10_000;
+      const costAtoms = cost * 10_000;
+      const affordable = state.economy.balanceAtoms >= costAtoms;
+      const nearMiss = isNearMissGoal(state.economy.balanceAtoms, costAtoms, 80, 99);
+      const proximity = endowedGoalProgress(state.economy.balanceAtoms, costAtoms, 20);
       const title = english ? this.#upgradeNameEnglish(id, STATIONS[id].title) : STATIONS[id].title;
       const number = (value) => value.toLocaleString(english ? 'en-US' : 'tr-TR', { minimumFractionDigits: 1, maximumFractionDigits: 2 });
-      return `<article class="upgrade-card machine-upgrade-card">
+      const nearMissBadge = nearMiss ? `<span class="near-miss-pill">${english ? `Near Goal: ${proximity}%` : `Hedefe Yakın: %${proximity}`}</span>` : '';
+      const nearMissPayload = { upgradeType: 'machine', machineId: id, costAtoms };
+      const canBailout = nearMiss && this.app.canOfferRewardedAd('near-miss-bailout', nearMissPayload);
+      if (canBailout) this.app.markRewardedOfferShown('near-miss-bailout', nearMissPayload);
+      const missingDollars = ((costAtoms - state.economy.balanceAtoms) / 10_000).toFixed(2);
+      const bailoutBtn = canBailout
+        ? `<button class="buy-button ad-reward-button near-miss-ad-btn" data-ad-accept="near-miss-bailout" data-ad-upgrade-type="machine" data-ad-machine="${id}" data-ad-cost-atoms="${costAtoms}">${english ? `Sponsor Grant (+$${missingDollars})` : `Sponsor Hibesi (+$${missingDollars})`}</button>`
+        : '';
+      return `<article class="upgrade-card machine-upgrade-card${nearMiss ? ' near-miss' : ''}">
         <div class="upgrade-icon">${assetIconMarkup('machine', 38)}</div><div class="upgrade-copy">
           <strong>${title}</strong><small>${english ? `Level ${level + 1} · ${number(currentSeconds)}s → ${number(nextSeconds)}s · +${speedGain.toFixed(2)}% speed` : `Seviye ${level + 1} · ${number(currentSeconds)} sn → ${number(nextSeconds)} sn · +%${speedGain.toFixed(2)} hız`}</small>
           <small>${english ? 'Small permanent production-time reduction' : 'Kalıcı ve küçük üretim süresi azalması'}</small>
-        </div><button class="buy-button" data-upgrade-machine="${id}" ${affordable ? '' : 'disabled'}>${english ? 'Upgrade' : 'Geliştir'} · $${cost}</button>
+          ${nearMissBadge}
+        </div>
+        <div class="upgrade-actions"><button class="buy-button" data-upgrade-machine="${id}" ${affordable ? '' : 'disabled'}>${english ? 'Upgrade' : 'Geliştir'} · $${cost}</button>${bailoutBtn}</div>
       </article>`;
     }).join('');
     const sections = [
@@ -1032,7 +1111,7 @@ export class HUD {
       const unlocked = state.availableUpgrades.includes(hire.upgradeId) && !state.completedUpgrades.includes(hire.upgradeId);
       const canHire = unlocked || state.completedUpgrades.includes(hire.upgradeId);
       const title = STAFF[hire.upgradeId]?.title ?? hire.staffTypes.map((type) => STAFF[type]?.title ?? type).join(' ve ');
-      const englishTitle = hire.staffTypes.length > 1 ? 'Chef and waiter' : ({ cashier: 'Cashier', harvester: 'Harvester', factoryFeeder: 'Factory feeder', caretaker: 'Farm caretaker', warehouseOperator: 'Warehouse operator', storeManager: 'Store manager' })[hire.staffTypes[0]] ?? title;
+      const englishTitle = hire.staffTypes.length > 1 ? 'Chef and waiter' : ({ cashier: 'Cashier', harvester: 'Harvester', factoryFeeder: 'Factory feeder', caretaker: 'Farm caretaker', warehouseOperator: 'Warehouse operator', storeManager: 'Store manager', security: 'Security guard' })[hire.staffTypes[0]] ?? title;
       const effect = state.settings.language === 'en' ? EN.staffEffect[hire.upgradeId] : hire.effect;
       const unlock = state.settings.language === 'en' ? EN.staffUnlock[hire.upgradeId] : hire.unlock;
       const subtitle = hired ? (state.settings.language === 'en' ? `On staff · ${hiredCount || hire.staffTypes.length}` : `Ekibinde · ${hiredCount || hire.staffTypes.length} kişi`)
@@ -1045,12 +1124,12 @@ export class HUD {
       const button = `<button class="buy-button" data-staff-candidates="${hire.upgradeId}" ${canHire ? '' : 'disabled'}>${canHire ? (english ? 'View 3 candidates' : '3 adayı gör') : (english ? 'Locked' : 'Kilitli')}</button>`;
       const adPayload = { role: hire.upgradeId };
       const showCashierAd = hire.upgradeId === 'cashier' && canHire;
-      const adReady = showCashierAd && this.app.canOfferRewardedAd('staff-hire', adPayload);
-      if (adReady) this.app.markRewardedOfferShown('staff-hire', adPayload);
-      const adButton = showCashierAd
-        ? `<button class="buy-button ad-reward-button" data-ad-accept="staff-hire" data-ad-role="${hire.upgradeId}" ${adReady ? '' : 'disabled'}>${adReady
-          ? (state.completedUpgrades.includes('cashier') ? (english ? 'Add cashier + register' : 'Ek kasiyer + kasa') : (english ? 'Hire cashier by ad' : 'Reklamla kasiyer al'))
-          : (english ? 'Ad unavailable' : 'Reklam hazır değil')}</button>`
+      const adReady = showCashierAd && Boolean(this.app?.canOfferRewardedAd?.('staff-hire', adPayload));
+      if (adReady && this.app?.markRewardedOfferShown) this.app.markRewardedOfferShown('staff-hire', adPayload);
+      const adButton = showCashierAd && adReady
+        ? `<button class="buy-button ad-reward-button" data-ad-accept="staff-hire" data-ad-role="${hire.upgradeId}">${state.completedUpgrades.includes('cashier')
+          ? (english ? 'Add cashier + register' : 'Ek kasiyer + kasa')
+          : (english ? 'Hire cashier by ad' : 'Reklamla kasiyer al')}</button>`
         : '';
       return `<article class="upgrade-card staff-card${hired ? ' hired' : ''}"><div class="upgrade-icon">${assetIconMarkup(STAFF[hire.staffTypes[0]]?.icon ?? 'workerAvatar', 50)}</div><div class="upgrade-copy"><strong>${english ? englishTitle : title}</strong><small>${subtitle}</small><small>${salaryText}</small></div><div class="staff-card-actions">${button}${adButton}</div></article>`;
     }).join('');
@@ -1062,7 +1141,7 @@ export class HUD {
       const currentSpeed = 3.4 * staffSpeedMultiplier(level) * (archetype?.speed ?? 1);
       const nextSpeed = 3.4 * staffSpeedMultiplier(level + 1) * (archetype?.speed ?? 1);
       const gain = percentGain(currentSpeed, nextSpeed);
-      const title = english ? ({ cashier: 'Cashier', harvester: 'Harvester', factoryFeeder: 'Factory feeder', caretaker: 'Farm caretaker', chefWaiter: 'Chef', waiter: 'Waiter', warehouseOperator: 'Warehouse operator', storeManager: 'Store manager' })[worker.type] ?? worker.type : (STAFF[worker.type]?.title ?? (worker.type === 'waiter' ? 'Garson' : worker.type));
+      const title = english ? ({ cashier: 'Cashier', harvester: 'Harvester', factoryFeeder: 'Factory feeder', caretaker: 'Farm caretaker', chefWaiter: 'Chef', waiter: 'Waiter', warehouseOperator: 'Warehouse operator', storeManager: 'Store manager', security: 'Security guard' })[worker.type] ?? worker.type : (STAFF[worker.type]?.title ?? (worker.type === 'waiter' ? 'Garson' : worker.type));
       const number = (value) => value.toLocaleString(english ? 'en-US' : 'tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       const salaryAtoms = worker.salaryAtoms ?? staffDailySalaryAtoms(worker.type);
       const salaryStatus = worker.waitingForSalary
@@ -1142,7 +1221,7 @@ export class HUD {
       caretaker: 'Hire a farm caretaker', bakery: 'Wheat field and stone oven',
       flourMill: 'Flour mill and shelf', orangeTartKitchen: 'Orange tart pastry kitchen',
       restaurant: 'Gourmet restaurant', chefWaiter: 'Hire chef and waiter',
-      managerOffice: 'Manager office and logistics line', warehouseOperator: 'Hire a warehouse operator', storeManager: 'Hire a store manager',
+      managerOffice: 'Manager office and logistics line', warehouseOperator: 'Hire a warehouse operator', storeManager: 'Hire a store manager', security: 'Hire security',
     };
     return names[id] ?? fallback;
   }

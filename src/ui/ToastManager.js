@@ -26,8 +26,10 @@ export class ToastManager {
     if (event.type === 'production') return;
     let message = event.message;
     let iconId = null;
-    if (event.type === 'sale' || event.type === 'cash-collected' || event.type === 'tip-ready') {
-      this.playEventSound(event.type);
+    const tone = event.tone ?? (event.type === 'customer-lost' ? 'error' : 'success');
+    if (event.type === 'world-event') this.playEventSound(event.eventType === 'strayCat' && event.success ? 'ambient-cat' : event.tone === 'error' || event.success === false ? 'world-crisis' : 'world-event');
+    if (event.type === 'sale' || event.type === 'cash-collected' || event.type === 'tip-ready' || event.type === 'customer-lost') {
+      this.playEventSound(event.isJackpot ? 'jackpot' : event.type);
     }
     if (event.type === 'payroll') {
       const english = this.app.getState().settings.language === 'en';
@@ -58,7 +60,13 @@ export class ToastManager {
       }
       if (event.type === 'tip-ready') {
         iconId = 'tip';
-        message = 'A customer left a tip.';
+        message = event.isJackpot
+          ? `🔥 JACKPOT TIP! A customer left $${Number(event.tipAmount ?? 0).toFixed(2)}!`
+          : ((event.tipAmount ?? 0) >= 18 ? `⭐ Generous Customer! Left $${Number(event.tipAmount ?? 0).toFixed(2)} tip!` : 'A customer left a tip.');
+      }
+      if (event.type === 'customer-lost') {
+        iconId = 'stock';
+        message = `⚠️ Customer left empty-handed! Lost revenue: -$${Number(event.lostAmount ?? 0).toFixed(2)}`;
       }
       if (message === 'Yedek kayıttan devam edildi.') message = 'Recovered from the backup save.';
       if (message === 'Yeni oyun hazır.') message = 'A new game is ready.';
@@ -73,7 +81,8 @@ export class ToastManager {
     if (event.type === 'sale') iconId ??= ITEMS[(event.items ?? [event.item])[0]]?.icon ?? 'stock';
     if (event.type === 'production') iconId ??= ITEMS[event.item]?.icon ?? 'stock';
     if (event.type === 'tip-ready') iconId ??= 'tip';
-    this.toast(message, event.tone, iconId);
+    if (event.type === 'customer-lost') iconId ??= 'stock';
+    this.toast(message, tone, iconId);
   }
 
   itemNameEnglish(itemId, fallback) {
@@ -94,14 +103,25 @@ export class ToastManager {
     try {
       this.audioContext ??= new AudioContextType();
       if (this.audioContext.state === 'suspended') this.audioContext.resume();
-      const frequencies = { sale: [620, 840], production: [450, 580], 'tip-ready': [740, 980] };
+      const frequencies = {
+        'world-event': [523, 659, 784],
+        'world-crisis': [440, 330, 440],
+        'ambient-cat': [540],
+        'cash-collected': [740, 980],
+        sale: [620, 840],
+        production: [450, 580],
+        'tip-ready': [740, 980],
+        jackpot: [587, 740, 880, 1175],
+        'customer-lost': [370, 247],
+      };
       const tones = frequencies[type] ?? [600];
       tones.forEach((frequency, index) => {
         const oscillator = this.audioContext.createOscillator();
         const gain = this.audioContext.createGain();
         const start = this.audioContext.currentTime + index * 0.075;
-        oscillator.type = 'sine';
+        oscillator.type = type === 'ambient-cat' ? 'triangle' : 'sine';
         oscillator.frequency.value = frequency;
+        if (type === 'ambient-cat') { oscillator.frequency.setValueAtTime(frequency, start); oscillator.frequency.exponentialRampToValueAtTime(360, start + 0.12); }
         gain.gain.setValueAtTime(0.0001, start);
         gain.gain.exponentialRampToValueAtTime(0.025, start + 0.012);
         gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.12);

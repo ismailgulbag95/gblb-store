@@ -1,0 +1,28 @@
+import '/src/style.css';
+import { GameApplication } from '/src/application/GameApplication.js';
+import { SaveService } from '/src/infrastructure/SaveService.js';
+import { WorldScene } from '/src/presentation/WorldScene.js';
+import { InputManager } from '/src/presentation/InputManager.js';
+import { HUD } from '/src/presentation/HUD.js';
+const values=new Map();
+const app=new GameApplication(new SaveService({getItem:key=>values.get(key)??null,setItem:(key,value)=>values.set(key,value),removeItem:key=>values.delete(key)}));
+app.debugUnlockAllUpgrades();
+app.state.customers=[];app.state.workers=[];
+for(const machine of Object.values(app.state.machines))machine.progressTicks=12;
+app.state.stock['shelf:TOMATO'].items.TOMATO=3;
+const world=new WorldScene();
+const input=new InputManager(world.getCanvas(),world,app,()=>{});
+const hud=new HUD(app,input);
+document.getElementById('loading-screen').classList.add('hidden');
+document.getElementById('btn-layout').onclick=()=>input.setLayoutMode(!input.layoutMode);
+input.onLayoutMessage=message=>document.getElementById('layout-help-text').textContent=message;
+input.onSelectionChange=()=>{};
+document.querySelector('#visual-day').onclick=()=>app.state.tick=1500;
+document.querySelector('#visual-night').onclick=()=>app.state.tick=2700;
+document.querySelector('#visual-farm').onclick=()=>{app.state.player.x=-13;app.state.player.z=-7;};
+document.querySelector('#visual-shop').onclick=()=>{app.state.player.x=5;app.state.player.z=2;};
+document.querySelector('#visual-street').onclick=()=>{app.state.player.x=12;app.state.player.z=11;};
+document.querySelector('#visual-money').onclick=()=>world.playEvent({type:'cash-collected',registerId:'register'},app.state);
+document.querySelector('#visual-stock').onclick=()=>app.state.stock['shelf:TOMATO'].items.TOMATO=8;
+function render(){world.render(app.state,[],null);hud.render(app.state,null);document.querySelector('#visual-proof').textContent=' • havuz '+world.particlePool.length+' / aktif '+world.effects.length+' / pause '+app.state.paused+' / tür '+world.effects.map(e=>e.kind+':'+e.age.toFixed(2)).join(',');requestAnimationFrame(render);}
+render();

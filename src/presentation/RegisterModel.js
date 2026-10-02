@@ -1,9 +1,11 @@
 import * as THREE from 'three';
+import { addContactShadow } from './ContactShadow.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { STATIONS } from '../domain/catalog.js';
 
 export function createRegisterModel({ x = STATIONS.register.x, z = STATIONS.register.z, number = 1 } = {}) {
   const group = new THREE.Group();
+  addContactShadow(group, 2.8, 2.1);
   group.position.set(x, 0, z);
 
   // High-Grade Materials

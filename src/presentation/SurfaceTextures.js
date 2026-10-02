@@ -30,6 +30,7 @@ function drawWrapped(ctx, size, x, y, margin, draw) {
 
 function getGrassCanvas() {
   if (grassCanvas) return grassCanvas;
+  if (typeof document === 'undefined') return null;
 
   const canvas = document.createElement('canvas');
   canvas.width = GRASS_TEXTURE_SIZE;
@@ -81,7 +82,15 @@ function getGrassCanvas() {
 }
 
 export function createGrassMaterial(color, repeatX = 1, repeatY = 1) {
-  const texture = new THREE.CanvasTexture(getGrassCanvas());
+  const canvas = getGrassCanvas();
+  if (!canvas) {
+    return new THREE.MeshStandardMaterial({
+      color,
+      roughness: 0.97,
+    });
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.wrapS = THREE.RepeatWrapping;
   texture.wrapT = THREE.RepeatWrapping;
@@ -96,6 +105,7 @@ export function createGrassMaterial(color, repeatX = 1, repeatY = 1) {
 
 function getSidewalkCanvas() {
   if (sidewalkCanvas) return sidewalkCanvas;
+  if (typeof document === 'undefined') return null;
 
   const size = 512;
   const canvas = document.createElement('canvas');
@@ -143,10 +153,19 @@ function getSidewalkCanvas() {
 }
 
 export function createSidewalkMaterial(repeatX = 1, repeatY = 1) {
+  const canvas = getSidewalkCanvas();
+  if (!canvas) {
+    return new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      roughness: 0.94,
+      metalness: 0,
+    });
+  }
+
   const textureKey = `${repeatX.toFixed(2)}:${repeatY.toFixed(2)}`;
   let texture = sidewalkTextures.get(textureKey);
   if (!texture) {
-    texture = new THREE.CanvasTexture(getSidewalkCanvas());
+    texture = new THREE.CanvasTexture(canvas);
     texture.colorSpace = THREE.SRGBColorSpace;
     texture.wrapS = THREE.RepeatWrapping;
     texture.wrapT = THREE.RepeatWrapping;
@@ -164,6 +183,7 @@ export function createSidewalkMaterial(repeatX = 1, repeatY = 1) {
 
 function getParquetCanvas() {
   if (parquetCanvas) return parquetCanvas;
+  if (typeof document === 'undefined') return null;
 
   const width = 1024;
   const height = 512;
@@ -224,10 +244,19 @@ function getParquetCanvas() {
 }
 
 export function createParquetMaterial(repeatX = 1, repeatY = 1) {
+  const canvas = getParquetCanvas();
+  if (!canvas) {
+    return new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      roughness: 0.88,
+      metalness: 0,
+    });
+  }
+
   const textureKey = `${repeatX.toFixed(2)}:${repeatY.toFixed(2)}`;
   let texture = parquetTextures.get(textureKey);
   if (!texture) {
-    texture = new THREE.CanvasTexture(getParquetCanvas());
+    texture = new THREE.CanvasTexture(canvas);
     texture.colorSpace = THREE.SRGBColorSpace;
     texture.wrapS = THREE.RepeatWrapping;
     texture.wrapT = THREE.RepeatWrapping;

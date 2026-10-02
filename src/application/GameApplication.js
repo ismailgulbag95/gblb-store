@@ -1,14 +1,14 @@
 import { AD_ONLY_UPGRADE_IDS, FARM_AD_UPGRADE_IDS, IMPORTED_SHELVES, ITEMS, MONEY_ATOMS, RECIPES, SHELVES, STAFF, STAFF_HIRES, STATIONS, UPGRADES, getStaffCount, staffDailySalaryAtoms } from '../domain/catalog.js';
 import { EconomyLedger } from '../domain/ledger.js';
-import { canTransfer, makeLocation, quantityAt, transferStock } from '../domain/inventory.js';
+import { canTransfer, makeLocation, quantityAt, totalAt, transferStock } from '../domain/inventory.js';
 import { createInitialState, hydrateState } from '../domain/state.js';
 import { advanceSimulation } from '../domain/simulation.js';
 import { gameDayNumber } from '../domain/dayCycle.js';
 import { createFarmState, removeFarmReady, syncFarmHarvest } from '../domain/farm.js';
-import { ZONES, canPlaceDecoration, canPlaceHangingSign, canPlaceStation, getAllStationIds, getDecorationDimensions, getDecorationZone, getMarketCollisionBoxes, getShelfLocations, getStationDimensions, isStationUnlocked, nextShelfStagingPosition, registerCashierPosition, stationPosition, syncCatalogLayout } from '../domain/layout.js';
+import { ZONES, canPlaceDecoration, canPlaceHangingSign, canPlaceStation, getAllStationIds, getDecorationDimensions, getDecorationZone, getMarketCollisionBoxes, getShelfLocations, getStationDimensions, isStationUnlocked, canPlaceAccessibleStation, pendingPlacementIds, placeNewStation, registerCashierPosition, stationPosition, syncCatalogLayout } from '../domain/layout.js';
 import { DECORATIONS } from '../domain/decorCatalog.js';
 import { decorationPrice, nextOrder } from '../domain/orders.js';
-import { machineProductionSeconds, machineSpeedMultiplier, machineUpgradeCost, percentGain, staffSpeedMultiplier, staffUpgradeCost } from '../domain/progression.js';
+import { isNearMissGoal, machineProductionSeconds, machineSpeedMultiplier, machineUpgradeCost, percentGain, staffSpeedMultiplier, staffUpgradeCost } from '../domain/progression.js';
 import { PLAYER_CHARACTERS, PLAYER_CHARACTER_IDS } from '../domain/characters.js';
 import { STAFF_FACILITIES, STAFF_LAND_PRICE } from '../domain/catalog.js';
 import { generateStaffCandidates, normalizeWorkerWelfare } from '../domain/staff.js';
@@ -70,6 +70,8 @@ const AD_LIMITS = Object.freeze({
   supplierDropPerDay: 2,
   supplierCooldownMs: 15 * 60_000,
   declinedCooldownMs: 5 * 60_000,
+  nearMissBailoutPerDay: 4,
+  expressTruckUnloadPerDay: 4,
 });
 const BONUS_FIRST_OFFER_MS = 3 * 60_000;
 const BONUS_NEXT_OFFER_MIN_MS = 5 * 60_000;
@@ -257,13 +259,44 @@ export class GameApplication {
       return Boolean(orderReward && !orderReward.claimed && orderReward.id === payload.orderId
         && (today.placements?.[placement] ?? 0) < AD_LIMITS.orderDoublePerDay);
     }
+    if (placement === 'near-miss-bailout') {
+      const { upgradeType, upgradeId, machineId } = payload;
+      if (upgradeType === 'expansion' || upgradeId) {
+        const id = upgradeId ?? payload.id;
+        const upgrade = UPGRADES.find((entry) => entry.id === id);
+        if (!upgrade || AD_ONLY_UPGRADE_IDS.includes(id)) return false;
+        if (!state.availableUpgrades.includes(id) || state.completedUpgrades.includes(id)) return false;
+        const costAtoms = upgrade.price * 10_000;
+        return isNearMissGoal(state.economy.balanceAtoms, costAtoms, 80, 99)
+          && (today.placements?.[placement] ?? 0) < AD_LIMITS.nearMissBailoutPerDay;
+      }
+      if (upgradeType === 'machine' || machineId) {
+        const id = machineId ?? payload.id;
+        const machine = state.machines[id];
+        if (!machine || !STATIONS[id]) return false;
+        const level = machine.upgradeLevel ?? 0;
+        const cost = machineUpgradeCost(id, level);
+        const costAtoms = cost * 10_000;
+        return isNearMissGoal(state.economy.balanceAtoms, costAtoms, 80, 99)
+          && (today.placements?.[placement] ?? 0) < AD_LIMITS.nearMissBailoutPerDay;
+      }
+      return false;
+    }
+    if (placement === 'express-truck-unload') {
+      if (!state.unlocked?.managerOffice) return false;
+      const delivery = state.procurement?.delivery;
+      if (!delivery || delivery.cargoReleased) return false;
+      const order = state.procurement?.orders?.find((entry) => entry.id === delivery.orderId);
+      return Boolean(order && (delivery.phase === 'arriving' || delivery.phase === 'unloading')
+        && (today.placements?.[placement] ?? 0) < AD_LIMITS.expressTruckUnloadPerDay);
+    }
     if (placement === 'supplier-drop') {
       const machine = state.machines[payload.machineId];
       const station = STATIONS[payload.machineId];
       const recipe = RECIPES[station?.recipe ?? machine?.recipe];
       const lastPlacementAt = ads.lastPlacementStarts[placement] ?? 0;
       return Boolean(machine && recipe && machine.blocked === 'missing-input'
-        && Number.isSafeInteger(machine.blockedTicks) && machine.blockedTicks >= 200
+        && Number.isSafeInteger(machine.blockedTicks) && machine.blockedTicks >= 30
         && (simulated || (now - lastPlacementAt >= AD_LIMITS.supplierCooldownMs
           && (today.placements?.[placement] ?? 0) < AD_LIMITS.supplierDropPerDay))
         && this.#supplierDropItems(state, payload.machineId, recipe));
@@ -277,7 +310,7 @@ export class GameApplication {
     }
     if (placement === 'staff-hire') {
       const hire = STAFF_HIRES.find((entry) => entry.upgradeId === payload.role);
-      const canHireFirstByAd = payload.role !== 'cashier' && state.availableUpgrades.includes(payload.role);
+      const canHireFirstByAd = state.availableUpgrades.includes(payload.role) && !state.completedUpgrades.includes(payload.role);
       const canHireExtraByAd = state.completedUpgrades.includes(payload.role) && getStaffCount(state, payload.role) > 0
         && (payload.role !== 'cashier' || ADDITIONAL_REGISTER_POSITIONS.some(({ x, z }) =>
           canPlaceStation(state, 'register_reward_preview', x, z, 0)));
@@ -314,7 +347,11 @@ export class GameApplication {
     }
     const sequence = ++this.adOfferSequence;
     const rewardId = globalThis.crypto?.randomUUID?.() ?? `reward-${Date.now()}-${this.state.revision}-${sequence}`;
-    const pending = { rewardId, placement, payload: clone(payload), createdAt: Date.now(), started: false };
+    const safePayload = clone(payload);
+    if (placement === 'order-double') {
+      safePayload.roll = import.meta.env?.PROD ? Math.random() : (safePayload.roll ?? 0.5);
+    }
+    const pending = { rewardId, placement, payload: safePayload, createdAt: Date.now(), started: false };
     const accepted = this.#command(`ad-accepted:${rewardId}`, (draft) => {
       if (draft.ads.pending) return { ok: false, reason: 'ad-already-active' };
       draft.ads.pending = pending;
@@ -332,7 +369,7 @@ export class GameApplication {
       onClosed: () => this.#failRewardedAd(pending, new Error('Ad closed before reward completion.')),
     }, { rewardId, payload: clone(payload) });
     return result && outcome?.ok && outcome.granted
-      ? { ok: true, rewardId, rewardAmount: outcome.rewardAmount ?? 0, message: outcome.message ?? null }
+      ? { ok: true, rewardId, rewardAmount: outcome.rewardAmount ?? 0, amount: outcome.rewardAmount ?? 0, details: outcome.details ?? null, message: outcome.message ?? null }
       : { ok: false, reason: result ? 'reward-unavailable' : 'ad-not-completed' };
   }
 
@@ -395,6 +432,7 @@ export class GameApplication {
     let granted = false;
     let rewardAmount = 0;
     let rewardMessage = null;
+    let rewardDetails = null;
     const result = this.#command(`ad-complete:${pending.rewardId}`, (draft) => {
       if (draft.ads.pending?.rewardId !== pending.rewardId) return { ok: false, reason: 'stale-ad' };
       draft.ads.completedAdIds.push(pending.rewardId);
@@ -411,6 +449,7 @@ export class GameApplication {
       granted = reward.ok;
       rewardAmount = reward.amount ?? 0;
       rewardMessage = reward.message ?? null;
+      rewardDetails = reward.details ?? null;
       if (granted) {
         draft.ads.grantedRewardIds.push(pending.rewardId);
         if (draft.ads.grantedRewardIds.length > 256) draft.ads.grantedRewardIds.splice(0, draft.ads.grantedRewardIds.length - 256);
@@ -421,7 +460,7 @@ export class GameApplication {
     });
     if (result.ok) this.onEvent({ type: 'ad-end' });
     return result.ok && granted
-      ? { ok: true, granted: true, rewardAmount, message: rewardMessage }
+      ? { ok: true, granted: true, rewardAmount, details: rewardDetails, message: rewardMessage }
       : { ok: false, granted: false, reason: 'reward-no-longer-available' };
   }
 
@@ -430,16 +469,113 @@ export class GameApplication {
     if (placement === 'order-double') {
       const order = state.lastOrderReward;
       if (!order || order.claimed || order.id !== payload.orderId) return { ok: false };
-      new EconomyLedger(state.economy).credit(`order-ad-bonus:${pending.rewardId}`, order.reward, 'rewarded-ad:order-double');
+      const roll = payload.roll != null && Number.isFinite(payload.roll) ? payload.roll : null;
+      let multiplier = 2;
+      if (roll !== null) {
+        if (roll < 0.05) multiplier = 5;
+        else if (roll < 0.30) multiplier = 3;
+        else multiplier = 2;
+      }
+      const bonusReward = order.reward * (multiplier - 1);
+      new EconomyLedger(state.economy).credit(`order-ad-bonus:${pending.rewardId}`, bonusReward, 'rewarded-ad:order-double');
       order.claimed = true;
-      return { ok: true, amount: order.reward, details: { orderId: order.id }, message: `Sipariş reklam ödülü: +$${order.reward}.` };
+      const message = multiplier > 2
+        ? `ŞANS ÇARPANI x${multiplier}! Sipariş reklam ödülü: +$${bonusReward}.`
+        : `Sipariş reklam ödülü: +$${order.reward}.`;
+      return { ok: true, amount: bonusReward, details: { orderId: order.id, multiplier }, message };
+    }
+    if (placement === 'near-miss-bailout') {
+      const { upgradeType, upgradeId, machineId } = payload;
+      if (upgradeType === 'expansion' || upgradeId) {
+        const id = upgradeId ?? payload.id;
+        const upgrade = UPGRADES.find((entry) => entry.id === id);
+        if (!upgrade || !state.availableUpgrades.includes(id) || state.completedUpgrades.includes(id)) return { ok: false };
+        const costAtoms = upgrade.price * 10_000;
+        const missingAtoms = Math.max(0, costAtoms - state.economy.balanceAtoms);
+        if (missingAtoms > 0) {
+          new EconomyLedger(state.economy).credit(`near-miss-grant:${pending.rewardId}`, missingAtoms / 10_000, 'rewarded-ad:near-miss-bailout');
+        }
+        new EconomyLedger(state.economy).debit(`purchase:${id}`, upgrade.price, `upgrade:${id}`);
+        state.completedUpgrades.push(id);
+        for (const unlockedId of upgrade.unlocks) state.unlocked[unlockedId] = true;
+        this.#applyUpgrade(state, id);
+        state.quest = this.#questFor(state);
+        const grantDollars = missingAtoms / 10_000;
+        return { ok: true, amount: grantDollars, details: { upgradeId: id, grantDollars }, message: `Sponsor Hibesi (+$${grantDollars.toFixed(2)}) ile ${upgrade.title} açıldı!` };
+      }
+      if (upgradeType === 'machine' || machineId) {
+        const id = machineId ?? payload.id;
+        const machine = state.machines[id];
+        if (!machine || !STATIONS[id]) return { ok: false };
+        const level = machine.upgradeLevel ?? 0;
+        const cost = machineUpgradeCost(id, level);
+        const costAtoms = cost * 10_000;
+        const missingAtoms = Math.max(0, costAtoms - state.economy.balanceAtoms);
+        if (missingAtoms > 0) {
+          new EconomyLedger(state.economy).credit(`near-miss-grant:${pending.rewardId}`, missingAtoms / 10_000, 'rewarded-ad:near-miss-bailout');
+        }
+        new EconomyLedger(state.economy).debit(`machine-upgrade:${id}:${level + 1}`, cost, `machine-upgrade:${id}`);
+        machine.upgradeLevel = level + 1;
+        machine.speedModifier = machineSpeedMultiplier(machine.upgradeLevel);
+        const grantDollars = missingAtoms / 10_000;
+        return { ok: true, amount: grantDollars, details: { machineId: id, level: machine.upgradeLevel, grantDollars }, message: `Sponsor Hibesi (+$${grantDollars.toFixed(2)}) ile ${STATIONS[id].title} geliştirildi!` };
+      }
+      return { ok: false };
+    }
+    if (placement === 'express-truck-unload') {
+      const delivery = state.procurement?.delivery;
+      if (!delivery || delivery.cargoReleased) return { ok: false };
+      const order = state.procurement.orders.find((entry) => entry.id === delivery.orderId);
+      if (!order) return { ok: false };
+      const remaining = order.lines.filter((line) => !state.stockTransactions.some(
+        (entry) => (typeof entry === 'string' ? entry : entry.id) === `procurement-unload:${order.id}:${line.item}`
+      ));
+      const quantity = remaining.reduce((sum, line) => sum + line.quantity, 0);
+      const currentDockTotal = totalAt(state.stock, 'dock:incoming');
+      const reservedSpace = state.stock['dock:incoming'].reservedCapacity ?? 0;
+      const baseCapacity = state.stock['dock:incoming'].capacity ?? 240;
+      const temporaryCapacityNeeded = currentDockTotal + quantity + reservedSpace > baseCapacity;
+      if (temporaryCapacityNeeded) {
+        state.stock['dock:incoming'].capacity = currentDockTotal + quantity + reservedSpace + 20;
+      }
+      const sourceId = `procurement:${order.id}`;
+      const existed = state.stock[sourceId];
+      const source = makeLocation(state.stock, sourceId, 120);
+      if (!existed) source.items = Object.fromEntries(remaining.map((line) => [line.item, line.quantity]));
+      for (const line of remaining) {
+        const result = transferStock(state, {
+          transactionId: `procurement-unload:${order.id}:${line.item}`,
+          from: sourceId,
+          to: 'dock:incoming',
+          item: line.item,
+          quantity: line.quantity,
+        });
+        if (!result.ok) throw new Error('Ekspres teslimat stok aktarımı tamamlanamadı.');
+      }
+      delete state.stock[sourceId];
+      if (temporaryCapacityNeeded) {
+        state.stock['dock:incoming'].capacity = baseCapacity;
+      }
+      delivery.cargoReleased = true;
+      order.status = 'delivered';
+      order.deliveredTick = state.tick;
+      delivery.phase = 'departing';
+      delivery.phaseStartTick = state.tick;
+      state.procurement.orders = state.procurement.orders.filter((entry) => entry.status !== 'delivered')
+        .concat(state.procurement.orders.filter((entry) => entry.status === 'delivered').slice(-64));
+      return {
+        ok: true,
+        amount: 0,
+        details: { orderId: order.id, quantity },
+        message: `Ekspres Forklift: ${quantity} koli kargo rampaya anında indirildi!`,
+      };
     }
     if (placement === 'supplier-drop') {
       const station = STATIONS[payload.machineId];
       const machine = state.machines[payload.machineId];
       const recipe = RECIPES[station?.recipe ?? machine?.recipe];
       const missing = recipe && this.#supplierDropItems(state, payload.machineId, recipe);
-      if (!missing || machine.blockedTicks < 200) return { ok: false };
+      if (!missing || machine.blockedTicks < 30) return { ok: false };
       const input = state.stock[`machine:${payload.machineId}:input`];
       for (const [item, quantity] of Object.entries(missing)) input.items[item] = (input.items[item] ?? 0) + quantity;
       machine.blockedTicks = 0;
@@ -458,8 +594,7 @@ export class GameApplication {
     if (placement === 'staff-hire') {
       const role = payload.role;
       const hire = STAFF_HIRES.find((entry) => entry.upgradeId === role);
-      if (!hire || (!state.availableUpgrades.includes(role) && !state.completedUpgrades.includes(role))
-        || role === 'cashier' && !state.completedUpgrades.includes(role)) return { ok: false };
+      if (!hire || (!state.availableUpgrades.includes(role) && !state.completedUpgrades.includes(role))) return { ok: false };
       if (!state.completedUpgrades.includes(role)) {
         state.completedUpgrades.push(role);
         state.unlocked[role] = true;
@@ -581,10 +716,12 @@ export class GameApplication {
     if (LOGISTICS_KINDS.includes(STATIONS[id]?.kind)) return { ok: false, reason: 'fixed-station' };
     const snappedX = Math.round(x * 2) / 2;
     const snappedZ = Math.round(z * 2) / 2;
-    if (!canPlaceStation(this.state, id, snappedX, snappedZ)) return { ok: false, reason: 'invalid-placement' };
+    if (!(pendingPlacementIds(this.state).includes(id) ? canPlaceAccessibleStation(this.state, id, snappedX, snappedZ) : canPlaceStation(this.state, id, snappedX, snappedZ))) return { ok: false, reason: 'invalid-placement' };
     const result = this.#command(`layout:${id}:${this.state.revision + 1}`, (draft) => {
       const existing = draft.layout[id] ?? {};
       draft.layout[id] = { ...existing, x: snappedX, z: snappedZ };
+      draft.pendingShelfIds = (draft.pendingShelfIds ?? []).filter(other => other !== id);
+      draft.pendingStationIds = (draft.pendingStationIds ?? []).filter(other => other !== id);
       if (id === 'register' || draft.checkoutRegisters?.[id]) {
         const register = stationPosition(draft, id);
         const cashierPosition = registerCashierPosition(register);
@@ -617,6 +754,7 @@ export class GameApplication {
   }
 
   rotateSelected(id) {
+    if (pendingPlacementIds(this.state).includes(id)) return { ok: false, reason: 'place-first' };
     if (!id) return { ok: false, reason: 'nothing-selected' };
     if (LOGISTICS_KINDS.includes(STATIONS[id]?.kind)) return { ok: false, reason: 'fixed-station' };
     if (id.startsWith('decor:')) {
@@ -763,13 +901,46 @@ export class GameApplication {
       && !AD_ONLY_UPGRADE_IDS.includes(upgrade.id));
   }
 
+  #pendingSaveTransaction = null;
+  #saveTimer = null;
+
   #persist(transactionId, draft = this.state) {
     this.saveService.commit(draft, transactionId);
     this.state = draft;
     this.lastDurableTick = draft.tick;
   }
 
+  #scheduleSimulationSave(transactionId) {
+    this.#pendingSaveTransaction = transactionId;
+    if (this.#saveTimer != null) return;
+    const scheduleFn = typeof globalThis.requestIdleCallback === 'function'
+      ? (cb) => globalThis.requestIdleCallback(cb, { timeout: 1500 })
+      : (cb) => globalThis.setTimeout(cb, 1000);
+    this.#saveTimer = scheduleFn(() => {
+      this.#saveTimer = null;
+      this.flushPendingSave();
+    });
+  }
+
+  flushPendingSave() {
+    if (this.#saveTimer != null) {
+      if (typeof globalThis.cancelIdleCallback === 'function') globalThis.cancelIdleCallback(this.#saveTimer);
+      else globalThis.clearTimeout(this.#saveTimer);
+      this.#saveTimer = null;
+    }
+    if (this.#pendingSaveTransaction) {
+      const transactionId = this.#pendingSaveTransaction;
+      this.#pendingSaveTransaction = null;
+      try {
+        this.#persist(transactionId, this.state);
+      } catch (error) {
+        this.onEvent({ type: 'save-error', message: error.message });
+      }
+    }
+  }
+
   #command(transactionId, action) {
+    this.flushPendingSave();
     const draft = clone(this.state);
     try {
       const result = action(draft);
@@ -847,15 +1018,8 @@ export class GameApplication {
       state.unlocked[`${itemId.toLowerCase()}Shelf`] = true;
       const shelfId = Object.entries(STATIONS).find(([, station]) => station.kind === 'shelf' && station.item === itemId)?.[0];
       if (shelfId && state.unlockedProducts.includes(itemId) && !state.layout?.[shelfId]) {
-        const stagingPosition = nextShelfStagingPosition(state, shelfId);
-        if (stagingPosition) {
-          state.layout ??= {};
-          state.layout[shelfId] = { ...stagingPosition };
-          newStationIds.add(shelfId);
-        } else {
-          state.pendingShelfIds ??= [];
-          if (!state.pendingShelfIds.includes(shelfId)) state.pendingShelfIds.push(shelfId);
-        }
+        placeNewStation(state, shelfId);
+        newStationIds.add(shelfId);
       }
     };
     const addMachine = (id) => {
@@ -880,7 +1044,7 @@ export class GameApplication {
 
     if (FARM_AD_UPGRADE_IDS.includes(upgradeId)) addFarm(upgradeId);
     if (upgradeId === 'cashier') this.#hire(state, 'cashier');
-    if (upgradeId === 'warehouseOperator' || upgradeId === 'storeManager') this.#hire(state, upgradeId);
+    if (upgradeId === 'warehouseOperator' || upgradeId === 'storeManager' || upgradeId === 'security') this.#hire(state, upgradeId);
     if (upgradeId === 'paste') { addMachine('paste'); unlockProduct('TOMATO_PASTE'); }
     if (upgradeId === 'harvester') this.#hire(state, 'harvester');
     if (upgradeId === 'orange') {
@@ -918,18 +1082,19 @@ export class GameApplication {
       this.#hire(state, 'waiter');
     }
     this.#refreshUpgrades(state);
-    for (const id of newStationIds) this.#pushPlayerClearOfStation(state, id);
+    state.pendingStationIds ??= [];
+    for (const id of newStationIds) if (!state.layout?.[id] && !state.pendingStationIds.includes(id)) state.pendingStationIds.push(id);
+    for (const id of newStationIds) {
+      placeNewStation(state, id);
+      this.#pushPlayerClearOfStation(state, id);
+    }
+    this.#stageNextPendingShelf(state);
   }
 
   #stageNextPendingShelf(state) {
-    const stationId = state.pendingShelfIds?.[0];
-    if (!stationId) return;
-    const stagingPosition = nextShelfStagingPosition(state, stationId);
-    if (!stagingPosition) return;
-    state.layout ??= {};
-    state.layout[stationId] = { ...stagingPosition };
-    state.pendingShelfIds = state.pendingShelfIds.slice(1);
-    this.#pushPlayerClearOfStation(state, stationId);
+    for (const stationId of pendingPlacementIds(state)) {
+      if (placeNewStation(state, stationId)) this.#pushPlayerClearOfStation(state, stationId);
+    }
   }
 
   #pushPlayerClearOfStation(state, stationId) {
@@ -991,7 +1156,7 @@ export class GameApplication {
     const fallbackCashierPosition = registerCashierPosition(STATIONS.register);
     const positions = {
       cashier: [fallbackCashierPosition.x, fallbackCashierPosition.z], harvester: [-10, 7], factoryFeeder: [-10, 0],
-      caretaker: [-18, 0], chefWaiter: [-30, 0], waiter: [-35, 0],
+      security: [5, 8.5], caretaker: [-18, 0], chefWaiter: [-30, 0], waiter: [-35, 0],
       warehouseOperator: [STATIONS.loadingDock.access.x, STATIONS.loadingDock.access.z],
       storeManager: [STATIONS.managerOffice.access.x, STATIONS.managerOffice.access.z],
     };
@@ -1049,6 +1214,7 @@ export class GameApplication {
       chefWaiter: state.stats.tipsCollected > 0,
       logisticsOffice: state.stats.eggSold > 0,
       warehouseOperator: state.completedUpgrades.includes('logisticsOffice'),
+      security: state.completedUpgrades.includes('logisticsOffice'),
       storeManager: state.completedUpgrades.includes('logisticsOffice'),
     };
     if (!statRequirements.cashier && !state.completedUpgrades.includes('cashier')) {
@@ -1162,13 +1328,8 @@ export class GameApplication {
       new EconomyLedger(draft.economy).debit(`imported-shelf:${item}`, definition.price, 'shelf-purchase');
       draft.unlockedProducts.push(item);
       draft.unlocked[definition.stationId] = true;
-      const station = STATIONS[definition.stationId];
       makeLocation(draft.stock, SHELVES[item].id, SHELVES[item].capacity);
-      if (canPlaceStation(draft, definition.stationId, station.x, station.z)) draft.layout[definition.stationId] = { x: station.x, z: station.z };
-      else {
-        draft.pendingShelfIds.push(definition.stationId);
-        this.#stageNextPendingShelf(draft);
-      }
+      placeNewStation(draft, definition.stationId);
       this.#pushPlayerClearOfStation(draft, definition.stationId);
       return { ok: true, stationId: definition.stationId, message: `${ITEMS[item].name} reyonu alındı.` };
     });
@@ -1577,30 +1738,23 @@ export class GameApplication {
   }
 
   tick() {
-    const draft = clone(this.state);
+    if (this.state.paused) return;
     this.adSessionTicks += 1;
-    const { events, durable } = advanceSimulation(draft, this.obstacles ?? []);
-    const previousDay = gameDayNumber(draft.tick);
-    draft.tick += 1;
-    const dayStarted = gameDayNumber(draft.tick) > previousDay;
-    const payroll = this.#processPayroll(draft, dayStarted);
-    this.#refreshUpgrades(draft);
-    draft.quest = this.#questFor(draft);
+    const { events, durable } = advanceSimulation(this.state, this.obstacles ?? []);
+    const previousDay = gameDayNumber(this.state.tick);
+    this.state.tick += 1;
+    const dayStarted = gameDayNumber(this.state.tick) > previousDay;
+    const payroll = this.#processPayroll(this.state, dayStarted);
+    this.#refreshUpgrades(this.state);
+    this.state.quest = this.#questFor(this.state);
     if (durable || payroll.changed) {
-      draft.revision += 1;
-      try { this.#persist(`simulation:${draft.tick}`, draft); }
-      catch (error) {
-        this.onEvent({ type: 'save-error', message: error.message });
-        return;
-      }
-    } else {
-      this.state = draft;
+      this.state.revision += 1;
+      this.#scheduleSimulationSave(`simulation:${this.state.tick}`);
     }
     for (const event of events) this.onEvent(event);
     if (payroll.shouldReport) this.onEvent({ type: 'payroll', ...payroll, dayStarted });
-    if (draft.tick - this.lastDurableTick >= 300) {
-      try { this.#persist(`checkpoint:${draft.tick}:${this.saveService.sequence + 1}`, this.state); }
-      catch (error) { this.onEvent({ type: 'save-error', message: error.message }); }
+    if (this.state.tick - this.lastDurableTick >= 300) {
+      this.#scheduleSimulationSave(`checkpoint:${this.state.tick}:${this.saveService.sequence + 1}`);
     }
   }
 
@@ -1613,6 +1767,7 @@ export class GameApplication {
   }
 
   checkpoint() {
+    this.flushPendingSave();
     const draft = clone(this.state);
     draft.revision += 1;
     this.#persist(`checkpoint:${draft.tick}:${this.saveService.sequence + 1}`, draft);
@@ -1648,11 +1803,13 @@ export class GameApplication {
   }
 
   setSpeedMultiplier(multiplier) {
+    if (import.meta.env?.PROD && multiplier !== 1) return;
     if (![1, 2, 5].includes(multiplier)) return;
     this.state.speedMultiplier = multiplier;
   }
 
   debugCredit(amount) {
+    if (import.meta.env?.PROD) return { ok: false, reason: 'disabled-in-production' };
     return this.#command(`debug-credit:${this.state.revision + 1}`, (draft) => {
       new EconomyLedger(draft.economy).credit(`debug-credit:${draft.revision + 1}`, amount, 'debug');
       return { ok: true, message: `$${amount.toLocaleString('tr-TR')} eklendi.` };
@@ -1660,6 +1817,7 @@ export class GameApplication {
   }
 
   debugCapacity(amount) {
+    if (import.meta.env?.PROD) return { ok: false, reason: 'disabled-in-production' };
     return this.#command(`debug-capacity:${this.state.revision + 1}`, (draft) => {
       draft.player.capacity = amount;
       draft.stock.player.capacity = amount;
@@ -1668,6 +1826,7 @@ export class GameApplication {
   }
 
   debugUnlockAllUpgrades() {
+    if (import.meta.env?.PROD) return { ok: false, reason: 'disabled-in-production' };
     return this.#command(`debug-all-upgrades:${this.state.revision + 1}`, (draft) => {
       for (const upgrade of UPGRADES) {
         for (const unlockedId of upgrade.unlocks) draft.unlocked[unlockedId] = true;
@@ -1686,12 +1845,7 @@ export class GameApplication {
         draft.unlocked[shelf.stationId] = true;
         makeLocation(draft.stock, SHELVES[itemId].id, SHELVES[itemId].capacity);
         if (!draft.layout[shelf.stationId] && !draft.pendingShelfIds.includes(shelf.stationId)) {
-          const station = STATIONS[shelf.stationId];
-          if (canPlaceStation(draft, shelf.stationId, station.x, station.z)) {
-            draft.layout[shelf.stationId] = { x: station.x, z: station.z };
-          } else {
-            draft.pendingShelfIds.push(shelf.stationId);
-          }
+          placeNewStation(draft, shelf.stationId);
         }
         this.#stageNextPendingShelf(draft);
         if (draft.layout[shelf.stationId]) this.#pushPlayerClearOfStation(draft, shelf.stationId);

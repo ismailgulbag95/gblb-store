@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { addContactShadow } from './ContactShadow.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 
 // Safe canvas helper for headless Node.js unit test environments
@@ -238,6 +239,21 @@ export const EXTENDED_CUSTOMER_ARCHETYPES = [
   'influencer',     // 13: Blonde hair, sunglasses, crop top, selfie smartphone
 ];
 
+// Reference-sheet outfits; skin tone and small clothing variations stay seeded by ID.
+const CUSTOMER_OUTFITS = {
+  shopperCart: [0xe74732, 0x305d8d, 0x513329],
+  shopperBasket: [0xf77ea3, 0x305d8d, 0x49302b],
+  elderly: [0x855b3e, 0x4d4a44, 0xe1ded6],
+  child: [0xffda45, 0x247cce, 0x49302b],
+  business: [0x353c48, 0x303641, 0x49302b],
+  teen: [0x879edc, 0x29496b, 0x49302b],
+  tourist: [0xffb52e, 0x596748, 0x49302b],
+  student: [0xa1aee1, 0x303641, 0x382e30],
+  youngWoman: [0xfa82ac, 0x286cb0, 0x874529],
+  influencer: [0xf65578, 0x296fb4, 0xffcf58],
+  sporty: [0x303039, 0x313744, 0x382e30],
+};
+
 function customerVariantHash(customerId, variant) {
   let value = 2166136261;
   for (const char of `${customerId}:${variant}`) {
@@ -259,11 +275,13 @@ export function makeHumanoid(group, shirtColor, hairColor, style = 0, profession
   const skinColor = options.skinColor ?? CUSTOMER_SKINS[style % CUSTOMER_SKINS.length];
   const pantsColor = options.pantsColor ?? CUSTOMER_PANTS[style % CUSTOMER_PANTS.length];
   const archetype = options.archetype ?? (profession ? null : CUSTOMER_ARCHETYPES[style % CUSTOMER_ARCHETYPES.length]);
+  const blockCustomer = !profession;
+  const longHair = ['shopperBasket', 'youngWoman', 'influencer'].includes(archetype);
 
   const skin = new THREE.MeshStandardMaterial({ color: skinColor, roughness: 0.76 });
   const shirt = new THREE.MeshStandardMaterial({ color: shirtColor, roughness: 0.58 });
   const trim = new THREE.MeshStandardMaterial({
-    color: profession && STAFF_PROFESSIONS[profession] ? STAFF_PROFESSIONS[profession].trimColor : CUSTOMER_SHIRTS[(style + 2) % CUSTOMER_SHIRTS.length],
+    color: profession && STAFF_PROFESSIONS[profession] ? STAFF_PROFESSIONS[profession].trimColor : 0xfff5e7,
     roughness: 0.52
   });
   const trousers = new THREE.MeshStandardMaterial({ color: pantsColor, roughness: 0.78 });
@@ -284,8 +302,13 @@ export function makeHumanoid(group, shirtColor, hairColor, style = 0, profession
   };
 
   // 1. Torso & Upper Body
-  part(new THREE.SphereGeometry(0.31, 14, 11), shirt, 0, 0.77, 0, [0.88, 1.12, 0.65]);
-  part(new THREE.SphereGeometry(0.255, 14, 11), shirt, 0, 0.57, 0, [0.91, 0.74, 0.7]);
+  if (blockCustomer) {
+    part(new RoundedBoxGeometry(0.43, 0.46, 0.31, 2, 0.055), shirt, 0, 0.76, 0);
+    part(new RoundedBoxGeometry(0.4, 0.13, 0.29, 2, 0.025), trousers, 0, 0.49, 0);
+  } else {
+    part(new THREE.SphereGeometry(0.31, 14, 11), shirt, 0, 0.77, 0, [0.88, 1.12, 0.65]);
+    part(new THREE.SphereGeometry(0.255, 14, 11), shirt, 0, 0.57, 0, [0.91, 0.74, 0.7]);
+  }
   part(new THREE.SphereGeometry(0.065, 10, 8), skin, 0, 1.04, 0, [0.85, 1.4, 0.9]);
 
   const collar = part(new THREE.SphereGeometry(0.105, 10, 7), trim, 0, 0.985, 0.171, [1.7, 0.48, 0.3]);
@@ -300,12 +323,12 @@ export function makeHumanoid(group, shirtColor, hairColor, style = 0, profession
   for (const side of [-1, 1]) {
     const leg = new THREE.Group();
     leg.position.set(side * 0.135, 0.43, 0);
-    const pants = new THREE.Mesh(new THREE.CapsuleGeometry(0.088, 0.09, 4, 8), trousers);
+    const pants = new THREE.Mesh(blockCustomer ? new RoundedBoxGeometry(0.18, 0.24, 0.21, 2, 0.025) : new THREE.CapsuleGeometry(0.088, 0.09, 4, 8), trousers);
     pants.position.y = -0.09;
     pants.castShadow = true;
     const knee = new THREE.Group();
     knee.position.y = -0.19;
-    const shin = new THREE.Mesh(new THREE.CapsuleGeometry(0.082, 0.07, 4, 8), trousers);
+    const shin = new THREE.Mesh(blockCustomer ? new RoundedBoxGeometry(0.17, 0.2, 0.2, 2, 0.022) : new THREE.CapsuleGeometry(0.082, 0.07, 4, 8), trousers);
     shin.position.y = -0.06;
     shin.castShadow = true;
 
@@ -315,6 +338,15 @@ export function makeHumanoid(group, shirtColor, hairColor, style = 0, profession
     const sole = new THREE.Mesh(new RoundedBoxGeometry(0.2, 0.03, 0.32, 2, 0.015), dark);
     sole.position.set(0, -0.175, 0.065);
     knee.add(shin, boot, sole);
+    if (blockCustomer) {
+      boot.material = ['business', 'elderly'].includes(archetype) ? dark : shirt;
+      sole.material = new THREE.MeshStandardMaterial({ color: 0xfff7eb, roughness: 0.8 });
+      for (const y of [-0.09, -0.12]) {
+        const lace = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.012, 0.015), sole.material);
+        lace.position.set(0, y, 0.208);
+        knee.add(lace);
+      }
+    }
     leg.add(pants, knee);
     knees.push(knee);
     group.add(leg);
@@ -332,8 +364,8 @@ export function makeHumanoid(group, shirtColor, hairColor, style = 0, profession
     arm.position.set(side * 0.26, 0.91, 0);
     arm.rotation.z = side * -0.08;
 
-    const sleeve = new THREE.Mesh(new THREE.SphereGeometry(0.14, 12, 9), shirt);
-    sleeve.scale.set(0.88, 1.7, 0.8);
+    const sleeve = new THREE.Mesh(blockCustomer ? new RoundedBoxGeometry(0.2, 0.25, 0.23, 2, 0.04) : new THREE.SphereGeometry(0.14, 12, 9), shirt);
+    if (!blockCustomer) sleeve.scale.set(0.88, 1.7, 0.8);
     sleeve.position.y = -0.14;
 
     const cuff = new THREE.Mesh(new THREE.SphereGeometry(0.09, 10, 8), trim);
@@ -346,7 +378,7 @@ export function makeHumanoid(group, shirtColor, hairColor, style = 0, profession
     forearm.position.y = -0.12;
     forearm.rotation.z = -side * 0.12;
 
-    const hand = new THREE.Mesh(new THREE.SphereGeometry(0.082, 10, 8), skin);
+    const hand = new THREE.Mesh(blockCustomer ? new RoundedBoxGeometry(0.15, 0.15, 0.14, 2, 0.035) : new THREE.SphereGeometry(0.082, 10, 8), skin);
     const wrist = new THREE.Group();
     wrist.position.y = -0.24;
     hand.position.set(0, 0, 0.035);
@@ -367,6 +399,7 @@ export function makeHumanoid(group, shirtColor, hairColor, style = 0, profession
   // 4. Detailed Stylized Head
   const head = new THREE.Group();
   head.position.set(0, 1.31, 0.015);
+  if (blockCustomer) head.scale.set(1.28, 1.12, 1.18);
 
   function partInHead(geometry, material, x, y, z, scale = [1, 1, 1]) {
     const mesh = new THREE.Mesh(geometry, material);
@@ -378,14 +411,20 @@ export function makeHumanoid(group, shirtColor, hairColor, style = 0, profession
   }
 
   // Head base
-  partInHead(new THREE.SphereGeometry(0.245, 16, 13), skin, 0, 0, 0, [0.92, 1.08, 0.9]);
+  partInHead(blockCustomer ? new RoundedBoxGeometry(0.45, 0.46, 0.4, 2, 0.065) : new THREE.SphereGeometry(0.245, 16, 13), skin, 0, 0, 0, blockCustomer ? [1, 1, 1] : [0.92, 1.08, 0.9]);
 
   // Eyes, Ears, Cheeks & Brows
   for (const side of [-1, 1]) {
     partInHead(new THREE.SphereGeometry(0.054, 9, 7), skin, side * 0.224, -0.01, 0, [0.64, 0.9, 0.55]);
     partInHead(new THREE.SphereGeometry(0.059, 10, 8), new THREE.MeshStandardMaterial({ color: 0xffaaa1, roughness: 0.9 }), side * 0.135, -0.06, 0.187, [1, 0.62, 0.24]);
-    partInHead(new THREE.SphereGeometry(0.053, 10, 8), new THREE.MeshBasicMaterial({ color: 0xfffaf1 }), side * 0.086, 0.034, 0.213, [0.83, 1, 0.42]);
-    partInHead(new THREE.SphereGeometry(0.027, 8, 6), new THREE.MeshBasicMaterial({ color: 0x1e272e }), side * 0.081, 0.031, 0.234, [0.82, 1, 0.45]);
+    if (blockCustomer) {
+      const eye = partInHead(new RoundedBoxGeometry(0.035, 0.075, 0.018, 1, 0.008), dark, side * 0.086, 0.01, 0.206);
+      eye.name = 'expressive-eye';
+      eye.userData.side = side;
+    } else {
+      partInHead(new THREE.SphereGeometry(0.053, 10, 8), new THREE.MeshBasicMaterial({ color: 0xfffaf1 }), side * 0.086, 0.034, 0.213, [0.83, 1, 0.42]);
+      partInHead(new THREE.SphereGeometry(0.027, 8, 6), new THREE.MeshBasicMaterial({ color: 0x1e272e }), side * 0.081, 0.031, 0.234, [0.82, 1, 0.45]);
+    }
     const browCurve = new THREE.CatmullRomCurve3([
       new THREE.Vector3(side * 0.14, 0.11, 0.21),
       new THREE.Vector3(side * 0.085, 0.13, 0.225),
@@ -409,12 +448,32 @@ export function makeHumanoid(group, shirtColor, hairColor, style = 0, profession
   });
 
   // Base hairstyle
-  const hairCap = partInHead(new THREE.SphereGeometry(0.205, 12, 9), hairMaterial, 0, 0.14, -0.035, [1.15, 0.7, 1.1]);
+  const hairCap = partInHead(blockCustomer ? new RoundedBoxGeometry(0.48, 0.2, 0.43, 2, 0.045) : new THREE.SphereGeometry(0.205, 12, 9), hairMaterial, 0, 0.18, -0.035, blockCustomer ? [1, 1, 1] : [1.15, 0.7, 1.1]);
   hairCap.rotation.z = style % 2 ? 0.12 : -0.08;
+  const cappedCustomer = blockCustomer && ['tourist', 'child', 'student'].includes(archetype);
+  if (cappedCustomer) {
+    hairCap.scale.set(0.9, 0.45, 0.9);
+    hairCap.position.y = 0.13;
+    hairCap.rotation.z = 0;
+  }
   for (const side of [-1, 1]) {
     partInHead(new THREE.SphereGeometry(0.09, 9, 7), hairMaterial, side * (0.16 + (style % 2) * 0.025), -0.055, -0.025, [0.72, 1.45, 0.85]);
   }
-  if (style % 3 === 0) {
+  if (blockCustomer) {
+    for (let index = 0; index < (cappedCustomer ? 0 : 3); index++) {
+      const lock = partInHead(new RoundedBoxGeometry(0.18, 0.12, 0.13, 1, 0.018), hairMaterial, -0.14 + index * 0.13, 0.145 + index * 0.025, 0.155);
+      lock.rotation.z = -0.3 + index * 0.13;
+    }
+    if (longHair) {
+      partInHead(new RoundedBoxGeometry(0.46, 0.56, 0.2, 2, 0.065), hairMaterial, 0, -0.12, -0.19);
+      for (const side of [-1, 1]) {
+        partInHead(new THREE.SphereGeometry(0.1, 7, 6), hairMaterial, side * 0.21, -0.2, -0.02, [0.85, 2, 0.9]);
+      }
+      if (archetype === 'shopperBasket') {
+        partInHead(new THREE.SphereGeometry(0.13, 8, 6), hairMaterial, 0, 0.3, -0.16);
+      }
+    }
+  } else if (style % 3 === 0) {
     partInHead(new THREE.SphereGeometry(0.11, 10, 8), hairMaterial, 0.16, -0.12, -0.02, [0.8, 1.1, 0.8]);
   }
 
@@ -683,11 +742,29 @@ export function makeHumanoid(group, shirtColor, hairColor, style = 0, profession
   let inspectMesh = null;
 
   if (!profession) {
+    if (['child', 'teen', 'student'].includes(archetype)) {
+      const backpackMat = new THREE.MeshStandardMaterial({ color: archetype === 'student' ? 0x24894d : 0x2268b0, roughness: 0.8 });
+      part(new RoundedBoxGeometry(0.34, 0.38, 0.16, 2, 0.05), backpackMat, 0, 0.76, -0.22);
+      for (const side of [-1, 1]) part(new RoundedBoxGeometry(0.045, 0.34, 0.025, 1, 0.009), backpackMat, side * 0.15, 0.79, 0.167);
+    }
+    if (archetype === 'business') {
+      const white = new THREE.MeshStandardMaterial({ color: 0xfff8ef, roughness: 0.8 });
+      part(new THREE.BoxGeometry(0.14, 0.3, 0.02), white, 0, 0.8, 0.162);
+      part(new RoundedBoxGeometry(0.035, 0.25, 0.025, 1, 0.006), dark, 0, 0.79, 0.182);
+    }
+    if (archetype === 'shopperCart') {
+      partInHead(new RoundedBoxGeometry(0.22, 0.07, 0.035, 1, 0.01), hairMaterial, 0, -0.15, 0.194);
+    }
     if (archetype === 'tourist') {
       // Turist: Safari hat, Hawaiian shirt, camera around neck
       const safariMat = new THREE.MeshStandardMaterial({ color: 0xd4a373, roughness: 0.85 });
       partInHead(new THREE.CylinderGeometry(0.36, 0.38, 0.03, 16), safariMat, 0, 0.16, 0);
       partInHead(new THREE.SphereGeometry(0.2, 12, 8), safariMat, 0, 0.22, 0, [1, 0.65, 1]);
+      partInHead(new THREE.CylinderGeometry(0.21, 0.21, 0.05, 12), dark, 0, 0.2, 0);
+      for (const side of [-1, 1]) {
+        partInHead(new RoundedBoxGeometry(0.09, 0.06, 0.025, 1, 0.01), dark, side * 0.07, 0.01, 0.215);
+        for (const y of [0.64, 0.83]) part(new THREE.SphereGeometry(0.03, 5, 4), gold, side * 0.15, y, 0.164, [1, 1, 0.3]);
+      }
       // Camera around neck
       const camera = new THREE.Group();
       camera.position.set(0, 0.72, 0.22);
@@ -702,6 +779,7 @@ export function makeHumanoid(group, shirtColor, hairColor, style = 0, profession
     } else if (archetype === 'student') {
       // Öğrenci: Backwards cap, green backpack, textbooks under arm
       partInHead(new THREE.SphereGeometry(0.24, 12, 8), new THREE.MeshStandardMaterial({ color: 0x2c3e50 }), 0, 0.17, -0.01, [1.06, 0.7, 1.06]);
+      partInHead(new RoundedBoxGeometry(0.3, 0.025, 0.18, 1, 0.01), dark, 0, 0.14, -0.23);
       // Textbooks under left arm
       const books = new THREE.Mesh(new RoundedBoxGeometry(0.1, 0.18, 0.22, 1, 0.01), new THREE.MeshStandardMaterial({ color: 0xe74c3c, roughness: 0.6 }));
       books.position.set(-0.04, -0.42, 0.05);
@@ -710,7 +788,13 @@ export function makeHumanoid(group, shirtColor, hairColor, style = 0, profession
 
     } else if (archetype === 'youngWoman' || archetype === 'influencer') {
       // Genç Kadın & Influencer: Sunglasses, chic hairstyle, smartphone
-      const shades = partInHead(new RoundedBoxGeometry(0.22, 0.045, 0.02, 1, 0.008), new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.2, metalness: 0.8 }), 0, 0.034, 0.225);
+      const lens = new THREE.MeshStandardMaterial({ color: 0x29243c, roughness: 0.25 });
+      const frame = new THREE.MeshStandardMaterial({ color: 0xc92a92, roughness: 0.45 });
+      for (const side of [-1, 1]) {
+        const y = archetype === 'youngWoman' ? 0.23 : 0.034;
+        partInHead(new THREE.TorusGeometry(0.06, 0.013, 5, 10), frame, side * 0.077, y, 0.233);
+        partInHead(new THREE.SphereGeometry(0.052, 8, 6), lens, side * 0.077, y, 0.231, [1, 1, 0.2]);
+      }
       // Smartphone in right hand
       const phone = new THREE.Mesh(new RoundedBoxGeometry(0.045, 0.09, 0.008, 1, 0.002), new THREE.MeshStandardMaterial({ color: 0xd4a373, metalness: 0.8 }));
       phone.position.set(0.04, -0.48, 0.06);
@@ -723,6 +807,9 @@ export function makeHumanoid(group, shirtColor, hairColor, style = 0, profession
       bag.position.set(-0.04, -0.48, 0.06);
       arms[0].add(bag);
       propObjects.bag = bag;
+      const handle = new THREE.Mesh(new THREE.TorusGeometry(0.045, 0.008, 5, 8, Math.PI), dark);
+      handle.position.y = 0.1;
+      bag.add(handle);
 
     } else if (archetype === 'sporty') {
       // Sporcu: Athletic jersey #23, headphones, duffel bag
@@ -755,6 +842,7 @@ export function makeHumanoid(group, shirtColor, hairColor, style = 0, profession
     } else if (archetype === 'child') {
       // Çocuk: Backwards cap, small candy snack in hand
       partInHead(new THREE.SphereGeometry(0.24, 12, 8), new THREE.MeshStandardMaterial({ color: 0xe74c3c }), 0, 0.17, -0.01, [1.06, 0.7, 1.06]);
+      partInHead(new RoundedBoxGeometry(0.31, 0.025, 0.17, 1, 0.01), dark, 0, 0.14, 0.24);
       const candy = new THREE.Mesh(new RoundedBoxGeometry(0.06, 0.09, 0.04, 1, 0.005), new THREE.MeshStandardMaterial({ color: 0xf1c40f }));
       candy.position.set(0.04, -0.48, 0.06);
       arms[1].add(candy);
@@ -773,8 +861,9 @@ export function makeHumanoid(group, shirtColor, hairColor, style = 0, profession
     } else if (archetype === 'teen') {
       // Genç Erkek: Headphones around neck
       const hpColor = new THREE.MeshStandardMaterial({ color: 0x00d2d3, roughness: 0.4 });
-      partInHead(new THREE.CylinderGeometry(0.05, 0.05, 0.03, 8), hpColor, -0.21, -0.06, 0.08);
-      partInHead(new THREE.CylinderGeometry(0.05, 0.05, 0.03, 8), hpColor, 0.21, -0.06, 0.08);
+      for (const side of [-1, 1]) part(new THREE.SphereGeometry(0.07, 8, 6), silver, side * 0.14, 0.96, 0.18, [0.8, 1.2, 0.6]);
+      const band = part(new THREE.TorusGeometry(0.15, 0.02, 5, 12, Math.PI), dark, 0, 0.94, 0.12);
+      band.rotation.x = Math.PI / 2;
     }
 
     // Shelf Product Inspection Prop (appears when examining products)
@@ -822,6 +911,7 @@ export function makeHumanoid(group, shirtColor, hairColor, style = 0, profession
  */
 export function createWorkerMesh(type, itemFactory) {
   const group = new THREE.Group();
+  addContactShadow(group);
   const professionKey = STAFF_PROFESSIONS[type] ? type : 'cashier';
   const prof = STAFF_PROFESSIONS[professionKey];
   const uniformColor = prof.uniformColor;
@@ -914,6 +1004,7 @@ export function updateWorkerEnergyBar(actor, worker, cameraQuaternion) {
  */
 export function createCustomerMesh(customer, environment, itemFactory) {
   const group = new THREE.Group();
+  addContactShadow(group);
   const customerId = customer.id ?? 'cust-0';
   const hash = [...customerId].reduce((value, char) => (Math.imul(value, 31) + char.charCodeAt(0)) >>> 0, 7);
 
@@ -921,16 +1012,25 @@ export function createCustomerMesh(customer, environment, itemFactory) {
   const archetypeIndex = customer.archetypeIndex ?? (hash % EXTENDED_CUSTOMER_ARCHETYPES.length);
   const archetype = customer.archetype ?? EXTENDED_CUSTOMER_ARCHETYPES[archetypeIndex];
   const skinColor = CUSTOMER_SKINS[hash % CUSTOMER_SKINS.length];
-  const hairColor = CUSTOMER_HAIR[(hash >>> 3) % CUSTOMER_HAIR.length];
+  const outfit = CUSTOMER_OUTFITS[archetype];
+  const hairColor = outfit?.[2] ?? CUSTOMER_HAIR[(hash >>> 3) % CUSTOMER_HAIR.length];
   const outfitStyle = customerVariantHash(customerId, 'style');
-  const shirtColor = CUSTOMER_SHIRTS[customerVariantHash(customerId, 'shirt') % CUSTOMER_SHIRTS.length];
-  const pantsColor = CUSTOMER_PANTS[customerVariantHash(customerId, 'pants') % CUSTOMER_PANTS.length];
+  const shirtColor = customer.eventRole === 'billionaire' ? 0xfffaf0 : outfit ? new THREE.Color(outfit[0]).offsetHSL(0, 0, (customerVariantHash(customerId, 'shirt') % 5 - 2) * 0.025).getHex() : CUSTOMER_SHIRTS[customerVariantHash(customerId, 'shirt') % CUSTOMER_SHIRTS.length];
+  const pantsColor = customer.eventRole === 'billionaire' ? 0xf5f1e7 : outfit?.[1] ?? CUSTOMER_PANTS[customerVariantHash(customerId, 'pants') % CUSTOMER_PANTS.length];
 
   const body = makeHumanoid(group, shirtColor, hairColor, outfitStyle, '', {
     archetype,
     skinColor,
     pantsColor
   });
+
+  if (customer.eventRole === 'billionaire') {
+    const white = new THREE.MeshStandardMaterial({ color: 0xfffaf0, roughness: 0.85 });
+    const hat = new THREE.Group(); hat.position.y = 0.31;
+    const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.07, 8), white);
+    const crown = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.29, 0.25, 8), white); crown.position.y = 0.15;
+    hat.add(brim, crown); body.head.add(hat);
+  }
 
   const legs = body.legs;
   const arms = body.arms;
@@ -964,6 +1064,16 @@ export function createCustomerMesh(customer, environment, itemFactory) {
     arms[1].rotation.set(0.12, 0, -0.15);
   }
 
+  const shoppingBags = [];
+  if (isShopper) for (let i = 0; i < 2; i++) {
+    const bag = new THREE.Group();
+    const paper = new THREE.Mesh(new RoundedBoxGeometry(0.22, 0.28, 0.16, 1, 0.018), new THREE.MeshStandardMaterial({ color: 0xc59a65, roughness: 0.95 }));
+    paper.position.y = -0.23; bag.add(paper);
+    const handle = new THREE.Mesh(new THREE.TorusGeometry(0.055, 0.009, 4, 10, Math.PI), new THREE.MeshStandardMaterial({ color: 0x84633f }));
+    handle.position.y = -0.065; bag.add(handle);
+    bag.visible = false; body.wrists[i].add(bag); shoppingBags.push(bag);
+  }
+
   // Headless Safe Speech / Item Wish Bubble
   const bubble = new THREE.Group();
   bubble.position.set(0, isChild ? 2.5 : 2.08, 0);
@@ -974,7 +1084,7 @@ export function createCustomerMesh(customer, environment, itemFactory) {
 
   if (bubbleCanvas) {
     bubbleTexture = new THREE.CanvasTexture(bubbleCanvas);
-    sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: bubbleTexture, transparent: true }));
+    sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: bubbleTexture, toneMapped: false, transparent: true }));
     sprite.scale.set(0.65, 0.65, 1);
     bubble.add(sprite);
   }
@@ -1020,6 +1130,7 @@ export function createCustomerMesh(customer, environment, itemFactory) {
     hasBasket,
     cartMesh,
     basketMesh,
+    shoppingBags,
     archetype,
     propObjects: body.propObjects,
     inspectMesh: body.inspectMesh,

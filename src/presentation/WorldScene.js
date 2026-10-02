@@ -1,10 +1,14 @@
+import { WorldEventVisuals } from './WorldEventVisuals.js';
+import { activeWorldEvent } from '../domain/worldEvents.js';
 import * as THREE from 'three';
 import { animate } from 'animejs';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+import { updateShelfFeedback } from './ShelfFeedback.js';
+import { addContactShadow } from './ContactShadow.js';
 import { Engine } from '../core/Engine.js';
 import { MarketGrid } from '../environment/MarketGrid.js';
-import { ITEMS, RECIPES, SHELVES, STATIONS } from '../domain/catalog.js';
+import { ITEMS, RECIPES, SHELVES, STATIONS, UPGRADES } from '../domain/catalog.js';
 import { gameDaylight } from '../domain/dayCycle.js';
 import { workerWorkSpeed } from '../domain/staff.js';
 import { getAvailableRegisters } from '../domain/simulation.js';
@@ -13,18 +17,19 @@ import { animateCoopChicken, createChickenCoopModel } from './ChickenCoopModel.j
 import { createFarmBuildModel } from './FarmBuildModel.js';
 import { buildFarmDecorationModel } from './FarmDecorationModels.js';
 import { createProductionBuildModel } from './ProductionBuildModel.js';
-import { ZONES, canPlaceDecoration, canPlaceHangingSign, canPlaceStation, getAllStationIds, getDecorationDimensions, getStationDimensions, HANGING_SIGN_FOOTPRINT, hangingSignPosition, isStationUnlocked, registerCashPosition, stationPosition } from '../domain/layout.js';
+import { ZONES, canPlaceAccessibleStation, pendingPlacementIds, canPlaceDecoration, canPlaceHangingSign, canPlaceStation, getAllStationIds, getDecorationDimensions, getStationDimensions, HANGING_SIGN_FOOTPRINT, hangingSignPosition, isStationUnlocked, registerCashPosition, stationPosition } from '../domain/layout.js';
 import { DECORATIONS } from '../domain/decorCatalog.js';
 import { drawAssetIcon } from '../ui/AssetIcons.js';
 
 import { LightingManager } from './LightingManager.js';
 import { Item3DFactory } from './Item3DFactory.js';
 import { createRegisterModel } from './RegisterModel.js';
-import { createCashPileModel, updateCashPileModel } from './CashPileModel.js';
+import { createCashPileModel, updateCashPileModel, disposeCashPileModel } from './CashPileModel.js';
 import { createShelfModel } from './ShelfModel.js';
 import { buildDecorationModel } from './DecorationModel.js';
 import { createWorkerMesh, createCustomerMesh, updateWorkerEnergyBar } from './HumanoidFactory.js';
 import { createDiningTableModel } from './DiningTableModel.js';
+import { customerHasPaid, customerExpression } from './CustomerExpressions.js';
 import { CharacterAnimator } from './CharacterAnimator.js';
 
 const SCENE_VISUALS_PER_FRAME = 1;
@@ -41,6 +46,7 @@ export class WorldScene {
     this.engine = new Engine(containerId);
     this.scene = this.engine.scene;
     this.environment = new MarketGrid(this.scene);
+    this.worldEventVisuals = new WorldEventVisuals(this.scene);
     this.farms = new Map();
     this.machines = new Map();
     this.shelves = new Map();
@@ -69,6 +75,25 @@ export class WorldScene {
     this.worldCoords = { x: 0, z: 0 };
     this.clock = new THREE.Clock();
     this.effects = [];
+    this.particleGeometry = new THREE.SphereGeometry(0.075, 6, 5);
+    this.particleMaterials = {
+      gold: new THREE.MeshBasicMaterial({ color: 0xffc800, transparent: true }),
+      blue: new THREE.MeshBasicMaterial({ color: 0x1cb0f6, transparent: true }),
+      green: new THREE.MeshBasicMaterial({ color: 0x58cc02, transparent: true }),
+    };
+    this.particleMaterials.white = new THREE.MeshBasicMaterial({ color: 0xfff8dc, transparent: true });
+    const star = new THREE.Shape();
+    for (let i = 0; i < 10; i++) { const angle = i * Math.PI / 5 + Math.PI / 2; const r = i % 2 ? 0.035 : 0.09; const x = Math.cos(angle) * r, y = Math.sin(angle) * r; if (i === 0) star.moveTo(x, y); else star.lineTo(x, y); }
+    star.closePath(); this.starGeometry = new THREE.ShapeGeometry(star);
+    this.ringGeometry = new THREE.RingGeometry(0.1, 0.15, 16);
+    this.particlePool = [];
+    for (let i = 0; i < 30; i += 1) {
+      const p = new THREE.Mesh(this.particleGeometry, this.particleMaterials.gold);
+      p.userData.materials = Object.fromEntries(Object.entries(this.particleMaterials).map(([key, material]) => [key, material.clone()]));
+      p.visible = false;
+      this.scene.add(p);
+      this.particlePool.push(p);
+    }
     this.reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
     this.#createPlayer();
     this.lighting = new LightingManager(this.scene);
@@ -113,6 +138,7 @@ export class WorldScene {
     this.playerCharacter = new CharacterFactory('shopkeeper');
     this.playerMesh = this.playerCharacter.group;
     this.#createPlayerCargo();
+    addContactShadow(this.playerMesh);
     this.scene.add(this.playerMesh);
   }
 
@@ -291,7 +317,8 @@ export class WorldScene {
     const p = state ? stationPosition(state, id) : station;
     if (p) group.position.set(p.x, 0, p.z);
     this.scene.add(group);
-    this.customShelves.set(id, { group, productMeshes, item: station.item, id });
+    group.scale.y = 1;
+    this.customShelves.set(id, { group, productMeshes, item: station.item, id, wobbler: group.getObjectByName('shelf-wobbler') });
   }
 
   setObstacles(app) {
@@ -320,7 +347,8 @@ export class WorldScene {
       this.lastPreviewSnapped = null;
     } else if (state) {
       const point = this.#selectionPosition(state, id);
-      this.previewPlacement(state, point.x, point.z);
+      if (point) this.previewPlacement(state, point.x, point.z);
+      else this.placementPreview.visible = false;
     }
   }
 
@@ -361,7 +389,9 @@ export class WorldScene {
       ? canPlaceHangingSign(state, this.selectedStation.slice('hanging-sign:'.length), snappedX, snappedZ)
       : isDecor
         ? canPlaceDecoration(state, this.selectedStation.slice(6), snappedX, snappedZ, rotation)
-        : canPlaceStation(state, this.selectedStation, snappedX, snappedZ, rotation);
+        : pendingPlacementIds(state).includes(this.selectedStation)
+          ? canPlaceAccessibleStation(state, this.selectedStation, snappedX, snappedZ)
+          : canPlaceStation(state, this.selectedStation, snappedX, snappedZ, rotation);
 
     const fillColor = valid ? 0x2ed573 : 0xff4757;
     const borderColor = valid ? 0x00ff88 : 0xff3838;
@@ -416,7 +446,7 @@ export class WorldScene {
     const rect = this.engine.renderer.domElement.getBoundingClientRect();
     this.pointer.set(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1);
     this.raycaster.setFromCamera(this.pointer, this.engine.camera);
-    const signs = [...this.environment.hangingSigns.values()];
+    const signs = this.environment?.hangingSigns ? [...this.environment.hangingSigns.values()] : [];
     const hit = this.raycaster.intersectObjects(signs, true)[0];
     let object = hit?.object;
     while (object && !object.userData.hangingSignId) object = object.parent;
@@ -483,7 +513,7 @@ export class WorldScene {
       canvas.height = 128;
       const texture = new THREE.CanvasTexture(canvas);
       texture.colorSpace = THREE.SRGBColorSpace;
-      sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: false }));
+      sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, toneMapped: false, transparent: true, depthTest: false }));
       sprite.name = 'status-badge';
       sprite.userData.canvas = canvas;
       sprite.position.y = height;
@@ -502,8 +532,8 @@ export class WorldScene {
     const label = opts.label ?? '';
     const tone = opts.tone ?? '#ffd35e';
     const isClose = (opts.distance ?? 10) < 4.5;
-
-    const signature = `${type}:${itemIcon}:${count}:${maxCount}:${Math.round(progress * 20)}:${tone}:${isClose}:${label}`;
+    const progressBucket = Math.round(progress * 5);
+    const signature = `${type}:${itemIcon}:${count}:${maxCount}:${progressBucket}:${tone}:${isClose ? 1 : 0}:${label}`;
     if (sprite.userData.signature === signature) return;
     sprite.userData.signature = signature;
 
@@ -602,6 +632,10 @@ export class WorldScene {
     const pcx = px + pw / 2;
     const pcy = py + ph / 2;
     if (type === 'ready') {
+      if (maxCount > 0) {
+        context.beginPath(); context.arc(pcx, pcy, 16, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.min(1, count / maxCount));
+        context.lineWidth = 2.5; context.strokeStyle = '#ffffff'; context.stroke();
+      }
       // Bold black checkmark ✓
       context.beginPath();
       context.moveTo(pcx - 9, pcy);
@@ -764,9 +798,13 @@ export class WorldScene {
   }
 
   playEvent(event, state) {
-    if (this.reducedMotion.matches || this.effects.length > 36) return;
+    if (this.reducedMotion.matches || this.effects.length > 30) return;
     let point = { x: state.player.x, z: state.player.z };
     if (event.type === 'sale') point = stationPosition(state, 'register');
+    if (event.type === 'cash-collected') {
+      const register = getAvailableRegisters(state).find(register => register.id === event.registerId);
+      point = register ? registerCashPosition(register) : stationPosition(state, 'register');
+    }
     if (event.type === 'production') {
       if (event.farmId) point = stationPosition(state, event.farmId);
       else {
@@ -774,15 +812,32 @@ export class WorldScene {
         if (machineId) point = stationPosition(state, machineId);
       }
     }
-    const color = event.type === 'sale' || event.type === 'tip-ready' ? 0xffc800
-      : event.type === 'production' ? 0x1cb0f6 : 0x58cc02;
-    for (let index = 0; index < 5; index += 1) {
-      const particle = new THREE.Mesh(new THREE.SphereGeometry(0.075, 6, 5), new THREE.MeshBasicMaterial({ color, transparent: true }));
+    if (event.point) point = event.point;
+    if (!point) return;
+    const color = ['sale', 'tip-ready', 'cash-collected'].includes(event.type) ? 'gold' : event.type === 'production' ? 'blue' : 'green';
+    for (let index = 0; index < (event.type === 'unlock' ? 15 : 5); index += 1) {
+      const particle = this.particlePool.pop();
+      if (!particle) break;
+      particle.material = particle.userData.materials[event.type === 'unlock' ? ['gold', 'blue', 'green'][index % 3] : color];
+      particle.geometry = color === 'gold' ? this.starGeometry : this.particleGeometry;
+      particle.quaternion.copy(this.engine.camera.quaternion);
+      particle.scale.setScalar(1);
+      particle.material.opacity = 1;
       particle.position.set(point.x, 1.3, point.z);
-      this.scene.add(particle);
-      this.effects.push({ mesh: particle, age: 0, vx: Math.cos(index * Math.PI * 0.4) * 1.3,
+      particle.visible = true;
+      this.effects.push({ mesh: particle, age: 0, kind: event.type === 'cash-collected' ? 'cash' : 'burst', lead: index === 0, originX: point.x, originZ: point.z, vx: Math.cos(index * Math.PI * 0.4) * 1.3,
         vz: Math.sin(index * Math.PI * 0.4) * 1.3 });
     }
+  }
+
+  #emitGlint(x, z, kind = 'glint') {
+    if (this.reducedMotion.matches) return;
+    const mesh = this.particlePool.pop(); if (!mesh) return;
+    mesh.material = mesh.userData.materials[kind === 'ring' ? 'gold' : 'white']; mesh.material.opacity = 1;
+    mesh.geometry = kind === 'dust' ? this.particleGeometry : kind === 'ring' ? this.ringGeometry : this.starGeometry;
+    mesh.scale.setScalar(kind === 'dust' ? 0.65 : 1.8);
+    mesh.position.set(x, ['dust', 'ring'].includes(kind) ? 0.08 : 1.9, z); mesh.visible = true;
+    this.effects.push({ mesh, age: 0, vx: 0, vz: 0, kind });
   }
 
   #part(group, geometry, color, x, y, z, options = {}) {
@@ -824,6 +879,7 @@ export class WorldScene {
     const baseId = station.baseType ?? id.split('_')[0];
 
     const { lamp, input, output, badgeY, update } = createProductionBuildModel(group, baseId);
+    addContactShadow(group, 3.4, 2.8);
 
     const inputMeshes = [];
     for (const [itemId, quantity] of Object.entries(recipe.inputs)) {
@@ -1037,15 +1093,21 @@ export class WorldScene {
   #syncCustomer(actor, customer, state, frameDelta) {
     actor.animator ??= new CharacterAnimator(actor, this.itemFactory, 'customer');
     actor.animator.update(customer, state.paused ? 0 : frameDelta, {
+      reducedMotion: this.reducedMotion.matches,
+      paid: customerHasPaid(customer, state.stock[`customer:${customer.id}`]?.items),
       resolveTarget: (cue) => this.#animationTarget(cue, state, actor),
       speed: state.speedMultiplier,
       lookTarget: customer.phase === 'waiting-stock' ? this.#animationTarget({ location: 'shelf:' + (customer.targetShelfId?.replace('shelf:', '') ?? customer.demand), item: customer.demand }, state, actor)?.point : null,
     });
 
-    const wish = customer.reaction ? (customer.reaction === 'happy' ? 'satisfied' : 'unhappy') : customer.kind === 'diner'
+    const expression = customerExpression(customer, actor.animator.action);
+    if (actor.lastExpression !== expression) { actor.lastExpression = expression; actor.expressionStartedAt = actor.animator.clock; }
+    const transientHappy = expression === 'happy' && actor.animator.clock - actor.expressionStartedAt < 1;
+    const expressionSymbol = transientHappy ? '♥' : { waiting: '⌛', unhappy: '…' }[expression];
+    const wish = expressionSymbol ?? (customer.reaction ? null : customer.kind === 'diner'
       ? (customer.phase === 'waiting-meal' ? customer.demand : null)
       : (['entering', 'to-shelf', 'waiting-stock', 'to-next-shelf'].includes(customer.phase)
-        ? customer.shoppingList?.[customer.shoppingIndex ?? 0] ?? customer.demand : null);
+        ? customer.shoppingList?.[customer.shoppingIndex ?? 0] ?? customer.demand : null));
     if (wish !== actor.lastWish) {
       if (actor.bubbleCanvas) {
         const context = actor.bubbleCanvas.getContext('2d');
@@ -1058,7 +1120,16 @@ export class WorldScene {
           context.lineWidth = 6;
           context.strokeStyle = '#2c3e50';
           context.stroke();
-          drawAssetIcon(context, ITEMS[wish]?.icon ?? wish, 32, 28, 64, 64);
+          if (expressionSymbol) {
+            context.fillStyle = expression === 'happy' ? '#ed6c98' : '#8b693e';
+            context.font = 'bold 65px sans-serif'; context.textAlign = 'center'; context.textBaseline = 'middle';
+            context.fillText(expressionSymbol, 64, 64);
+          } else {
+            drawAssetIcon(context, ITEMS[wish]?.icon ?? wish, 32, 28, 64, 64);
+            if (expression === 'missing') {
+              context.fillStyle = '#c47427'; context.font = 'bold 32px sans-serif'; context.textAlign = 'center'; context.fillText('?', 102, 28);
+            }
+          }
           actor.bubbleTexture.needsUpdate = true;
         }
       }
@@ -1310,8 +1381,15 @@ export class WorldScene {
   }
 
   #syncCollection(map, ids, create, dispose) {
-    const idSet = new Set(ids);
     let failedIds = this.visualBuildFailures.get(map);
+    if (map.size === ids.length && (!failedIds || failedIds.size === 0)) {
+      let identical = true;
+      for (let i = 0; i < ids.length; i += 1) {
+        if (!map.has(ids[i])) { identical = false; break; }
+      }
+      if (identical) return;
+    }
+    const idSet = new Set(ids);
     for (const [id, value] of map) {
       if (idSet.has(id)) continue;
       value.animator?.dispose();
@@ -1337,6 +1415,10 @@ export class WorldScene {
   }
 
   #disposeVisual(value) {
+    if (value?.billGeometry && value?.bandGeometry) {
+      disposeCashPileModel(value);
+      return;
+    }
     const root = value.group ?? value;
     root.traverse((object) => {
       if (!object.geometry?.userData?.sharedAsset) object.geometry?.dispose();
@@ -1393,11 +1475,22 @@ export class WorldScene {
     const frameDelta = Math.min(this.clock.getDelta(), 0.05);
     const time = this.clock.elapsedTime;
     this.lighting.updateDaylight(gameDaylight, state.tick, THREE);
+    this.engine.setDaylight(gameDaylight(state.tick));
+    this.environment.setDaylight(gameDaylight(state.tick));
     this.environment.syncHangingSigns(state.hangingSigns);
     this.environment.setRestaurantUnlocked(state.unlocked?.restaurant);
     this.#guardDynamicVisual('staff-facilities', () => this.environment.syncStaffFacilities(state, this.sceneBuildBudget));
     this.#guardDynamicVisual('east-logistics', () => this.environment.syncLogistics(state, this.sceneBuildBudget));
-    this.environment.update(frameDelta, time);
+    this.environment.constructionSites.sync(state, state.paused ? 0 : frameDelta, this.reducedMotion.matches);
+    this.visualTime = (this.visualTime ?? 0) + (state.paused ? 0 : frameDelta);
+    this.environment.update(state.paused || this.reducedMotion.matches ? 0 : frameDelta, this.reducedMotion.matches ? 0 : this.visualTime);
+    this.environment.ambientLife.update(state, frameDelta, gameDaylight(state.tick), this.reducedMotion.matches);
+    this.worldEventVisuals.update(state, frameDelta, this.engine.camera, this.environment.ambientLife.cat, this.reducedMotion.matches);
+    if (activeWorldEvent(state, 'goldenHarvest')) {
+      this.lighting.dirLight.color.setHex(0xffcf55);
+      this.lighting.hemiLight.color.setHex(0xffdf88);
+    }
+
     const wasMoving = Math.hypot(state.player.x - this.playerMesh.position.x, state.player.z - this.playerMesh.position.z) > 0.001;
     if (this.playerCharacter.type !== state.player.character && this.sceneBuildBudget.take()) {
       this.#disposeVisual(this.playerMesh);
@@ -1405,11 +1498,16 @@ export class WorldScene {
       this.playerCharacter = new CharacterFactory(state.player.character);
       this.playerMesh = this.playerCharacter.group;
       this.#createPlayerCargo();
+      addContactShadow(this.playerMesh);
       this.scene.add(this.playerMesh);
     }
     this.playerMesh.position.set(state.player.x, 0, state.player.z);
     this.playerMesh.rotation.y = state.player.facing;
-    this.playerCharacter.animate(frameDelta, wasMoving);
+    this.playerCharacter.animate(state.paused ? 0 : frameDelta, wasMoving);
+    if (wasMoving && !state.paused && this.visualTime - (this.lastPlayerDust ?? 0) > 0.24) {
+      this.lastPlayerDust = this.visualTime;
+      this.#emitGlint(state.player.x - Math.sin(state.player.facing) * 0.3, state.player.z - Math.cos(state.player.facing) * 0.3, 'dust');
+    }
     this.#syncPlayerCargo(state.stock.player?.items ?? {});
     const nearby = this.stationAt(state, state.player.x, state.player.z);
     this.cameraFocus.copy(this.playerMesh.position);
@@ -1420,7 +1518,7 @@ export class WorldScene {
     }
     this.engine.followTarget(this.cameraFocus, frameDelta);
 
-    this.#syncCollection(this.farms, Object.keys(state.farms), (id) => this.#addFarm(id), (entry) => this.#disposeVisual(entry));
+    this.#syncCollection(this.farms, Object.keys(state.farms).filter(id => stationPosition(state, id)), (id) => this.#addFarm(id), (entry) => this.#disposeVisual(entry));
     for (const [farmId, farm] of this.farms) {
       const farmState = state.farms[farmId];
       const count = farmState?.readyCount ?? 0;
@@ -1463,9 +1561,9 @@ export class WorldScene {
         });
       }
     }
-    this.#syncCollection(this.machines, Object.keys(state.machines), (id) => this.#addMachine(id), (entry) => this.#disposeVisual(entry));
+    this.#syncCollection(this.machines, Object.keys(state.machines).filter(id => stationPosition(state, id)), (id) => this.#addMachine(id), (entry) => this.#disposeVisual(entry));
     this.#syncCollection(this.shelves, shelfItems, (id) => this.#addShelf(id), (entry) => this.#disposeVisual(entry));
-    this.#syncCollection(this.tables, Object.keys(state.diningTables), (id) => this.#addTable(id), (entry) => this.#disposeVisual(entry));
+    this.#syncCollection(this.tables, Object.keys(state.diningTables).filter(id => stationPosition(state, id)), (id) => this.#addTable(id), (entry) => this.#disposeVisual(entry));
     this.#syncDecorations(state);
     for (const [id, farm] of this.farms) {
       const p = stationPosition(state, id);
@@ -1539,6 +1637,9 @@ export class WorldScene {
         ? (shelfStock.items[shelf.item] ?? 0)
         : (state.stock[`shelf:${shelf.item}`]?.items[shelf.item] ?? 0);
       shelf.productMeshes.forEach((mesh, index) => { mesh.visible = index < count; });
+      const near = Math.hypot(state.player.x - shelf.group.position.x, state.player.z - shelf.group.position.z) < 2;
+      if (updateShelfFeedback(shelf, count, shelf.productMeshes.length, state.paused ? 0 : frameDelta,
+        this.visualTime, near, this.reducedMotion.matches)) this.#emitGlint(shelf.group.position.x, shelf.group.position.z);
     }
     if (this.coop) {
       const p = stationPosition(state, 'coop');
@@ -1565,7 +1666,7 @@ export class WorldScene {
     }
     if (this.selectedStation) {
       const group = this.#selectedGroup(this.selectedStation);
-      const point = this.#selectionPosition(state, this.selectedStation);
+      const point = this.#selectionPosition(state, this.selectedStation) ?? this.lastPreviewSnapped ?? state.player;
       if (group) group.position.y = 0.55 + Math.sin(time * 4) * 0.08;
       this.selectionRing.position.set(point.x, 0.07, point.z);
 
@@ -1595,6 +1696,9 @@ export class WorldScene {
       this.#drawShelfLabel(shelf, itemId, state.settings.language);
       shelf.productMeshes.forEach((mesh, index) => { mesh.visible = index < count; });
       const distance = Math.hypot(state.player.x - shelf.group.position.x, state.player.z - shelf.group.position.z);
+      const full = updateShelfFeedback(shelf, count, capacity, state.paused ? 0 : frameDelta, this.visualTime,
+        distance < 2 || state.customers.some(customer => Math.hypot(customer.x - shelf.group.position.x, customer.z - shelf.group.position.z) < 1.5), this.reducedMotion.matches);
+      if (full) this.#emitGlint(shelf.group.position.x, shelf.group.position.z);
       const iconId = ITEMS[itemId]?.icon ?? itemId.toLowerCase();
       if (count > 0) {
         this.#statusBadge(shelf.group, {
@@ -1648,9 +1752,9 @@ export class WorldScene {
       }
       machine.lamp.material.color.setHex(entry?.blocked === 'output-full' ? 0xff4b4b
         : entry?.progressTicks ? 0xffc800 : 0x58cc02);
-      machine.group.rotation.y = Math.sin(time * 1.5) * (entry && entry.progressTicks ? 0.025 : 0);
+      machine.group.rotation.y = (state.layout?.[machineId]?.rotation ?? 0) + (this.reducedMotion.matches ? 0 : Math.sin(this.visualTime * 1.5) * (entry && entry.progressTicks ? 0.025 : 0));
       const isWorking = Boolean(entry && entry.progressTicks);
-      machine.update?.(time, frameDelta, isWorking);
+      machine.update?.(this.visualTime, state.paused || this.reducedMotion.matches ? 0 : frameDelta, isWorking && !this.reducedMotion.matches);
       const distance = Math.hypot(state.player.x - machine.group.position.x, state.player.z - machine.group.position.z);
       const recipe = RECIPES[STATIONS[machineId]?.recipe];
       const prodThreshold = (recipe?.seconds ?? 3) * 10;
@@ -1767,14 +1871,25 @@ export class WorldScene {
 
     for (let index = this.effects.length - 1; index >= 0; index -= 1) {
       const effect = this.effects[index];
-      effect.age += frameDelta;
-      effect.mesh.position.x += effect.vx * frameDelta;
-      effect.mesh.position.z += effect.vz * frameDelta;
-      effect.mesh.position.y += 1.1 * frameDelta;
+      const dt = state.paused ? 0 : frameDelta;
+      effect.age += dt;
+      if (effect.kind === 'cash') {
+        const t = Math.min(1, effect.age / 0.55);
+        effect.mesh.position.set(THREE.MathUtils.lerp(effect.originX, state.player.x, t) + Math.sin(t * Math.PI) * effect.vx * 0.2,
+          0.9 + Math.sin(t * Math.PI) * 0.9, THREE.MathUtils.lerp(effect.originZ, state.player.z, t) + Math.sin(t * Math.PI) * effect.vz * 0.2);
+        effect.mesh.scale.setScalar(1 - t * 0.8);
+      } else {
+        effect.mesh.position.x += effect.vx * dt;
+        effect.mesh.position.z += effect.vz * dt;
+        effect.mesh.position.y += (effect.kind === 'dust' ? 0.25 : 1.1) * dt;
+      }
+      if (effect.kind === 'ring') { effect.mesh.rotation.set(-Math.PI / 2, 0, 0); effect.mesh.scale.setScalar(1 + effect.age * 7); }
+      else effect.mesh.quaternion.copy(this.engine.camera.quaternion);
       effect.mesh.material.opacity = Math.max(0, 1 - effect.age / 0.55);
-      if (effect.age >= 0.55) {
-        this.scene.remove(effect.mesh);
-        effect.mesh.geometry.dispose(); effect.mesh.material.dispose();
+      if (effect.age >= 0.55 || this.reducedMotion.matches) {
+        if (effect.kind === 'cash' && effect.lead) this.#emitGlint(state.player.x, state.player.z, 'ring');
+        effect.mesh.visible = false;
+        this.particlePool.push(effect.mesh);
         this.effects.splice(index, 1);
       }
     }
@@ -1798,15 +1913,36 @@ export class WorldScene {
       actor.animator ??= new CharacterAnimator(actor, this.itemFactory, 'worker');
       actor.animator.update(worker, state.paused ? 0 : frameDelta, {
         items: state.stock['worker:' + worker.id]?.items ?? {},
+        reducedMotion: this.reducedMotion.matches,
         speed: state.speedMultiplier * workerWorkSpeed(worker),
         resolveTarget: (cue) => this.#animationTarget(cue, state, actor),
         paying: worker.type === 'cashier' && state.customers.some((customer) => customer.phase === 'paying'
           && (customer.targetRegisterId ?? 'register') === (worker.registerId ?? 'register')),
       });
+      if (!state.paused && actor.animator.path.length && this.visualTime - (actor.lastDust ?? 0) > 0.45) {
+        actor.lastDust = this.visualTime;
+        this.#emitGlint(actor.group.position.x, actor.group.position.z, 'dust');
+      }
       updateWorkerEnergyBar(actor, worker, this.engine.camera.quaternion);
     });
 
+    if (this.lastCompletedUpgrades) {
+      for (const id of state.completedUpgrades) if (!this.lastCompletedUpgrades.has(id)) {
+        const definition = UPGRADES.find(upgrade => upgrade.id === id);
+        if (definition && !this.reducedMotion.matches) {
+          this.playEvent({ type: 'unlock', point: definition }, state);
+          this.cameraPunch = 0.12;
+        }
+      }
+    }
+    if (!this.lastCompletedUpgrades || state.completedUpgrades.length < this.lastCompletedUpgrades.size) this.lastCompletedUpgrades = new Set(state.completedUpgrades);
+    else for (const id of state.completedUpgrades) this.lastCompletedUpgrades.add(id);
+    const punch = !this.reducedMotion.matches && !state.paused && this.cameraPunch > 0
+      ? Math.sin(this.cameraPunch * 70) * 0.035 : 0;
+    this.cameraPunch = Math.max(0, (this.cameraPunch ?? 0) - (state.paused ? 0 : frameDelta));
+    this.engine.camera.position.x += punch;
     this.engine.render();
+    this.engine.camera.position.x -= punch;
   }
 
   screenToWorld(clientX, clientY) {

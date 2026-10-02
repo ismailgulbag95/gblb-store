@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import { addShelfWobbler } from './ShelfFeedback.js';
+import { addContactShadow } from './ContactShadow.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 
 export function createShelfModel(itemId, shelfDef, itemFactory) {
@@ -6,6 +8,7 @@ export function createShelfModel(itemId, shelfDef, itemFactory) {
   group.position.set(shelfDef.x, 0, shelfDef.z);
 
   const type = shelfDef.displayType ?? 'gondola';
+  addContactShadow(group, type === 'produce' ? 3.7 : 2.5, type === 'produce' ? 2.1 : 1.5);
   const productMeshes = [];
 
   const labelCanvas = typeof document !== 'undefined'
@@ -34,13 +37,6 @@ export function createShelfModel(itemId, shelfDef, itemFactory) {
     const woodMedium = new THREE.MeshStandardMaterial({ color: 0xa06233, roughness: 0.8 });
     const woodLight = new THREE.MeshStandardMaterial({ color: 0xd4a373, roughness: 0.75 });
     const crateMat = new THREE.MeshStandardMaterial({ color: 0xba8c5a, roughness: 0.8 });
-    const redMat = new THREE.MeshStandardMaterial({ color: 0xeb4d4b, roughness: 0.3 });
-    const orangeMat = new THREE.MeshStandardMaterial({ color: 0xff9f1a, roughness: 0.4 });
-    const yellowMat = new THREE.MeshStandardMaterial({ color: 0xf1c40f, roughness: 0.35 });
-    const greenMat = new THREE.MeshStandardMaterial({ color: 0x2ed573, roughness: 0.5 });
-    const darkGreenMat = new THREE.MeshStandardMaterial({ color: 0x20bf6b, roughness: 0.4 });
-    const purpleMat = new THREE.MeshStandardMaterial({ color: 0x6c5ce7, roughness: 0.3 });
-    const potatoMat = new THREE.MeshStandardMaterial({ color: 0xc8a165, roughness: 0.9 });
     const stoneBaseMat = new THREE.MeshStandardMaterial({ color: 0xe5dec9, roughness: 0.9 });
     const grassMat = new THREE.MeshStandardMaterial({ color: 0x78e08f, roughness: 0.6 });
 
@@ -126,108 +122,6 @@ export function createShelfModel(itemId, shelfDef, itemFactory) {
         chalkLine.position.set(0, 0.07, tier.crateD / 2 + 0.016);
         crateGroup.add(chalkLine);
 
-        // Populate crate with lush static decorative produce based on reference photo
-        if (tierIdx === 2) {
-          // Top Tier: Bananas (left), Tomatoes (middle), Oranges (right)
-          if (c === 0) {
-            // Bananas
-            for (let b = 0; b < 6; b++) {
-              const banana = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.035, 0.22, 6), yellowMat);
-              banana.rotation.z = Math.PI / 2 + (b - 2.5) * 0.15;
-              banana.rotation.x = (b % 2) * 0.2;
-              banana.position.set(-0.12 + (b % 3) * 0.12, 0.07 + Math.floor(b / 3) * 0.05, (b % 2) * 0.08);
-              banana.castShadow = true;
-              crateGroup.add(banana);
-            }
-          } else if (c === 1) {
-            // Tomatoes
-            for (let t = 0; t < 8; t++) {
-              const tom = new THREE.Mesh(new THREE.SphereGeometry(0.065, 8, 8), redMat);
-              tom.position.set(-0.16 + (t % 3) * 0.16, 0.065 + (t >= 6 ? 0.06 : 0), -0.1 + Math.floor((t % 6) / 3) * 0.18);
-              tom.scale.set(1.05, 0.9, 1.05);
-              tom.castShadow = true;
-              crateGroup.add(tom);
-            }
-          } else {
-            // Oranges
-            for (let o = 0; o < 8; o++) {
-              const org = new THREE.Mesh(new THREE.SphereGeometry(0.068, 8, 8), orangeMat);
-              org.position.set(-0.16 + (o % 3) * 0.16, 0.068 + (o >= 6 ? 0.06 : 0), -0.1 + Math.floor((o % 6) / 3) * 0.18);
-              org.castShadow = true;
-              crateGroup.add(org);
-            }
-          }
-        } else if (tierIdx === 1) {
-          // Middle Tier: Cabbages (left), Carrots (middle), Lemons (right)
-          if (c === 0) {
-            // Cabbages / Leafy Greens
-            for (let k = 0; k < 4; k++) {
-              const cab = new THREE.Mesh(new THREE.SphereGeometry(0.09, 8, 8), greenMat);
-              cab.position.set(-0.12 + (k % 2) * 0.24, 0.085, -0.09 + Math.floor(k / 2) * 0.18);
-              cab.scale.set(1.1, 0.85, 1.1);
-              cab.castShadow = true;
-              crateGroup.add(cab);
-            }
-          } else if (c === 1) {
-            // Carrots with green tops
-            for (let cr = 0; cr < 6; cr++) {
-              const carrot = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.24, 6), orangeMat);
-              carrot.rotation.x = -Math.PI / 2 + 0.3;
-              carrot.position.set(-0.15 + (cr % 3) * 0.15, 0.06 + Math.floor(cr / 3) * 0.05, -0.05);
-              carrot.castShadow = true;
-              crateGroup.add(carrot);
-
-              const greenTuft = new THREE.Mesh(new THREE.ConeGeometry(0.035, 0.1, 5), darkGreenMat);
-              greenTuft.position.set(-0.15 + (cr % 3) * 0.15, 0.08 + Math.floor(cr / 3) * 0.05, -0.16);
-              greenTuft.rotation.x = -Math.PI / 2;
-              crateGroup.add(greenTuft);
-            }
-          } else {
-            // Lemons / Yellow Squash
-            for (let l = 0; l < 8; l++) {
-              const lem = new THREE.Mesh(new THREE.SphereGeometry(0.062, 8, 8), yellowMat);
-              lem.scale.set(1.2, 0.85, 0.85);
-              lem.position.set(-0.15 + (l % 3) * 0.15, 0.062 + (l >= 6 ? 0.05 : 0), -0.09 + Math.floor((l % 6) / 3) * 0.18);
-              lem.castShadow = true;
-              crateGroup.add(lem);
-            }
-          }
-        } else {
-          // Bottom Tier: Potatoes (left), Cucumbers (middle), Eggplants (right)
-          if (c === 0) {
-            // Potatoes / Red Apples
-            for (let p = 0; p < 8; p++) {
-              const pot = new THREE.Mesh(new THREE.SphereGeometry(0.065, 8, 8), potatoMat);
-              pot.position.set(-0.16 + (p % 3) * 0.16, 0.065 + (p >= 6 ? 0.05 : 0), -0.1 + Math.floor((p % 6) / 3) * 0.18);
-              pot.castShadow = true;
-              crateGroup.add(pot);
-            }
-          } else if (c === 1) {
-            // Cucumbers
-            for (let cu = 0; cu < 6; cu++) {
-              const cuc = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.28, 7), darkGreenMat);
-              cuc.rotation.z = Math.PI / 2;
-              cuc.rotation.y = (cu % 2) * 0.2;
-              cuc.position.set(0, 0.05 + Math.floor(cu / 2) * 0.04, -0.12 + (cu % 2) * 0.22);
-              cuc.castShadow = true;
-              crateGroup.add(cuc);
-            }
-          } else {
-            // Eggplants
-            for (let eg = 0; eg < 5; eg++) {
-              const eggp = new THREE.Mesh(new THREE.SphereGeometry(0.075, 8, 8), purpleMat);
-              eggp.scale.set(0.9, 1.35, 0.9);
-              eggp.position.set(-0.14 + (eg % 3) * 0.14, 0.075, -0.08 + Math.floor(eg / 3) * 0.16);
-              eggp.castShadow = true;
-              crateGroup.add(eggp);
-
-              const cap = new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.04, 5), darkGreenMat);
-              cap.position.set(-0.14 + (eg % 3) * 0.14, 0.16, -0.08 + Math.floor(eg / 3) * 0.16);
-              crateGroup.add(cap);
-            }
-          }
-        }
-
         group.add(crateGroup);
       }
     });
@@ -252,7 +146,7 @@ export function createShelfModel(itemId, shelfDef, itemFactory) {
     label.position.set(0, 1.82, -0.37);
     group.add(label);
 
-    // Left Side Accessory: Rustic Wooden Barrel filled with Red Apples
+    // Empty side barrel: saleable produce belongs exclusively to stock slots.
     const barrelGroup = new THREE.Group();
     barrelGroup.position.set(-1.42, 0.04, 0.32);
 
@@ -268,20 +162,9 @@ export function createShelfModel(itemId, shelfDef, itemFactory) {
       barrelGroup.add(hoop);
     }
 
-    // Apples overflowing the top
-    for (let a = 0; a < 7; a++) {
-      const apple = new THREE.Mesh(new THREE.SphereGeometry(0.065, 8, 8), redMat);
-      apple.position.set(
-        Math.cos((a * Math.PI * 2) / 6) * 0.12 * (a === 6 ? 0 : 1),
-        0.58 + (a === 6 ? 0.05 : 0),
-        Math.sin((a * Math.PI * 2) / 6) * 0.12 * (a === 6 ? 0 : 1)
-      );
-      apple.castShadow = true;
-      barrelGroup.add(apple);
-    }
     group.add(barrelGroup);
 
-    // Right Side Accessory: Leek / Green Onions Basket
+    // Empty side crate (no decorative food outside inventory).
     const rightBasket = new THREE.Group();
     rightBasket.position.set(1.38, 0.04, 0.32);
     const crateSide = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.42, 0.34), woodLight);
@@ -289,13 +172,6 @@ export function createShelfModel(itemId, shelfDef, itemFactory) {
     crateSide.castShadow = true;
     rightBasket.add(crateSide);
 
-    for (let lk = 0; lk < 5; lk++) {
-      const leek = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.025, 0.42, 6), greenMat);
-      leek.position.set(-0.06 + (lk % 3) * 0.06, 0.38, -0.04 + Math.floor(lk / 3) * 0.08);
-      leek.rotation.z = (lk - 2) * 0.1;
-      leek.rotation.x = 0.15;
-      rightBasket.add(leek);
-    }
     group.add(rightBasket);
 
     // Dynamic Product Slots (for player interaction & shelf capacity)
@@ -308,6 +184,7 @@ export function createShelfModel(itemId, shelfDef, itemFactory) {
       mesh.rotation.x = tier.rotX;
       mesh.scale.setScalar(itemId === 'CORN' ? 1.05 : 0.9);
       mesh.castShadow = true;
+      mesh.visible = false;
       group.add(mesh);
       productMeshes.push(mesh);
     }
@@ -881,5 +758,6 @@ export function createShelfModel(itemId, shelfDef, itemFactory) {
     }
   }
 
-  return { group, productMeshes, labelCanvas, labelTexture };
+  const wobbler = addShelfWobbler(group, type === 'produce');
+  return { group, productMeshes, labelCanvas, labelTexture, wobbler };
 }

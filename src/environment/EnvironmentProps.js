@@ -22,6 +22,7 @@ export class EnvironmentProps {
     this.scene = scene;
     this.animatedTrees = [];
     this.animatedProps = [];
+    this.streetLights = [];
   }
 
   createManagerOffice(x = 22, z = 0) {
@@ -148,6 +149,7 @@ export class EnvironmentProps {
     b2.position.x = width / 2 - 0.2;
 
     group.add(b1, b2);
+    this.animatedProps.push((_delta, time) => { group.rotation.z = Math.sin(time * 1.2 + x) * 0.008; });
     this.scene.add(group);
     return group;
   }
@@ -719,6 +721,13 @@ export class EnvironmentProps {
     pointLight.position.set(0, 4.1, 0);
     group.add(pointLight);
 
+    const beam = new THREE.Mesh(new THREE.ConeGeometry(1.15, 3.9, 12, 1, true),
+      new THREE.MeshBasicMaterial({ color: 0xffe7a3, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide }));
+    beam.position.set(0, 2.12, 0); group.add(beam);
+    const pool = new THREE.Mesh(new THREE.CircleGeometry(1.3, 20),
+      new THREE.MeshBasicMaterial({ color: 0xffe7a3, transparent: true, opacity: 0, depthWrite: false }));
+    pool.rotation.x = -Math.PI / 2; pool.position.y = 0.016; group.add(pool);
+    this.streetLights.push({ pointLight, beam, pool });
     this.scene.add(group);
     return group;
   }

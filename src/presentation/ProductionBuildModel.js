@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { createProductionAtmosphere } from './ProductionAtmosphere.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 
 const material = (color, roughness = 0.76, metalness = 0) => new THREE.MeshStandardMaterial({ color, roughness, metalness });
@@ -882,7 +883,7 @@ export function createProductionBuildModel(group, id) {
       color: 0xdffbff, transparent: true, opacity: 0.32, roughness: 0.12, metalness: 0.08, side: THREE.DoubleSide,
     }),
     kettle: material(0xd93c2b, 0.5), paste: material(0xb93527),
-    fireGlow: new THREE.MeshBasicMaterial({ color: 0xff7020 }),
+    fireGlow: new THREE.MeshStandardMaterial({ color: 0xff7020, emissive: 0xff6600, emissiveIntensity: 0.8, roughness: 0.8 }),
     fireYellow: new THREE.MeshBasicMaterial({ color: 0xffd030 }),
     brick: material(0x9b4936), brickLight: material(0xd39d7f), brickDark: material(0x733e34),
     stone: material(0xc2b197), stoneLight: material(0xe2d3b7), stoneDark: material(0x70645b),
@@ -918,5 +919,9 @@ export function createProductionBuildModel(group, id) {
   const builder = builders[id];
   const result = builder ? builder(group, m) : { input: anchor(group, [-1, 0.6, 0.5]), output: anchor(group, [1, 0.6, 0.5]), badgeY: 3 };
 
-  return { ...result, trayMaterial: m.woodLight };
+  const atmosphere = createProductionAtmosphere(group, id);
+  return { ...result, trayMaterial: m.woodLight, update(time, delta, active) {
+    result.update?.(time, delta, active);
+    atmosphere.update(time, active);
+  } };
 }

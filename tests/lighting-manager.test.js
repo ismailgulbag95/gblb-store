@@ -10,5 +10,5 @@ test('LightingManager instantiates correctly and sets up lights without Referenc
   assert.ok(lighting.dirLight, 'dirLight should be initialized');
   assert.ok(lighting.hemiLight, 'hemiLight should be initialized');
   assert.ok(lighting.storeLight, 'storeLight should be initialized');
-  assert.equal(scene.children.length, 4, 'scene should contain 4 lights');
+  assert.equal(scene.children.length, 5, 'scene should contain key, sky, store, rim and ambient lights');
 });

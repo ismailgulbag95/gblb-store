@@ -66,6 +66,6 @@ export class EconomyLedger {
     if (!Number.isSafeInteger(balance) || balance < 0) throw new RangeError('İşlem bakiyeyi güvenli sınırın dışına çıkarıyor.');
     this.economy.balanceAtoms = balance;
     this.economy.entries.push({ ...entry, balanceAtoms: this.economy.balanceAtoms });
-    if (this.economy.entries.length > 2_000) this.economy.entries.splice(0, 1);
+    if (this.economy.entries.length > 1_000) this.economy.entries.splice(0, this.economy.entries.length - 1_000);
   }
 }

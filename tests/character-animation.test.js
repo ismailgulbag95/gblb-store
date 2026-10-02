@@ -5,8 +5,9 @@ import { createCustomerMesh, createWorkerMesh } from '../src/presentation/Humano
 import { Item3DFactory } from '../src/presentation/Item3DFactory.js';
 import { CharacterAnimator } from '../src/presentation/CharacterAnimator.js';
 import { createInitialState } from '../src/domain/state.js';
-import { advanceSimulation } from '../src/domain/simulation.js';
+import { advanceSimulation, getAvailableRegisters } from '../src/domain/simulation.js';
 import { makeLocation, reserveStock } from '../src/domain/inventory.js';
+import { registerCashPosition } from '../src/domain/layout.js';
 import { EnvironmentProps } from '../src/environment/EnvironmentProps.js';
 
 const factory = new Item3DFactory();
@@ -205,7 +206,13 @@ test('simulation emits cues only after successful inventory transfers and keeps 
   assert.deepEqual(customer.basket, ['TOMATO']);
   for (let i = 0; i < 80; i++) { state.tick++; state.customerSpawnTicks = 0; advanceSimulation(state); }
   assert.equal(state.stats.tomatoSold, 1);
+  assert.equal(state.cashAtRegisters.register, 30_000);
+  const pickup = registerCashPosition(getAvailableRegisters(state)[0]);
+  state.player.x = pickup.x;
+  state.player.z = pickup.z;
+  advanceSimulation(state);
   assert.equal(state.economy.balanceAtoms, 1030000);
+  assert.equal(state.cashAtRegisters.register, 0);
 });
 
 test('real staff job emits ordered pickup/delivery receipts exactly once', () => {

@@ -221,6 +221,13 @@ export class InputManager {
     this.onSelectionChange?.(null);
   }
 
+  selectPendingStation(id) {
+    this.selectedStation = id;
+    this.world.selectStation(id, this.app.getState());
+    this.onSelectionChange?.(id);
+    this.onLayoutMessage?.('Yerleştirmek için boş bir konuma dokun.');
+  }
+
   rotateCurrentSelection() {
     if (!this.layoutMode || !this.selectedStation || this.selectedStation.startsWith('hanging-sign:')) return;
     const result = this.app.rotateSelected(this.selectedStation);

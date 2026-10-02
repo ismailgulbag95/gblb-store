@@ -1,10 +1,11 @@
+import { activeWorldEvent, advanceWorldEvents, hasWorldBuff } from './worldEvents.js';
 import { ITEMS, MONEY_ATOMS, RECIPES, SHELVES, STATIONS } from './catalog.js';
 import { getDecorationDimensions, getMarketCollisionBoxes, getShelfLocations, getStationDimensions, registerCashPosition, registerCashierPosition, stationPosition, getStaffFacilityAccess, getStaffFacilityCollisionBoxes } from './layout.js';
 import { chooseStaffFacility, tickWorkerNeeds, workerWorkSpeed, recoverWorker } from './staff.js';
 import { EconomyLedger } from './ledger.js';
 import { decorBonus, decorScore } from './decorCatalog.js';
 import { FARM_CAPACITY, ensureFarmState, removeFarmReady, syncFarmHarvest } from './farm.js';
-import { adjustCustomerSatisfaction, customerMood, customerSpawnIntervalTicks, saleMoodMultiplier, tipForMood } from './customerExperience.js';
+import { adjustCustomerSatisfaction, customerMood, customerSpawnIntervalTicks, missedOpportunityAmount, saleMoodMultiplier, tipForMood } from './customerExperience.js';
 import { nextOrder } from './orders.js';
 import { cancelReservation, capacityAt, makeLocation, pickUpReservedStock, quantityAt, reserveStock, totalAt, transferStock } from './inventory.js';
 import { staffSpeedMultiplier } from './progression.js';
@@ -65,12 +66,14 @@ function move(state, from, to, item, quantity, key) {
 function produceFarm(state, events) {
   let durable = false;
   const farmTick = state.tick + 1;
-  for (const [farmId, farm] of Object.entries(state.farms)) {
+  for (const [farmId, farm] of Object.entries(state.farms).filter(([id]) => stationPosition(state, id))) {
     const station = STATIONS[farmId] ?? state.customStations?.[farmId];
     const item = farm.item ?? station?.item;
     if (!item) continue;
     ensureFarmState(farm, state.tick, farmId);
     const location = `farm:${item}`;
+    const golden = Boolean(activeWorldEvent(state, 'goldenHarvest'));
+    if (golden) for (const plant of farm.plants) if (!plant.ready) plant.nextReadyTick -= 2;
     for (const plant of farm.plants) {
       if (plant.ready || plant.nextReadyTick > farmTick) continue;
       if (farm.readyCount >= FARM_CAPACITY || capacityAt(state.stock, location) - totalAt(state.stock, location) < 1) {
@@ -82,6 +85,15 @@ function produceFarm(state, events) {
       plant.nextReadyTick += plant.cycleTicks;
       farm.readyCount += 1;
       farm.harvestCount += 1;
+      if (golden && farm.readyCount < FARM_CAPACITY && capacityAt(state.stock, location) - totalAt(state.stock, location) >= 1) {
+        const extra = farm.plants.find(p => !p.ready);
+        if (extra) {
+          extra.ready = true;
+          extra.nextReadyTick = Math.max(farmTick + 1, extra.nextReadyTick) + extra.cycleTicks;
+          farm.readyCount += 1; farm.harvestCount += 1;
+          state.stock[location].items[item] += 1;
+        }
+      }
       events.push({ type: 'production', item, farmId, message: `${ITEMS[item].name} hazır.` });
       durable = true;
     }
@@ -91,7 +103,8 @@ function produceFarm(state, events) {
 
 function produceMachines(state, events) {
   let durable = false;
-  for (const [machineId, machine] of Object.entries(state.machines)) {
+  for (const [machineId, machine] of Object.entries(state.machines).filter(([id]) => stationPosition(state, id))) {
+    if (activeWorldEvent(state, 'machineJam')?.targetId === machineId) { machine.blocked = 'event-jam'; continue; }
     const station = STATIONS[machineId] ?? state.customStations?.[machineId];
     const recipeKey = machine.recipe ?? station?.recipe;
     const recipe = RECIPES[recipeKey];
@@ -118,7 +131,7 @@ function produceMachines(state, events) {
     machine.blocked = false;
     machine.blockedTicks = 0;
     machine.blockedSinceTick = null;
-    machine.progressTicks += Number.isFinite(machine.speedModifier) ? machine.speedModifier : 1;
+    machine.progressTicks += (Number.isFinite(machine.speedModifier) ? machine.speedModifier : 1) * (hasWorldBuff(state, 'maintenance', machineId) ? 1.25 : 1);
     const productionThreshold = recipe.seconds * TICKS_PER_SECOND;
     if (machine.progressTicks < productionThreshold) continue;
     machine.progressTicks -= productionThreshold;
@@ -145,7 +158,7 @@ function locationPosition(state, locationId) {
   if (locationId.startsWith('farm:')) {
     const item = locationId.slice('farm:'.length);
     // Önce custom farm'lara bak, sonra sabit STATIONS'a
-    const customEntry = Object.entries(state.farms).find(([id]) => {
+    const customEntry = Object.entries(state.farms).filter(([id]) => stationPosition(state, id)).find(([id]) => {
       const cs = state.customStations?.[id];
       return cs?.item === item;
     });
@@ -154,7 +167,7 @@ function locationPosition(state, locationId) {
       const pos = state.layout?.[farmId] ?? state.customStations?.[farmId];
       if (pos) return { x: pos.x, z: pos.z };
     }
-    const station = Object.entries(state.farms)
+    const station = Object.entries(state.farms).filter(([id]) => stationPosition(state, id))
       .map(([id]) => STATIONS[id]).find((entry) => entry?.item === item);
     return station ? { x: station.x, z: station.z } : { x: -10, z: 5 };
   }
@@ -247,7 +260,7 @@ function restockSources(state, item) {
     return (entry.item ?? station?.item) === item;
   })) sources.push(farm);
   if (item === 'EGG' && state.coops?.coop && state.stock['coop:eggs']) sources.push('coop:eggs');
-  for (const [machineId, machine] of Object.entries(state.machines ?? {})) {
+  for (const [machineId, machine] of Object.entries(state.machines ?? {}).filter(([id]) => stationPosition(state, id))) {
     const station = STATIONS[machineId] ?? state.customStations?.[machineId];
     const recipe = RECIPES[machine.recipe ?? station?.recipe];
     const output = `machine:${machineId}:output`;
@@ -287,7 +300,7 @@ function shelfRestockCandidate(state, item = null) {
 function machineInputSources(state, item) {
   const farm = `farm:${item}`;
   const sources = state.stock[farm] ? [farm] : [];
-  for (const [sourceId, sourceMachine] of Object.entries(state.machines ?? {})) {
+  for (const [sourceId, sourceMachine] of Object.entries(state.machines ?? {}).filter(([id]) => stationPosition(state, id))) {
     const station = STATIONS[sourceId] ?? state.customStations?.[sourceId];
     const recipe = RECIPES[sourceMachine.recipe ?? station?.recipe];
     const output = `machine:${sourceId}:output`;
@@ -309,7 +322,7 @@ function workerCandidate(state, worker) {
     }
   }
   if (worker.type === 'harvester') {
-    for (const [farmId, farm] of Object.entries(state.farms)) {
+    for (const [farmId, farm] of Object.entries(state.farms).filter(([id]) => stationPosition(state, id))) {
       // Custom farm ya da sabit STATIONS'dan item'ı al
       const item = STATIONS[farmId]?.item ?? state.customStations?.[farmId]?.item ?? farm.item;
       if (!item) continue;
@@ -324,7 +337,7 @@ function workerCandidate(state, worker) {
   if (worker.type === 'factoryFeeder' || worker.type === 'harvester') {
     const shelfTask = shelfRestockCandidate(state);
     if (shelfTask) return shelfTask;
-    const machines = Object.entries(state.machines);
+    const machines = Object.entries(state.machines).filter(([id]) => stationPosition(state, id));
     for (const [sourceId, sourceMachine] of machines) {
       const sourceStation = STATIONS[sourceId] ?? state.customStations?.[sourceId];
       const item = RECIPES[sourceMachine.recipe ?? sourceStation?.recipe]?.output;
@@ -716,10 +729,10 @@ function workerTick(state, environmentObstacles) {
   const obstacles = getWorkerObstacles(state, environmentObstacles);
   const obstacleSignature = workerObstacleSignature(obstacles);
   for (const [workerIndex, worker] of state.workers.entries()) {
-    tickWorkerNeeds(worker, Boolean(worker.task || worker.type === 'cashier'
+    tickWorkerNeeds(worker, Boolean(worker.task || worker.type === 'security' || worker.type === 'cashier'
       && state.customers.some(customer => ['queueing', 'paying'].includes(customer.phase)
         && (customer.targetRegisterId ?? 'register') === (worker.registerId ?? 'register'))
-      || worker.type === 'chefWaiter' && Object.entries(state.machines).some(([id, machine]) =>
+      || worker.type === 'chefWaiter' && Object.entries(state.machines).filter(([id]) => stationPosition(state, id)).some(([id, machine]) =>
         ['burgerKitchen', 'pizzaKitchen'].includes(id) && machine.blocked === false)));
     if (worker.waitingForSalary) {
       worker.break = null;
@@ -1227,24 +1240,26 @@ function pickBalancedItem(state, pool) {
   return state.customerDemandBag.pop() ?? pool[0];
 }
 
-function addCustomer(state) {
+function addCustomer(state, options = {}) {
   const retailItems = state.unlockedProducts.filter((item) => SHELVES[item]);
   if (!retailItems.length) return;
   const id = `customer-${state.nextEntityId++}`;
   const restaurantUnlocked = Boolean(state.unlocked.restaurant && Object.keys(state.diningTables).length);
-  const diner = restaurantUnlocked && random(state) < 0.35;
+  const diner = options.kind ? options.kind === 'diner' : restaurantUnlocked && random(state) < 0.35;
   if (diner) {
     const customer = {
       id, kind: 'diner', x: -37 + (random(state) - 0.5) * 1.8, z: 16 + random(state) * 2,
-      phase: 'entering', demand: random(state) < 0.5 ? 'BURGER' : 'PIZZA', tableId: null,
+      phase: 'entering', demand: options.item ?? (random(state) < 0.5 ? 'BURGER' : 'PIZZA'), tableId: null,
+      eventRole: options.eventRole, archetype: options.eventRole ? 'business' : undefined,
       eatTicks: 0, waitTicks: 0, mealWaitTicks: 0, missedItems: 0, checkoutWaitTicks: 0, facing: Math.PI,
     };
     routeTo(customer, [{ x: -37, z: 10.4 }, { x: -37, z: 6.6 }], 'entering');
     state.customers.push(customer);
-    return;
+    return customer;
   }
 
-  const firstItem = pickBalancedItem(state, retailItems);
+  const premium = ['tourist', 'billionaire'].includes(options.eventRole);
+  const firstItem = options.item ?? (premium ? [...retailItems].sort((a,b) => ITEMS[b].price - ITEMS[a].price)[0] : pickBalancedItem(state, retailItems));
   const basketSize = retailItems.length >= 3
     ? (random(state) < 0.35 ? 1 : random(state) < 0.54 ? 2 : 3)
     : retailItems.length === 2 && random(state) < 0.5 ? 2 : 1;
@@ -1253,9 +1268,9 @@ function addCustomer(state) {
     const swap = Math.floor(random(state) * (index + 1));
     [alternatives[index], alternatives[swap]] = [alternatives[swap], alternatives[index]];
   }
-  const shoppingList = [firstItem, ...alternatives.slice(0, basketSize - 1)];
+  const shoppingList = options.item ? [firstItem] : premium ? [...retailItems].sort((a,b) => ITEMS[b].price - ITEMS[a].price).slice(0, 3) : [firstItem, ...alternatives.slice(0, basketSize - 1)];
   const customer = {
-    id, kind: 'shopper', x: 5 + (random(state) - 0.5) * 1.4, z: 16 + random(state) * 2,
+    id, kind: 'shopper', eventRole: options.eventRole, archetype: options.eventRole === 'tourist' ? 'tourist' : options.eventRole ? 'business' : undefined, x: 5 + (random(state) - 0.5) * 1.4, z: 16 + random(state) * 2,
     phase: 'entering', shoppingList, shoppingIndex: 0, demand: firstItem, basket: [],
     payTicks: 0, waitTicks: 0, missedItems: 0, checkoutWaitTicks: 0, mealWaitTicks: 0, checkoutOrder: state.nextEntityId,
     facing: Math.PI,
@@ -1263,6 +1278,7 @@ function addCustomer(state) {
   routeTo(customer, [{ x: customer.x, z: 10.4 }, { x: 5, z: 6.6 }], 'entering');
   makeLocation(state.stock, `customer:${id}`, 4);
   state.customers.push(customer);
+  return customer;
 }
 
 function getCustomerCarPoint(customer) {
@@ -1393,10 +1409,49 @@ function claimTable(state, customer) {
   return true;
 }
 
+function completeShopperSale(state, customer, regId, events) {
+        const soldItems = [...customer.basket];
+        let saleAmountAtoms = 0;
+        for (let itemIndex = 0; itemIndex < soldItems.length; itemIndex += 1) {
+          const item = soldItems[itemIndex];
+          const stock = state.stock[`customer:${customer.id}`];
+          if (quantityAt(state.stock, `customer:${customer.id}`, item) < 1) continue;
+          stock.items[item] -= 1;
+          if (!stock.items[item]) delete stock.items[item];
+          const unitPriceAtoms = Math.round(ITEMS[item].price * (1 + decorBonus(state)) * saleMoodMultiplier(customer) * MONEY_ATOMS);
+          saleAmountAtoms += unitPriceAtoms;
+          const statMap = {
+            TOMATO: 'tomatoSold', TOMATO_PASTE: 'pasteSold', ORANGE_JUICE: 'juiceSold', CORN: 'cornSold',
+            POPCORN: 'popcornSold', EGG: 'eggSold', FLOUR: 'flourSold', BREAD: 'breadSold',
+            ORANGE_TART: 'orangeTartSold',
+          };
+          if (statMap[item]) state.stats[statMap[item]] += 1;
+        }
+        if (saleAmountAtoms) {
+          adjustCustomerSatisfaction(state, 1);
+          const registerId = state.checkoutRegisters?.[regId] || state.selfRegisters?.[regId] ? regId : 'register';
+          state.cashAtRegisters ??= { register: 0 };
+          state.cashAtRegisters[registerId] = (state.cashAtRegisters[registerId] ?? 0) + saleAmountAtoms;
+          state.cashBundleCounts ??= { register: 0 };
+          state.cashBundleCounts[registerId] = (state.cashBundleCounts[registerId] ?? 0) + 1;
+          const saleAmount = saleAmountAtoms / MONEY_ATOMS;
+          const mood = customerMood(customer);
+          state.stats[mood < 85 ? 'customersUnhappy' : 'customersSatisfied'] += 1;
+          customer.reaction = mood < 85 ? 'unhappy' : 'happy';
+          const firstItem = soldItems[0];
+          events.push({ type: 'sale', item: firstItem, items: soldItems, amount: saleAmount,
+            mood,
+            message: 'Kasada $' + saleAmount.toFixed(2) + ' birikti · ' + soldItems.map((item) => ITEMS[item].name).join(', ') + ' satıldı.',
+            decorationScore: decorScore(state), decorationBonus: decorBonus(state) });
+          customer.eventPaid = true;
+        }
+        leaveShopper(customer, state);
+}
+
 function customerTick(state, events) {
   let durable = false;
   state.customerSpawnTicks += 1;
-  if (state.customerSpawnTicks >= customerSpawnIntervalTicks(state.customerSatisfaction)) {
+  if (state.customerSpawnTicks >= customerSpawnIntervalTicks(state.customerSatisfaction) / (hasWorldBuff(state, 'popularity') ? 1.5 : 1)) {
     state.customerSpawnTicks = 0;
     if (state.customers.length < MAX_CUSTOMERS) addCustomer(state);
   }
@@ -1435,6 +1490,7 @@ function customerTick(state, events) {
       if (customer.kind === 'diner') leaveDiner(state, customer);
       else leaveShopper(customer, state);
     }
+    if (activeWorldEvent(state, 'blackout') && ['to-register', 'queueing', 'paying'].includes(customer.phase)) continue;
     separateCustomerCrowd(state, customer);
     if (customer.kind === 'diner') {
       if (customer.phase === 'entering' && moveAlongRoute(customer)) durable = claimTable(state, customer) || durable;
@@ -1443,7 +1499,7 @@ function customerTick(state, events) {
         const targetZ = 10.8 + (customer.tableWaitIndex ?? 0) * 0.85;
         if (moveToward(customer, -37, targetZ, CUSTOMER_SPEED)) customer.phase = 'waiting-table';
         if ((customer.tableWaitIndex ?? 0) === 0 && claimTable(state, customer)) durable = true;
-        else if (customer.waitTicks > 450) {
+        else if (customer.waitTicks > (customer.eventRole === 'critic' ? 600 : 450)) {
           state.stats.customersUnhappy += 1;
           adjustCustomerSatisfaction(state, -5);
           customer.reaction = 'unhappy';
@@ -1460,7 +1516,7 @@ function customerTick(state, events) {
         const mealInTransit = Object.values(state.reservations).some((reservation) => (
           reservation.to === `customer:${customer.id}` && reservation.item === customer.demand
         ));
-        if (customer.waitTicks > 300 && !mealInTransit) {
+        if (customer.waitTicks > (customer.eventRole === 'critic' ? 600 : 300) && !mealInTransit) {
           state.stats.customersUnhappy += 1;
           adjustCustomerSatisfaction(state, -5);
           customer.reaction = 'unhappy';
@@ -1472,7 +1528,9 @@ function customerTick(state, events) {
         const table = state.diningTables[customer.tableId];
         if (table) table.eatTicks = customer.eatTicks;
         if (customer.eatTicks >= 80 && table && table.tipAtoms === 0) {
-          table.tipAtoms = tipForMood(customer) * 10_000;
+          const roll = random(state);
+          const tip = Math.round(tipForMood(customer, roll) * (customer.vipTip ? 10 : 1) * (hasWorldBuff(state, 'certificate') ? 1.25 : 1));
+          table.tipAtoms = tip * 10_000;
           state.stats[customerMood(customer) < 85 ? 'customersUnhappy' : 'customersSatisfied'] += 1;
           adjustCustomerSatisfaction(state, 1);
           customer.reaction = customerMood(customer) < 85 ? 'unhappy' : 'happy';
@@ -1482,7 +1540,8 @@ function customerTick(state, events) {
             stock.items[customer.meal] -= 1;
             if (!stock.items[customer.meal]) delete stock.items[customer.meal];
           }
-          events.push({ type: 'tip-ready', message: 'Müşterinin bahşişi hazır.' });
+          const tipMsg = tip >= 30 ? '🔥 JACKPOT BAHŞİŞ! Müşteri cömert bir bahşiş bıraktı!' : 'Müşterinin bahşişi hazır.';
+          events.push({ type: 'tip-ready', tipAmount: tip, isJackpot: tip >= 30, message: tipMsg });
           durable = true;
         }
       } else if (customer.phase === 'leaving' && moveAlongRoute(customer)) {
@@ -1559,7 +1618,7 @@ function customerTick(state, events) {
             queueForCheckout(state, customer);
           }
         }
-      } else if (customer.waitTicks > 180) {
+      } else if (customer.waitTicks > (customer.eventRole === 'critic' ? 600 : 180)) {
         if (customer.basket.length) {
           customer.missedItems = (customer.missedItems ?? 0) + 1;
           adjustCustomerSatisfaction(state, -3);
@@ -1571,6 +1630,9 @@ function customerTick(state, events) {
           state.stats.customersUnhappy += 1;
           adjustCustomerSatisfaction(state, -5);
           customer.reaction = 'unhappy';
+          const lostAmount = missedOpportunityAmount(customer);
+          events.push({ type: 'customer-lost', customerId: customer.id, lostAmount,
+            message: `⚠️ Müşteri eli boş ayrıldı! Kaçan ciro: -$${lostAmount.toFixed(2)}` });
           leaveShopper(customer, state);
           durable = true;
         }
@@ -1617,7 +1679,7 @@ function customerTick(state, events) {
       const playerAtRegister = Math.hypot(state.player.x - registerQueuePosition(reg, -1.1).x,
           state.player.z - registerQueuePosition(reg, -1.1).z) <= 1.8;
       const cashier = isSelfCheckout || Boolean(activeCashier) || playerAtRegister;
-      if (customer.queueIndex === 0) {
+      if (customer.queueIndex === 0 && cashier) {
         customer.payTicks = (customer.payTicks ?? 0) + 1;
       }
       if (customer.queueIndex === 0 && !cashier) {
@@ -1631,44 +1693,10 @@ function customerTick(state, events) {
         }
       }
       const itemCount = customer.basket?.length ?? 0;
-      const payThreshold = TICKS_PER_SECOND * (CHECKOUT_BASE_SECONDS + CHECKOUT_SECONDS_PER_ITEM * itemCount);
+      const payThreshold = TICKS_PER_SECOND * (CHECKOUT_BASE_SECONDS + CHECKOUT_SECONDS_PER_ITEM * itemCount) / (customer.eventRole === 'tourist' ? 2 : 1);
       if (cashier && customer.queueIndex === 0 && customer.payTicks >= payThreshold) {
-        const soldItems = [...customer.basket];
-        let saleAmountAtoms = 0;
-        for (let itemIndex = 0; itemIndex < soldItems.length; itemIndex += 1) {
-          const item = soldItems[itemIndex];
-          const stock = state.stock[`customer:${customer.id}`];
-          if (quantityAt(state.stock, `customer:${customer.id}`, item) < 1) continue;
-          stock.items[item] -= 1;
-          if (!stock.items[item]) delete stock.items[item];
-          const unitPriceAtoms = Math.round(ITEMS[item].price * (1 + decorBonus(state)) * saleMoodMultiplier(customer) * MONEY_ATOMS);
-          saleAmountAtoms += unitPriceAtoms;
-          const statMap = {
-            TOMATO: 'tomatoSold', TOMATO_PASTE: 'pasteSold', ORANGE_JUICE: 'juiceSold', CORN: 'cornSold',
-            POPCORN: 'popcornSold', EGG: 'eggSold', FLOUR: 'flourSold', BREAD: 'breadSold',
-            ORANGE_TART: 'orangeTartSold',
-          };
-          if (statMap[item]) state.stats[statMap[item]] += 1;
-        }
-        if (saleAmountAtoms) {
-          adjustCustomerSatisfaction(state, 1);
-          const registerId = state.checkoutRegisters?.[regId] || state.selfRegisters?.[regId] ? regId : 'register';
-          state.cashAtRegisters ??= { register: 0 };
-          state.cashAtRegisters[registerId] = (state.cashAtRegisters[registerId] ?? 0) + saleAmountAtoms;
-          state.cashBundleCounts ??= { register: 0 };
-          state.cashBundleCounts[registerId] = (state.cashBundleCounts[registerId] ?? 0) + 1;
-          const saleAmount = saleAmountAtoms / MONEY_ATOMS;
-          const mood = customerMood(customer);
-          state.stats[mood < 85 ? 'customersUnhappy' : 'customersSatisfied'] += 1;
-          customer.reaction = mood < 85 ? 'unhappy' : 'happy';
-          const firstItem = soldItems[0];
-          events.push({ type: 'sale', item: firstItem, items: soldItems, amount: saleAmount,
-            mood,
-            message: 'Kasada $' + saleAmount.toFixed(2) + ' birikti · ' + soldItems.map((item) => ITEMS[item].name).join(', ') + ' satıldı.',
-            decorationScore: decorScore(state), decorationBonus: decorBonus(state) });
-          durable = true;
-        }
-        leaveShopper(customer, state);
+        completeShopperSale(state, customer, regId, events);
+        durable = true;
       }
     } else if (customer.phase === 'leaving' && customer.routeBlocked) {
       customer.routeBlockedTicks = (customer.routeBlockedTicks ?? 0) + 1;
@@ -1723,6 +1751,19 @@ function coopTick(state) {
 
 export function advanceSimulation(state, environmentObstacles = []) {
   const events = [];
+  if (state.paused) return { events, durable: false };
+  const hooks = {
+    spawnCustomer: options => addCustomer(state, options),
+    shelfPoint: (item, id) => shelfQueuePosition(item, 0, state, id),
+    escapeRoute: actor => [...findCustomerMarketRoute(state, actor, { x: 5, z: 6.6 }), { x: 5, z: 10.4 }],
+    payQueue: regId => {
+      for (const customer of state.customers) {
+        if (customer.kind === 'shopper' && ['to-register', 'queueing', 'paying'].includes(customer.phase)
+          && (customer.targetRegisterId ?? 'register') === regId) completeShopperSale(state, customer, regId, events);
+      }
+    },
+  };
+  const eventDurable = advanceWorldEvents(state, hooks, events);
   syncFarmHarvest(state);
   let durable = produceFarm(state, events);
   durable = produceMachines(state, events) || durable;
@@ -1736,6 +1777,6 @@ export function advanceSimulation(state, environmentObstacles = []) {
     state.activeOrder = nextOrder(state);
     if (state.activeOrder) durable = true;
   }
-  return { events, durable };
+  return { events, durable: durable || eventDurable };
 }
 

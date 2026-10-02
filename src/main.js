@@ -12,7 +12,7 @@ const sceneFreezeDiagnostics = createSceneFreezeDiagnostics();
 hydrateAssetIcons();
 
 const SIMULATION_STEP = 0.1;
-const MAX_TICKS_PER_FRAME = 5;
+const MAX_TICKS_PER_FRAME = 2;
 const MIN_LOADING_VISIBLE_MS = 850;
 const loadingStartedAt = performance.now();
 const loadingScreen = document.getElementById('loading-screen');
@@ -175,6 +175,7 @@ async function boot() {
     setPaused();
     if (!open) showPendingBonusOffer();
   });
+  world.environment.ambientLife.onSound = type => hud.toasts.playEventSound(type);
   world.onVisualError = (visualId, error) => {
     sceneFreezeDiagnostics?.fail('world.visual-build', error, {
       visualId,
@@ -238,10 +239,10 @@ async function boot() {
       pauseReasons.delete('rewarded-ad');
       setPaused();
     }
-    if (event.type === 'toast' || event.type === 'sale'
-      || event.type === 'tip-ready' || event.type === 'payroll') {
+    if (event.type === 'toast' || event.type === 'sale' || event.type === 'cash-collected'
+      || event.type === 'world-event' || event.type === 'tip-ready' || event.type === 'payroll' || event.type === 'customer-lost') {
       hud.showEvent(event);
-      if (event.type !== 'payroll' && event.tone !== 'error') world.playEvent(event, app.getState());
+      if (event.type !== 'payroll' && event.tone !== 'error' && event.type !== 'customer-lost') world.playEvent(event, app.getState());
     }
     if (event.type === 'save-error') {
       pauseReasons.add('save-error');
@@ -277,6 +278,7 @@ async function boot() {
     try { app.checkpoint(); } catch (error) { /* the visible app reports save failures */ }
   };
   window.addEventListener('pagehide', checkpointOnExit);
+  window.addEventListener('beforeunload', checkpointOnExit);
 
   const canvas = world.getCanvas();
   canvas.addEventListener('webglcontextlost', (event) => {
@@ -324,10 +326,10 @@ async function boot() {
         const autoResult = app.tryAutoPickup();
         if (autoResult) {
           hud.feedback();
-          hud.render(app.getState(), app.getNearbyAction(), true);
+          hudElapsed = 0.12;
         }
       }
-      simulationAccumulator = Math.min(0.5, simulationAccumulator + elapsed * app.getState().speedMultiplier);
+      simulationAccumulator = Math.min(0.25, simulationAccumulator + elapsed * app.getState().speedMultiplier);
       let ticks = 0;
       while (simulationAccumulator >= SIMULATION_STEP && ticks < MAX_TICKS_PER_FRAME) {
         app.tick();

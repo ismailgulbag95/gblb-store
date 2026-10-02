@@ -74,8 +74,9 @@ export class DevelopmentRewardedProvider {
     callbacks.onLoaded?.();
     callbacks.onStarted?.();
     await new Promise((resolve) => setTimeout(resolve, this.delayMs));
-    callbacks.onCompleted?.({ rewardId: context.rewardId, rewarded: true, source: 'development-simulation' });
-    return undefined;
+    const receipt = { rewardId: context.rewardId, rewarded: true, source: 'development-simulation' };
+    callbacks.onCompleted?.(receipt);
+    return receipt;
   }
 
   getCompletedRewardReceipts() {

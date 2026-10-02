@@ -220,6 +220,12 @@ kbd { display: inline-grid; place-items: center; min-width: 26px; min-height: 24
 
 /* Upgrade & Staff Cards */
 .upgrade-card { display: grid; grid-template-columns: 46px minmax(0, 1fr) auto; gap: 12px; align-items: center; min-width: 0; min-height: 72px; padding: 10px 12px; border: 2px solid #000; border-radius: var(--radius); background: #ffffff; box-shadow: var(--shadow-sm); }
+.upgrade-card.near-miss { border-color: #000; background: #fffbeb; animation: near-miss-pulse 2s infinite ease-in-out; }
+@keyframes near-miss-pulse { 0%, 100% { box-shadow: var(--shadow-sm); } 50% { box-shadow: 3px 3px 0px #000, 0 0 12px rgba(245, 158, 11, 0.45); } }
+.near-miss-pill { display: inline-block; align-self: start; margin-top: 2px; padding: 2px 7px; border: 1.5px solid #000; border-radius: var(--radius-pill); background: #fef08a; color: #854d0e; font-family: var(--font-heading); font-size: 10px; font-weight: 800; letter-spacing: 0.02em; text-transform: uppercase; }
+.upgrade-actions { display: grid; justify-items: end; gap: 6px; }
+.near-miss-ad-btn { min-height: 40px; padding: 6px 10px; font-size: 11px; white-space: normal; line-height: 1.2; text-align: center; background: #ffd35e; border: 2px solid #000; box-shadow: var(--shadow-xs); }
+.near-miss-ad-btn:hover { background: #facc15; }
 .staff-card, .staff-upgrade-card { grid-template-columns: 52px minmax(0, 1fr) minmax(94px, 136px); gap: 10px; }
 .staff-upgrade-card { min-height: 132px; }
 .staff-card.hired { border-color: #000; background: #ecfdf5; }
@@ -574,6 +580,9 @@ kbd { display: inline-grid; place-items: center; min-width: 26px; min-height: 24
 .crt-terminal input[type='number'] { width: 62px; min-height: 38px; padding: 6px; border: 1px solid #69c079; border-radius: 2px; background: #0c2514; color: var(--crt-green); font: inherit; }
 .crt-auto-items { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 9px 12px; margin-top: 14px; }
 .crt-auto-items label { min-height: 32px; }
+.crt-express-unload { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; margin-bottom: 12px; border: 1px solid #ffd35e; border-radius: var(--radius-sm); background: rgba(255, 211, 94, 0.12); }
+.crt-express-text { font: bold 12px Consolas, monospace; color: #ffd35e; }
+.crt-express-unload .ad-reward-button { min-height: 38px; padding: 6px 12px; border: 1px solid #ffd35e; color: #000; background: #ffd35e; font-weight: 800; font-size: 11px; }
 .crt-deliveries li { display: flex; justify-content: space-between; gap: 14px; font-size: 12px; }
 .crt-deliveries li strong { flex: 0 0 auto; color: #c2ffca; }
 .crt-footer { display: flex; justify-content: space-between; padding-top: 10px; border-top: 1px solid #448650; }
@@ -586,3 +595,41 @@ kbd { display: inline-grid; place-items: center; min-width: 26px; min-height: 24
   .crt-product-controls button { min-height: 44px; }
   .crt-deliveries li { flex-wrap: wrap; gap: 4px; }
 }
+.pending-placement-panel {
+  position: fixed;
+  top: 180px;
+  left: 12px;
+  z-index: 35;
+  max-width: min(290px, calc(100vw - 24px));
+  max-height: 35vh;
+  overflow: auto;
+  padding: 12px;
+  border: 3px solid #222;
+  border-radius: 8px;
+  background: #fff4cd;
+  color: #222;
+  box-shadow: 4px 4px 0 #222;
+  pointer-events: auto;
+}
+.pending-placement-panel p { margin: 6px 0; font-size: 12px; }
+.pending-placement-panel button { display: block; width: 100%; margin-top: 6px; padding: 8px; cursor: pointer; }
+
+/* Diorama edge shading stays below the HUD and never captures input. */
+#game-container::after { content: ''; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse at 50% 45%, transparent 62%, rgb(24 36 44 / 13%) 100%); }
+.modal-card { animation: diorama-pop .24s cubic-bezier(.34, 1.56, .64, 1); }
+@keyframes diorama-pop { from { opacity: 0; transform: translateY(8px) scale(.96); } to { opacity: 1; transform: none; } }
+.money-updated { animation: money-tick .28s ease-out; }
+@keyframes money-tick { from { transform: translateY(4px); opacity: .55; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .modal-card, .money-updated { animation: none; } }
+
+/* Nonblocking dynamic event card; the world remains playable around it. */
+.world-event-alert { position: absolute; top: 104px; left: 50%; transform: translateX(-50%); width: min(430px, calc(100vw - 44px)); padding: 13px 15px; background: #fff2b6; color: #14252a; border: 3px solid #15272c; border-radius: 12px; box-shadow: 4px 4px 0 #15272c; pointer-events: auto; display: grid; grid-template-columns: 1fr auto; gap: 7px 12px; font-size: 13px; z-index: 12; }
+.world-event-alert[hidden] { display: none; }
+.world-event-alert--crisis { background: #ffe0cb; }
+.world-event-alert strong { font-size: 17px; line-height: 1.2; }
+.world-event-alert time { font-variant-numeric: tabular-nums; font-weight: 800; }
+.world-event-alert p { grid-column: 1 / -1; margin: 0; line-height: 1.45; }
+.world-event-alert button { grid-column: 1 / -1; justify-self: end; min-height: 34px; border: 2px solid #15272c; border-radius: 7px; background: white; color: #14252a; font-weight: 800; padding: 5px 10px; box-shadow: 2px 2px 0 #15272c; cursor: pointer; }
+.world-event-alert progress { grid-column: 1 / -1; width: 100%; accent-color: #20964d; }
+.world-event-alert button[hidden], .world-event-alert progress[hidden] { display: none; }
+@media (max-width: 720px) { .world-event-alert { top: 142px; right: 12px; left: auto; transform: none; width: min(350px, calc(100vw - 24px)); padding: 10px 12px; font-size: 11px; } .world-event-alert strong { font-size: 14px; } }

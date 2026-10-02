@@ -57,3 +57,17 @@ export function updateCashPileModel(pile, amountAtoms, savedBundleCount) {
   }
   pile.visibleBundleCount = bundleCount;
 }
+
+export function disposeCashPileModel(pile) {
+  if (!pile) return;
+  pile.billGeometry?.dispose();
+  pile.bandGeometry?.dispose();
+  pile.billMaterial?.dispose();
+  pile.bandMaterial?.dispose();
+  for (const bundle of pile.bundles ?? []) {
+    bundle.traverse((object) => {
+      object.geometry?.dispose();
+      object.material?.dispose();
+    });
+  }
+}

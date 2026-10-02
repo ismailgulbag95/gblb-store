@@ -1,0 +1,15 @@
+<!doctype html><html lang="tr"><meta charset="utf-8"><title>İnşaat alanları önizlemesi</title><style>body{margin:0;background:#efe6d1;font:16px system-ui}header{position:absolute;top:12px;left:12px;background:white;padding:12px;border:2px solid #574738;border-radius:10px}button{padding:8px;margin:4px;cursor:pointer}</style><header>İnşaat alanları — bağımsız önizleme<br><button id="ready">İnşaata hazır</button><button id="open">Alanları aç</button><button id="reset">Başa dön</button></header><script type="module">
+import * as THREE from 'three';
+import {ConstructionSites, CONSTRUCTION_SITES} from '/src/environment/ConstructionSites.js';
+import {createInitialState} from '/src/domain/state.js';
+const scene=new THREE.Scene();scene.background=new THREE.Color(0xefe6d1);
+scene.add(new THREE.HemisphereLight(0xffffff,0x997955,2));const light=new THREE.DirectionalLight(0xffffff,3);light.position.set(-10,30,15);scene.add(light);
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(85,35),new THREE.MeshStandardMaterial({color:0xbbcca0}));ground.rotation.x=-Math.PI/2;ground.position.set(-10,-0.02,0);scene.add(ground);
+const camera=new THREE.OrthographicCamera(-40,40,24,-24,0.1,200);camera.position.set(10,55,65);camera.lookAt(-10,0,0);
+const renderer=new THREE.WebGLRenderer({antialias:true});renderer.setSize(innerWidth,innerHeight);document.body.append(renderer.domElement);
+let state=createInitialState();const sites=new ConstructionSites(scene);
+document.querySelector('#ready').onclick=()=>state.availableUpgrades=CONSTRUCTION_SITES.map(site=>site.id);
+document.querySelector('#open').onclick=()=>{for(const site of CONSTRUCTION_SITES){state.completedUpgrades.push(site.id);state.unlocked[site.unlock??site.id]=true;for(const id of site.stations??[])state.layout[id]={x:site.x,z:site.z};}};
+document.querySelector('#reset').onclick=()=>state=createInitialState();
+const clock=new THREE.Clock();renderer.setAnimationLoop(()=>{sites.sync(state,clock.getDelta());renderer.render(scene,camera);});
+</script></html>

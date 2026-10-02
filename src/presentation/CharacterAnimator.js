@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { customerExpression } from './CustomerExpressions.js';
 
 const DOWN = new THREE.Vector3(0, -1, 0);
 const clamp = THREE.MathUtils.clamp;
@@ -22,6 +23,7 @@ export class CharacterAnimator {
     this.held = kind === 'customer' ? actor.inspectMesh : actor.cargo;
     this.home = this.held?.position.clone();
     this.cargoHomes = kind === 'customer' ? actor.cargo.map((mesh) => mesh.position.clone()) : [];
+    this.eyes = actor.head?.children.filter(mesh => mesh.name === 'expressive-eye') ?? [];
     this.target = new THREE.Vector3();
     this.temp = new THREE.Vector3();
   }
@@ -73,6 +75,7 @@ export class CharacterAnimator {
     this.pose(dt, distance);
     if (this.action && dt > 0) this.interact(dt);
     this.syncEquipment();
+    this.syncFace(distance);
   }
 
   move(dt) {
@@ -328,11 +331,14 @@ export class CharacterAnimator {
   syncCargo() {
     const a = this.actor;
     if (this.kind === 'customer') {
+      for (const bag of a.shoppingBags ?? []) bag.visible = Boolean(this.context.paid);
+      if (a.cartMesh) a.cartMesh.visible = !this.context.paid;
+      if (a.basketMesh) a.basketMesh.visible = !this.context.paid;
       a.cargo.forEach((mesh, index) => {
         const item = this.entity.basket?.[index];
         const inFlight = [this.action, ...this.pending].some((cue) =>
           cue?.type === 'shop' && cue.basketIndex === index && (cue.elapsed ?? 0) < 1.95);
-        mesh.visible = Boolean(item) && !inFlight;
+        mesh.visible = Boolean(item) && !inFlight && !this.context.paid;
         if (item) { mesh.geometry = this.factory.getItemGeometry(item); mesh.material = this.factory.getItemMaterial(item); }
       });
     } else if (!this.action) {
@@ -366,7 +372,10 @@ export class CharacterAnimator {
         this.reach(i, grip);
       }
     }
-    if (a.cartMesh) {
+    if (a.cartMesh) a.cartMesh.visible = !this.context.paid;
+    if (a.basketMesh) a.basketMesh.visible = !this.context.paid;
+    for (const bag of a.shoppingBags ?? []) bag.visible = Boolean(this.context.paid);
+    if (a.cartMesh && !this.context.paid) {
       for (let i = 0; i < 2; i++) {
         if (this.action && i === 0) continue;
         const grip = a.cartMesh.localToWorld(new THREE.Vector3(-0.31, 0.78, i ? -0.2 : 0.2));
@@ -379,7 +388,7 @@ export class CharacterAnimator {
       const parentRotation = tray.parent.getWorldQuaternion(new THREE.Quaternion());
       tray.quaternion.copy(parentRotation.invert()).multiply(a.group.getWorldQuaternion(new THREE.Quaternion()));
     }
-    if (a.basketMesh) {
+    if (a.basketMesh && !this.context.paid) {
       a.group.updateMatrixWorld(true);
       const grip = a.wrists[1].getWorldPosition(this.temp);
       grip.y -= 0.29 * a.group.scale.y;
@@ -389,6 +398,30 @@ export class CharacterAnimator {
         mesh.position.copy(a.basketMesh.position).add(new THREE.Vector3(0, 0.06 + index * 0.07, 0));
         this.cargoHomes[index].copy(mesh.position);
       });
+    }
+  }
+
+  syncFace(distance) {
+    const expression = customerExpression(this.entity, this.action);
+    const blink = !this.context.reducedMotion && ((this.clock + this.offset) % (4 + this.offset % 2)) < 0.12;
+    for (const eye of this.eyes) {
+      eye.scale.y = blink ? 0.08 : expression === 'happy' ? 0.45 : 1;
+      eye.rotation.z = expression === 'happy' ? eye.userData.side * -0.28 : 0;
+    }
+    const shadow = this.actor.group.contactShadow;
+    if (shadow) {
+      shadow.position.y = 0.015 - this.actor.group.position.y / this.actor.group.scale.y;
+      const pulse = distance > 0 ? 1 + Math.sin(this.actor.walkCycle * 2) * 0.035 : 1;
+      shadow.scale.x = shadow.userData.baseWidth * pulse;
+    }
+    if (!this.action && distance === 0 && expression === 'waiting') {
+      this.actor.arms[0].rotation.x = -0.7;
+      this.actor.elbows[0].rotation.x = -0.75;
+      this.actor.head.rotation.x = 0.2;
+    }
+    if (!this.action && distance === 0 && this.kind === 'worker' && this.entity.type === 'cashier' && !this.context.paying && !this.entity.break) {
+      this.actor.arms[1].rotation.x = -0.3 + Math.sin(this.clock * 1.5) * 0.12;
+      this.actor.head.rotation.y = Math.sin(this.clock * 0.8) * 0.12;
     }
   }
 
